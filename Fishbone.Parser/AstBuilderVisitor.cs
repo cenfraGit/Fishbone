@@ -15,6 +15,16 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         return new BlockNode(statements);
     }
 
+    public override AstNode VisitBlockStat(FishboneParser.BlockStatContext context)
+    {
+        var statements = new List<AstNode>();
+
+        foreach (var statement in context.statement())
+            statements.Add(Visit(statement));
+
+        return new BlockNode(statements);
+    }
+
     public override AstNode VisitStatement(FishboneParser.StatementContext context)
     {
         return Visit(context.GetChild(0));
