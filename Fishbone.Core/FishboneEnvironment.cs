@@ -3,6 +3,7 @@ namespace Fishbone.Core;
 public class FishboneEnvironment
 {
     private readonly Dictionary<string, object> _values = [];
+    public Dictionary<string, object> Values { get => _values; }
 
     public FishboneEnvironment()
     {
