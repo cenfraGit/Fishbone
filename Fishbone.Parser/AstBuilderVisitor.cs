@@ -51,4 +51,19 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
     {
         return new LiteralNode(int.Parse(context.INT().GetText()));
     }
+
+    public override AstNode VisitFloatExpr(FishboneParser.FloatExprContext context)
+    {
+        return new LiteralNode(double.Parse(context.FLOAT().GetText()));
+    }
+
+    public override AstNode VisitStringExpr(FishboneParser.StringExprContext context)
+    {
+        return new LiteralNode(context.STRING().GetText());
+    }
+
+    public override AstNode VisitBoolExpr(FishboneParser.BoolExprContext context)
+    {
+        return (context.TRUE() is not null) ? new LiteralNode(true) : new LiteralNode(false);
+    }
 }
