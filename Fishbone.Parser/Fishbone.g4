@@ -10,6 +10,7 @@ importStat : IMPORT STRING SEMI ;
 
 statement
     : declarationStat SEMI
+    | assignmentStat SEMI
     | ID (COMMA ID)* ASSIGN expr SEMI
     | functionCallStat SEMI
     | functionDeclarationStat
