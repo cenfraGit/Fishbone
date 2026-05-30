@@ -17,6 +17,8 @@ public class FishboneInterpreter
             AssignmentNode assignment => EvaluateAssignment(env, assignment),
             UnaryOpNode unary => EvaluateUnary(env, unary),
             BinaryOpNode binary => EvaluateBinary(env, binary),
+            IfNode ifNode => EvaluateIf(env, ifNode),
+            WhileNode whileNode => EvaluateWhile(env, whileNode),
             BlockNode block => EvaluateBlock(env, block),
             _ => throw new NotImplementedException($"Execution for {node.GetType().Name} not yet implemented.")
         };
@@ -72,6 +74,26 @@ public class FishboneInterpreter
             ">=" => left >= right,
             _ => throw new Exception($"Unknown binary operator: {node.Operator}")
         };
+    }
+
+    public object EvaluateIf(FishboneEnvironment env, IfNode node)
+    {
+        if (IsTruthy(Evaluate(env, node.Condition)))
+            return Evaluate(env, node.ThenBranch);
+        else if (node.ElseBranch != null)
+            return Evaluate(env, node.ElseBranch);
+
+        return null!;
+    }
+
+    public object EvaluateWhile(FishboneEnvironment env, WhileNode node)
+    {
+        object lastValue = null!;
+
+        while (IsTruthy(Evaluate(env, node.Condition)))
+            lastValue = Evaluate(env, node.Body);
+
+        return lastValue;
     }
 
     public object EvaluateBlock(FishboneEnvironment env, BlockNode node)

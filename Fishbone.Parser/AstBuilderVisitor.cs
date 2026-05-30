@@ -49,6 +49,26 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         return new BinaryOpNode(op, left, right);
     }
 
+    public override AstNode VisitIfStat(FishboneParser.IfStatContext context)
+    {
+        var condition = Visit(context.expr(0));
+        var thenBranch = Visit(context.blockStat(0)); // first block
+        AstNode? elseBranch = null;
+
+        // todo: handle chained else ifs
+        if (context.blockStat().Length > 1)
+            elseBranch = Visit(context.blockStat(context.blockStat().Length - 1)); // last block (else)
+
+        return new IfNode(condition, thenBranch, elseBranch);
+    }
+
+    public override AstNode VisitWhileStat(FishboneParser.WhileStatContext context)
+    {
+        var condition = Visit(context.expr());
+        var body = Visit(context.blockStat());
+        return new WhileNode(condition, body);
+    }
+
     public override AstNode VisitIdExpr(FishboneParser.IdExprContext context)
     {
         return new IdentifierNode(context.ID().GetText());
