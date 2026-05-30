@@ -58,7 +58,7 @@ public class FishboneInterpreter
         return node.Operator switch
         {
             "-" => -right,
-            "!" => !IsTruthy(right),
+            "not" => !IsTruthy(right),
             _ => throw new Exception($"Unknown unary operator: {node.Operator}")
         };
     }
