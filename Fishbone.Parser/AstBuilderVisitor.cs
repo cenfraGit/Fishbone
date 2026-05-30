@@ -34,7 +34,7 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         AstNode left = Visit(context.expr(0));
         AstNode right = Visit(context.expr(1));
         string op = context.GetChild(1).GetText();
-        return new BinaryOpCode(op, left, right);
+        return new BinaryOpNode(op, left, right);
     }
 
     public override AstNode VisitIdExpr(FishboneParser.IdExprContext context)
