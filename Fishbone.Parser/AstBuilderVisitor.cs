@@ -34,7 +34,14 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         return new AssignmentNode(names, value);
     }
 
-    public override AstNode VisitMDASExpr(FishboneParser.MDASExprContext context)
+    public override AstNode VisitUnaryExpr(FishboneParser.UnaryExprContext context)
+    {
+        string op = context.GetChild(0).GetText();
+        AstNode right = Visit(context.expr());
+        return new UnaryOpNode(op, right);
+    }
+
+    public override AstNode VisitBinaryExpr(FishboneParser.BinaryExprContext context)
     {
         AstNode left = Visit(context.expr(0));
         AstNode right = Visit(context.expr(1));

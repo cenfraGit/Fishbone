@@ -38,11 +38,12 @@ returnStat : RETURN (expr (COMMA expr)*)? ;
 expr
     : '(' expr ')'                    #ParenthesesExpr
     | functionCallStat                #FunctionCallExpr
-    | (MINUS | NOT) expr              #UnaryExpr
-    | expr (PLUS|MINUS|MUL|DIV) expr  #MDASExpr
-    | expr (EQ|NEQ|GE|LE|GT|LT) expr  #ComparisonExpr
+    | (MINUS|NOT) expr                #UnaryExpr
+    | expr (MUL|DIV) expr             #BinaryExpr
+    | expr (PLUS|MINUS) expr          #BinaryExpr
+    | expr (GE|LE|GT|LT) expr         #BinaryExpr
+    | expr (EQ|NEQ) expr              #BinaryExpr
     | expr (AND|OR|XOR) expr          #BoolOperatorExpr
-    | NOT expr                        #NotExpr
     | ID                              #IdExpr
     | INT                             #IntExpr
     | FLOAT                           #FloatExpr

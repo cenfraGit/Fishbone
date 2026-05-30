@@ -15,6 +15,7 @@ public class FishboneInterpreter
             IdentifierNode identifier => env.GetValue(identifier.Name),
             DeclarationNode declaration => EvaluateDeclaration(env, declaration),
             AssignmentNode assignment => EvaluateAssignment(env, assignment),
+            UnaryOpNode unary => EvaluateUnary(env, unary),
             BinaryOpNode binary => EvaluateBinary(env, binary),
             BlockNode block => EvaluateBlock(env, block),
             _ => throw new NotImplementedException($"Execution for {node.GetType().Name} not yet implemented.")
@@ -39,6 +40,18 @@ public class FishboneInterpreter
         return value;
     }
 
+    public object EvaluateUnary(FishboneEnvironment env, UnaryOpNode node)
+    {
+        dynamic right = Evaluate(env, node.Right);
+
+        return node.Operator switch
+        {
+            "-" => -right,
+            "!" => !IsTruthy(right),
+            _ => throw new Exception($"Unknown unary operator: {node.Operator}")
+        };
+    }
+
     public object EvaluateBinary(FishboneEnvironment env, BinaryOpNode node)
     {
         dynamic left = Evaluate(env, node.Left);
@@ -50,7 +63,14 @@ public class FishboneInterpreter
             "-" => left - right,
             "*" => left * right,
             "/" => left / right,
-            _ => throw new Exception($"Unknown operator: {node.Operator}")
+            // comparison
+            "==" => left == right,
+            "!=" => left != right,
+            "<"  => left < right,
+            ">"  => left > right,
+            "<=" => left <= right,
+            ">=" => left >= right,
+            _ => throw new Exception($"Unknown binary operator: {node.Operator}")
         };
     }
 
@@ -63,4 +83,14 @@ public class FishboneInterpreter
 
         return lastValue;
     }
+
+    private bool IsTruthy(object? value) => value switch
+    {
+        null => false,
+        bool b => b,
+        int i => i != 0,
+        double d => d != 0.0,
+        string s => !string.IsNullOrEmpty(s),
+        _ => true
+    };
 }
