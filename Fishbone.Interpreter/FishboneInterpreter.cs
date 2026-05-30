@@ -11,6 +11,7 @@ public class FishboneInterpreter
 
         return node switch
         {
+            ProgramNode programNode => EvaluateProgram(env, programNode),
             LiteralNode literal => literal.Value,
             IdentifierNode identifier => env.GetValue(identifier.Name),
             DeclarationNode declaration => EvaluateDeclaration(env, declaration),
@@ -22,6 +23,14 @@ public class FishboneInterpreter
             BlockNode block => EvaluateBlock(env, block),
             _ => throw new NotImplementedException($"Execution for {node.GetType().Name} not yet implemented.")
         };
+    }
+
+    public object EvaluateProgram(FishboneEnvironment env, ProgramNode node)
+    {
+        object lastValue = null!;
+        foreach (var statement in node.Statements)
+            lastValue = Evaluate(env, statement);
+        return lastValue;
     }
 
     public object EvaluateDeclaration(FishboneEnvironment env, DeclarationNode node)
@@ -98,10 +107,12 @@ public class FishboneInterpreter
 
     public object EvaluateBlock(FishboneEnvironment env, BlockNode node)
     {
+        var blockEnv = new FishboneEnvironment(env);
+
         object lastValue = null!;
 
         foreach (var statement in node.Statements)
-            lastValue = Evaluate(env, statement);
+            lastValue = Evaluate(blockEnv, statement);
 
         return lastValue;
     }
