@@ -30,6 +30,12 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         return Visit(context.GetChild(0));
     }
 
+    public override AstNode VisitParenthesesExpr(FishboneParser.ParenthesesExprContext context)
+    {
+        var innerExpr = Visit(context.expr());
+        return innerExpr;
+    }
+
     public override AstNode VisitDeclarationStat(FishboneParser.DeclarationStatContext context)
     {
         string varName = context.ID().GetText();
