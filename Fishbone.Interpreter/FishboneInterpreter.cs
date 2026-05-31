@@ -35,20 +35,45 @@ public class FishboneInterpreter
 
     private object EvaluateDeclaration(FishboneEnvironment env, DeclarationNode node)
     {
-        object value = Evaluate(env, node.Value);
-        env.Declare(node.Name, value);
-        return value;
+        // eval right side
+        object rawValue = Evaluate(env, node.Value);
+
+        // right side is always handled as list
+        List<object> valueList = rawValue is List<object> list
+            ? list
+            : new List<object> { rawValue };
+
+        // deconstruct and assign
+        for (int i = 0; i < node.Names.Count; i++)
+        {
+            string name = node.Names[i];
+            object elementValue = i < valueList.Count ? valueList[i] : null!;
+
+            env.Declare(name, elementValue);
+        }
+
+        return rawValue;
     }
 
     private object EvaluateAssignment(FishboneEnvironment env, AssignmentNode node)
     {
-        object value = Evaluate(env, node.Value);
+        // eval right side
+        object rawValue = Evaluate(env, node.Value);
 
-        // todo: multiple assignments
-        foreach (var name in node.Names)
-            env.Assign(name, value);
+        // right side is always handled as list
+        List<object> valueList = rawValue is List<object> list
+            ? list
+            : new List<object> { rawValue };
 
-        return value;
+        // deconstruct and assign
+        for (int i = 0; i < node.Names.Count; i++)
+        {
+            string name = node.Names[i];
+            object elementValue = i < valueList.Count ? valueList[i] : null!;
+            env.Assign(name, elementValue);
+    }
+
+        return rawValue;
     }
 
     private object EvaluateUnary(FishboneEnvironment env, UnaryOpNode node)

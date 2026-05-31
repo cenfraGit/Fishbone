@@ -52,6 +52,27 @@ public record BlockNode(IReadOnlyList<AstNode> Statements) : AstNode
     }
 }
 
+public record DeclarationNode(IReadOnlyList<string> Names, AstNode Value) : AstNode
+{
+    public virtual bool Equals(DeclarationNode? other)
+    {
+        if (other is null) return false;
+        if (ReferenceEquals(this, other)) return true;
+        return Names.SequenceEqual(other.Names) && Equals(Value, other.Value);
+}
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        foreach (var name in Names)
+        {
+            hash.Add(name);
+        }
+        hash.Add(Value);
+        return hash.ToHashCode();
+    }
+}
+
 public record AssignmentNode(IReadOnlyList<string> Names, AstNode Value) : AstNode
 {
     public virtual bool Equals(AssignmentNode? other)

@@ -23,7 +23,7 @@ statement
 
 blockStat : '{' statement* '}' ;
 
-declarationStat : 'let' ID ASSIGN expr ;
+declarationStat : 'let' ID (COMMA ID)* ASSIGN expr ;
 assignmentStat : ID (COMMA ID)* ASSIGN expr ;
 
 ifStat : IF '(' expr ')' blockStat (ELSEIF '(' expr ')' blockStat)* (ELSE blockStat)? ;

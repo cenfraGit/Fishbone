@@ -38,9 +38,9 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
 
     public override AstNode VisitDeclarationStat(FishboneParser.DeclarationStatContext context)
     {
-        string varName = context.ID().GetText();
-        AstNode varValue = Visit(context.expr());
-        return new DeclarationNode(varName, varValue);
+        var names = context.ID().Select(id => id.GetText()).ToList();
+        AstNode value = Visit(context.expr());
+        return new DeclarationNode(names, value);
     }
 
     public override AstNode VisitAssignmentStat(FishboneParser.AssignmentStatContext context)
