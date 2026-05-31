@@ -19,6 +19,8 @@ statement
     | foreachStat
     | blockStat
     | returnStat SEMI
+    | breakStat SEMI
+    | continueStat SEMI
     ;
 
 blockStat : '{' statement* '}' ;
@@ -34,6 +36,8 @@ foreachStat : FOREACH '(' ID IN expr ')' blockStat ;
 functionCallStat : ID '(' (expr (COMMA expr)*)? ')' ;
 functionDeclarationStat : FUNC ID '(' (ID (COMMA ID)*)? ')' blockStat ; // return?
 returnStat : RETURN (expr (COMMA expr)*)? ;
+breakStat : 'break' ;
+continueStat : 'continue' ;
 
 expr
     : '(' expr ')'                    #ParenthesesExpr
