@@ -25,7 +25,7 @@ public class FishboneInterpreter
         };
     }
 
-    public object EvaluateProgram(FishboneEnvironment env, ProgramNode node)
+    private object EvaluateProgram(FishboneEnvironment env, ProgramNode node)
     {
         object lastValue = null!;
         foreach (var statement in node.Statements)
@@ -33,14 +33,14 @@ public class FishboneInterpreter
         return lastValue;
     }
 
-    public object EvaluateDeclaration(FishboneEnvironment env, DeclarationNode node)
+    private object EvaluateDeclaration(FishboneEnvironment env, DeclarationNode node)
     {
         object value = Evaluate(env, node.Value);
         env.Declare(node.Name, value);
         return value;
     }
 
-    public object EvaluateAssignment(FishboneEnvironment env, AssignmentNode node)
+    private object EvaluateAssignment(FishboneEnvironment env, AssignmentNode node)
     {
         object value = Evaluate(env, node.Value);
 
@@ -51,7 +51,7 @@ public class FishboneInterpreter
         return value;
     }
 
-    public object EvaluateUnary(FishboneEnvironment env, UnaryOpNode node)
+    private object EvaluateUnary(FishboneEnvironment env, UnaryOpNode node)
     {
         dynamic right = Evaluate(env, node.Right);
 
@@ -63,7 +63,7 @@ public class FishboneInterpreter
         };
     }
 
-    public object EvaluateBinary(FishboneEnvironment env, BinaryOpNode node)
+    private object EvaluateBinary(FishboneEnvironment env, BinaryOpNode node)
     {
         dynamic left = Evaluate(env, node.Left);
         dynamic right = Evaluate(env, node.Right);
@@ -85,7 +85,7 @@ public class FishboneInterpreter
         };
     }
 
-    public object EvaluateIf(FishboneEnvironment env, IfNode node)
+    private object EvaluateIf(FishboneEnvironment env, IfNode node)
     {
         if (IsTruthy(Evaluate(env, node.Condition)))
             return Evaluate(env, node.ThenBranch);
@@ -95,7 +95,7 @@ public class FishboneInterpreter
         return null!;
     }
 
-    public object EvaluateWhile(FishboneEnvironment env, WhileNode node)
+    private object EvaluateWhile(FishboneEnvironment env, WhileNode node)
     {
         object lastValue = null!;
 
@@ -105,7 +105,7 @@ public class FishboneInterpreter
         return lastValue;
     }
 
-    public object EvaluateBlock(FishboneEnvironment env, BlockNode node)
+    private object EvaluateBlock(FishboneEnvironment env, BlockNode node)
     {
         var blockEnv = new FishboneEnvironment(env);
 
