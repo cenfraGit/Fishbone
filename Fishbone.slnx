@@ -1,5 +1,7 @@
 <Solution>
+  <Project Path="Fishbone.Core.Tests/Fishbone.Core.Tests.csproj" />
   <Project Path="Fishbone.Core/Fishbone.Core.csproj" />
+  <Project Path="Fishbone.Engine.Tests/Fishbone.Engine.Tests.csproj" />
   <Project Path="Fishbone.Engine/Fishbone.Engine.csproj" />
   <Project Path="Fishbone.Interpreter.Tests/Fishbone.Interpreter.Tests.csproj" />
   <Project Path="Fishbone.Interpreter/Fishbone.Interpreter.csproj" />
