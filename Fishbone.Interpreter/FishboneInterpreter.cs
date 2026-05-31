@@ -21,6 +21,9 @@ public class FishboneInterpreter
             IfNode ifNode => EvaluateIf(env, ifNode),
             WhileNode whileNode => EvaluateWhile(env, whileNode),
             BlockNode block => EvaluateBlock(env, block),
+            ReturnNode returnNode => EvaluateReturn(env, returnNode),
+            BreakNode breakNode => EvaluateBreak(env, breakNode),
+            ContinueNode continueNode => EvaluateContinue(env, continueNode),
             _ => throw new NotImplementedException($"Execution for {node.GetType().Name} not yet implemented.")
         };
     }
@@ -143,6 +146,29 @@ public class FishboneInterpreter
     }
 
     private bool IsTruthy(object? value) => value switch
+    internal object EvaluateReturn(FishboneEnvironment env, ReturnNode node)
+    {
+        // return;
+        if (node.ReturnValues.Count == 0)
+            throw new ReturnException(null!);
+
+        // return expr, expr;
+        var returnValues = new List<object>();
+        for (int i = 0; i < node.ReturnValues.Count; i++)
+            returnValues.Add(Evaluate(env, node.ReturnValues[i]));
+
+        throw new ReturnException(returnValues);
+    }
+
+    internal object EvaluateBreak(FishboneEnvironment env, BreakNode node)
+    {
+        throw new BreakException();
+    }
+
+    internal object EvaluateContinue(FishboneEnvironment env, ContinueNode node)
+    {
+        throw new ContinueException();
+    }
     {
         null => false,
         bool b => b,
