@@ -10,6 +10,11 @@ public record WhileNode(AstNode Condition, AstNode Body) : AstNode;
 public record IdentifierNode(string Name) : AstNode;
 public record LiteralNode(object Value) : AstNode;
 
+
+public record ReturnNode(List<AstNode> ReturnValues) : AstNode;
+public record BreakNode() : AstNode;
+public record ContinueNode() : AstNode;
+
 public record ProgramNode(IReadOnlyList<AstNode> Statements) : AstNode
 {
     public virtual bool Equals(ProgramNode? other)
