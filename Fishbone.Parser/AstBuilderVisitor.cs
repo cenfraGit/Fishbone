@@ -1,5 +1,7 @@
 using Fishbone.Core;
 using Antlr4.Runtime;
+using Antlr4.Runtime.Misc;
+using System.Collections.Immutable;
 
 namespace Fishbone.Parser;
 
@@ -25,6 +27,35 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         return new BlockNode(statements);
     }
 
+    public override AstNode VisitFunctionDefinitionStat(FishboneParser.FunctionDefinitionStatContext context)
+    {
+        var funcName = context.ID(0).GetText();
+        var block = Visit(context.blockStat());
+
+        // get parameters
+        var funcParams = new List<string>();
+        for (int i = 1; i < context.ID().Length; i++)
+            funcParams.Add(context.ID(i).GetText());
+
+        return new FunctionDefinitionNode(funcName, funcParams.ToImmutableArray(), (BlockNode)block);
+    }
+
+    public override AstNode VisitFunctionCallStat(FishboneParser.FunctionCallStatContext context)
+    {
+        var funcName = context.ID().GetText();
+        var funcArgs = new List<AstNode>();
+
+        for (int i = 0; i < context.expr().Length; i++)
+            funcArgs.Add(Visit(context.expr(i)));
+
+        return new FunctionCallNode(funcName, funcArgs.ToImmutableArray());
+    }
+
+    public override AstNode VisitFunctionCallExpr(FishboneParser.FunctionCallExprContext context)
+    {
+        return Visit(context.functionCallStat());
+    }
+
     public override AstNode VisitReturnStat(FishboneParser.ReturnStatContext context)
     {
         var values = new List<AstNode>();
@@ -42,6 +73,7 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
     {
         return new ContinueNode();
     }
+
     public override AstNode VisitStatement(FishboneParser.StatementContext context)
     {
         return Visit(context.GetChild(0));
