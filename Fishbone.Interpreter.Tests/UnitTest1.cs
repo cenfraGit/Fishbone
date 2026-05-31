@@ -121,4 +121,112 @@ while (outer < 3)
         Assert.Equal(12, env.GetValue("totalCycles"));
         Assert.Equal(3, env.GetValue("outer"));
     }
+
+    [Fact]
+    public void Interpreter_SimpleAssignment_ReturnsCorrectAstTest()
+    {
+        string code = @"
+func getCoordinates() {
+    let lat = 20;
+    let lng = 100;
+    return lat, lng;
+}
+
+let x, y = getCoordinates();
+
+let newX, newY = 0, 0;
+newX, newY = getCoordinates();
+";
+
+        var ast = ASTParser.Parse(code);
+
+        var env = new FishboneEnvironment();
+        var interpreter = new FishboneInterpreter();
+
+        interpreter.Evaluate(env, ast);
+
+        Assert.Equal(20, env.GetValue("x"));
+        Assert.Equal(100, env.GetValue("y"));
+
+        Assert.Equal(20, env.GetValue("newX"));
+        Assert.Equal(100, env.GetValue("newY"));
+    }
+
+    [Fact]
+    public void Interpreter_FunctionParameters_EvaluatesAndAssignsCorrectly()
+    {
+        string code = @"
+func calculatePower(base, multiplier) {
+    let result = base * multiplier;
+    result = result + 5; // local reassignment
+    return result;
+}
+
+let finalAnswer = calculatePower(10, 3);
+";
+
+        var ast = ASTParser.Parse(code);
+        var env = new FishboneEnvironment();
+        var interpreter = new FishboneInterpreter();
+
+        interpreter.Evaluate(env, ast);
+
+        Assert.Equal(35, env.GetValue("finalAnswer"));
+        Assert.Throws<Exception>(() => env.GetValue("result"));
+    }
+
+    [Fact]
+    public void Interpreter_FunctionClosure_CanMutateOuterScope()
+    {
+        string code = @"
+let counter = 0;
+
+func increment() {
+    counter = counter + 1;
+    return counter;
+}
+
+let firstCall = increment();
+let secondCall = increment();
+";
+
+        var ast = ASTParser.Parse(code);
+        var env = new FishboneEnvironment();
+        var interpreter = new FishboneInterpreter();
+
+        interpreter.Evaluate(env, ast);
+
+        Assert.Equal(1, env.GetValue("firstCall"));
+        Assert.Equal(2, env.GetValue("secondCall"));
+        Assert.Equal(2, env.GetValue("counter"));
+    }
+
+    [Fact]
+    public void Interpreter_FunctionReturn_EscapesNestedLoopAndIfBlock()
+    {
+        string code = @"
+func searchTarget(target) {
+    let i = 0;
+    while (i < 10) {
+        if (i == target) {
+            return i * 100;
+        }
+        i = i + 1;
+    }
+    return -1;
+}
+
+let successResult = searchTarget(4);
+let failResult = searchTarget(15);
+";
+
+        var ast = ASTParser.Parse(code);
+        var env = new FishboneEnvironment();
+        var interpreter = new FishboneInterpreter();
+
+        interpreter.Evaluate(env, ast);
+
+        Assert.Equal(400, env.GetValue("successResult"));
+        Assert.Equal(-1, env.GetValue("failResult"));
+    }
 }
