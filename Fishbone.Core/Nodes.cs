@@ -1,8 +1,9 @@
+using System.Collections.Immutable;
+
 namespace Fishbone.Core;
 
 public abstract record AstNode;
 
-public record DeclarationNode(string Name, AstNode Value) : AstNode;
 public record UnaryOpNode(string Operator, AstNode Right) : AstNode;
 public record BinaryOpNode(string Operator, AstNode Left, AstNode Right) : AstNode;
 public record IfNode(AstNode Condition, AstNode ThenBranch, AstNode? ElseBranch) : AstNode;
@@ -64,7 +65,7 @@ public record DeclarationNode(IReadOnlyList<string> Names, AstNode Value) : AstN
         if (other is null) return false;
         if (ReferenceEquals(this, other)) return true;
         return Names.SequenceEqual(other.Names) && Equals(Value, other.Value);
-}
+    }
 
     public override int GetHashCode()
     {
@@ -98,3 +99,14 @@ public record AssignmentNode(IReadOnlyList<string> Names, AstNode Value) : AstNo
         return hash.ToHashCode();
     }
 }
+
+public record FunctionDefinitionNode(
+    string Name,
+    ImmutableArray<string> Parameters,
+    BlockNode Body
+) : AstNode;
+
+public record FunctionCallNode(
+    string Name,
+    ImmutableArray<AstNode> Arguments
+) : AstNode;
