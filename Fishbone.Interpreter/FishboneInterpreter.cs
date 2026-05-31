@@ -130,7 +130,20 @@ public class FishboneInterpreter
         object lastValue = null!;
 
         while (IsTruthy(Evaluate(env, node.Condition)))
-            lastValue = Evaluate(env, node.Body);
+        {
+            try
+            {
+                lastValue = Evaluate(env, node.Body);
+            }
+            catch (ContinueException)
+            {
+                continue;
+            }
+            catch (BreakException)
+            {
+                break;
+            }
+        }
 
         return lastValue;
     }
