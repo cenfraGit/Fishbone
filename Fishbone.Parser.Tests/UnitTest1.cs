@@ -1,5 +1,4 @@
 ﻿using Fishbone.Core;
-using Fishbone.Parser;
 
 namespace Fishbone.Parser.Tests;
 
@@ -14,7 +13,7 @@ public class UnitTest1
 
         var expectedAst = new ProgramNode(new List<AstNode>
         {
-            new DeclarationNode("x", new LiteralNode(10))
+            new DeclarationNode(["x"], new LiteralNode(10))
         });
 
         Console.WriteLine(expectedAst.ToString());
@@ -34,7 +33,7 @@ x = x + 3 * 2;
         var expectedAst = new ProgramNode(new List<AstNode>
         {
             // let x = 5;
-            new DeclarationNode("x", new LiteralNode(5)),
+            new DeclarationNode(["x"], new LiteralNode(5)),
 
             // x = x + 3 * 2;
             new AssignmentNode(
@@ -63,7 +62,7 @@ x = x + 3 * 2;
         var expectedAst = new ProgramNode(new List<AstNode>
         {
             new DeclarationNode(
-                "isLessThan",
+                ["isLessThan"],
                 new BinaryOpNode(
                     ">",
                     new IdentifierNode("x"),
@@ -85,7 +84,7 @@ x = x + 3 * 2;
         var expectedAst = new ProgramNode(new List<AstNode>
         {
             new DeclarationNode(
-                "total",
+                ["total"],
                 new BinaryOpNode(
                     "*",
                     new BinaryOpNode("+", new IdentifierNode("x"), new IdentifierNode("y")),
