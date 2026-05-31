@@ -25,6 +25,23 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         return new BlockNode(statements);
     }
 
+    public override AstNode VisitReturnStat(FishboneParser.ReturnStatContext context)
+    {
+        var values = new List<AstNode>();
+        for (int i = 0; i < context.expr().Length; i++)
+            values.Add(Visit(context.expr(i)));
+        return new ReturnNode(values);
+    }
+
+    public override AstNode VisitBreakStat(FishboneParser.BreakStatContext context)
+    {
+        return new BreakNode();
+    }
+
+    public override AstNode VisitContinueStat(FishboneParser.ContinueStatContext context)
+    {
+        return new ContinueNode();
+    }
     public override AstNode VisitStatement(FishboneParser.StatementContext context)
     {
         return Visit(context.GetChild(0));
