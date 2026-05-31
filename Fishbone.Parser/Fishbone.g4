@@ -13,7 +13,7 @@ statement
     | assignmentStat SEMI
     | ID (COMMA ID)* ASSIGN expr SEMI
     | functionCallStat SEMI
-    | functionDeclarationStat
+    | functionDefinitionStat
     | ifStat
     | whileStat
     | foreachStat
@@ -34,7 +34,7 @@ whileStat : WHILE '(' expr ')' blockStat ;
 foreachStat : FOREACH '(' ID IN expr ')' blockStat ;
 
 functionCallStat : ID '(' (expr (COMMA expr)*)? ')' ;
-functionDeclarationStat : FUNC ID '(' (ID (COMMA ID)*)? ')' blockStat ; // return?
+functionDefinitionStat : FUNC ID '(' (ID (COMMA ID)*)? ')' blockStat ;
 returnStat : RETURN (expr (COMMA expr)*)? ;
 breakStat : 'break' ;
 continueStat : 'continue' ;
