@@ -118,11 +118,19 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
     {
         var condition = Visit(context.expr(0));
         var thenBranch = Visit(context.blockStat(0)); // first block
-        AstNode? elseBranch = null;
 
-        // todo: handle chained else ifs
-        if (context.blockStat().Length > 1)
-            elseBranch = Visit(context.blockStat(context.blockStat().Length - 1)); // last block (else)
+        var elseIfCount = context.ELSEIF().Length;
+        var hasElse = context.ELSE() is not null;
+        AstNode? elseBranch = hasElse
+            ? Visit(context.blockStat(context.blockStat().Length - 1))
+            : null;
+
+        for (int i = elseIfCount - 1; i >= 0; i--)
+        {
+            var elseIfCondition = Visit(context.expr(i + 1));
+            var elseIfBranch = Visit(context.blockStat(i + 1));
+            elseBranch = new IfNode(elseIfCondition, elseIfBranch, elseBranch);
+        }
 
         return new IfNode(condition, thenBranch, elseBranch);
     }
