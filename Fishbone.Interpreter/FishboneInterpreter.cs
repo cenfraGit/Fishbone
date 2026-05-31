@@ -167,6 +167,72 @@ public class FishboneInterpreter
         return null!;
     }
 
+    internal object EvaluateFunctionCall(FishboneEnvironment env, FunctionCallNode node)
+    {
+        object callee = env.GetValue(node.Name);
+
+        // eval arguments
+        var evaluatedArgs = new List<object>();
+        foreach (var argNode in node.Arguments)
+            evaluatedArgs.Add(Evaluate(env, argNode));
+
+        // check if c# delegate
+        if (callee is Delegate csharpDelegate)
+        {
+            var methodParameters = csharpDelegate.Method.GetParameters();
+
+            // check arg count
+            if (evaluatedArgs.Count != methodParameters.Length)
+                throw new Exception($"Expected {methodParameters.Length} args but got {evaluatedArgs.Count}.");
+
+            var marshalledArgs = new object[evaluatedArgs.Count];
+            for (int i = 0; i < evaluatedArgs.Count; i++)
+            {
+                object rawArg = evaluatedArgs[i];
+                Type targetType = methodParameters[i].ParameterType;
+
+                if (rawArg == null)
+                {
+                    marshalledArgs[i] = targetType.IsValueType ? Activator.CreateInstance(targetType)! : null!;
+                    continue;
+                }
+
+                // convert primitives
+                if (targetType.IsPrimitive && rawArg.GetType().IsPrimitive)
+                {
+                    marshalledArgs[i] = Convert.ChangeType(rawArg, targetType);
+                }
+                else
+                {
+                    marshalledArgs[i] = rawArg;
+                }
+            }
+
+            try
+            {
+                // execute with new types
+                return csharpDelegate.DynamicInvoke(marshalledArgs)!;
+            }
+            catch (System.Reflection.TargetInvocationException ex)
+            {
+                throw ex.InnerException ?? ex;
+            }
+        }
+
+        // check if fishbone callable
+        if (callee is ICallable fishboneFunction)
+        {
+            // check arg count
+            if (evaluatedArgs.Count != fishboneFunction.Arity)
+                throw new Exception($"Expected {fishboneFunction.Arity} args but got {evaluatedArgs.Count}.");
+
+            // execute
+            return fishboneFunction.Call(this, evaluatedArgs);
+        }
+
+        throw new Exception($"Symbol \"{node.Name}\" is not a callable target.");
+    }
+
     internal object EvaluateReturn(FishboneEnvironment env, ReturnNode node)
     {
         // return;
@@ -189,27 +255,6 @@ public class FishboneInterpreter
     internal object EvaluateContinue(FishboneEnvironment env, ContinueNode node)
     {
         throw new ContinueException();
-    }
-
-    internal object EvaluateFunctionCall(FishboneEnvironment env, FunctionCallNode node)
-    {
-        object callee = env.GetValue(node.Name);
-
-        // check if callable
-        if (callee is not ICallable function)
-            throw new Exception($"\"{node.Name}\" is not a function.");
-
-        // eval arguments
-        var evaluatedArgs = new List<object>();
-        foreach (var argNode in node.Arguments)
-            evaluatedArgs.Add(Evaluate(env, argNode));
-
-        // check arg count
-        if (evaluatedArgs.Count != function.Arity)
-            throw new Exception($"Expected {function.Arity} args but got {evaluatedArgs.Count}.");
-
-        // execute
-        return function.Call(this, evaluatedArgs);
     }
 
     internal bool IsTruthy(object? value) => value switch
