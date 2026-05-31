@@ -21,6 +21,8 @@ public class FishboneInterpreter
             IfNode ifNode => EvaluateIf(env, ifNode),
             WhileNode whileNode => EvaluateWhile(env, whileNode),
             BlockNode block => EvaluateBlock(env, block),
+            FunctionDefinitionNode functionDefinition => EvaluateFunctionDefinition(env, functionDefinition),
+            FunctionCallNode functionCall => EvaluateFunctionCall(env, functionCall),
             ReturnNode returnNode => EvaluateReturn(env, returnNode),
             BreakNode breakNode => EvaluateBreak(env, breakNode),
             ContinueNode continueNode => EvaluateContinue(env, continueNode),
@@ -62,7 +64,7 @@ public class FishboneInterpreter
     {
         // eval right side
         object rawValue = Evaluate(env, node.Value);
-
+        
         // right side is always handled as list
         List<object> valueList = rawValue is List<object> list
             ? list
@@ -74,7 +76,7 @@ public class FishboneInterpreter
             string name = node.Names[i];
             object elementValue = i < valueList.Count ? valueList[i] : null!;
             env.Assign(name, elementValue);
-    }
+        }
 
         return rawValue;
     }
@@ -145,7 +147,13 @@ public class FishboneInterpreter
         return lastValue;
     }
 
-    private bool IsTruthy(object? value) => value switch
+    internal object EvaluateFunctionDefinition(FishboneEnvironment env,  FunctionDefinitionNode node)
+    {
+        var function = new FishboneFunction(node, env);
+        env.Declare(node.Name, function);
+        return null!;
+    }
+
     internal object EvaluateReturn(FishboneEnvironment env, ReturnNode node)
     {
         // return;
@@ -169,6 +177,28 @@ public class FishboneInterpreter
     {
         throw new ContinueException();
     }
+
+    internal object EvaluateFunctionCall(FishboneEnvironment env, FunctionCallNode node)
+    {
+        object callee = env.GetValue(node.Name);
+
+        // check if callable
+        if (callee is not ICallable function)
+            throw new Exception($"\"{node.Name}\" is not a function.");
+
+        // eval arguments
+        var evaluatedArgs = new List<object>();
+        foreach (var argNode in node.Arguments)
+            evaluatedArgs.Add(Evaluate(env, argNode));
+
+        // check arg count
+        if (evaluatedArgs.Count != function.Arity)
+            throw new Exception($"Expected {function.Arity} args but got {evaluatedArgs.Count}.");
+
+        // execute
+        return function.Call(this, evaluatedArgs);
+    }
+
     internal bool IsTruthy(object? value) => value switch
     {
         null => false,
