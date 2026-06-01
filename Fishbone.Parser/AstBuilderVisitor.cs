@@ -159,7 +159,8 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
 
     public override AstNode VisitStringExpr(FishboneParser.StringExprContext context)
     {
-        return new LiteralNode(context.STRING().GetText());
+        var text = context.STRING().GetText();
+        return new LiteralNode(text[1..^1]);
     }
 
     public override AstNode VisitBoolExpr(FishboneParser.BoolExprContext context)
