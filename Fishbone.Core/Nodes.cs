@@ -12,7 +12,26 @@ public record IdentifierNode(string Name) : AstNode;
 public record LiteralNode(object Value) : AstNode;
 
 
-public record ReturnNode(List<AstNode> ReturnValues) : AstNode;
+public record ReturnNode(IReadOnlyList<AstNode> ReturnValues) : AstNode
+{
+    public virtual bool Equals(ReturnNode? other)
+    {
+        if (other is null) return false;
+        if (ReferenceEquals(this, other)) return true;
+
+        return ReturnValues.SequenceEqual(other.ReturnValues);
+    }
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        foreach (var value in ReturnValues)
+        {
+            hash.Add(value);
+        }
+        return hash.ToHashCode();
+    }
+}
 public record BreakNode() : AstNode;
 public record ContinueNode() : AstNode;
 
@@ -104,9 +123,52 @@ public record FunctionDefinitionNode(
     string Name,
     ImmutableArray<string> Parameters,
     BlockNode Body
-) : AstNode;
+) : AstNode
+{
+    public virtual bool Equals(FunctionDefinitionNode? other)
+    {
+        if (other is null) return false;
+        if (ReferenceEquals(this, other)) return true;
+
+        return Name == other.Name
+            && Parameters.SequenceEqual(other.Parameters)
+            && Equals(Body, other.Body);
+    }
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add(Name);
+        foreach (var parameter in Parameters)
+        {
+            hash.Add(parameter);
+        }
+        hash.Add(Body);
+        return hash.ToHashCode();
+    }
+}
 
 public record FunctionCallNode(
     string Name,
     ImmutableArray<AstNode> Arguments
-) : AstNode;
+) : AstNode
+{
+    public virtual bool Equals(FunctionCallNode? other)
+    {
+        if (other is null) return false;
+        if (ReferenceEquals(this, other)) return true;
+
+        return Name == other.Name && Arguments.SequenceEqual(other.Arguments);
+    }
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add(Name);
+        foreach (var argument in Arguments)
+        {
+            hash.Add(argument);
+        }
+        return hash.ToHashCode();
+    }
+}
