@@ -1,0 +1,175 @@
+namespace Fishbone.Interpreter.Tests;
+
+public class ControlFlowEvaluationTests
+{
+    [Fact]
+    public void Evaluate_IfElse_ExecutesCorrectPath()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let score = 85;
+let grade = 0;
+
+if (score > 80)
+{
+    grade = 1;
+}
+else
+{
+    grade = 3;
+}
+""");
+
+        Assert.Equal(1, env.GetValue("grade"));
+    }
+
+    [Fact]
+    public void Evaluate_ElseIfChain_ExecutesFirstTruthyBranchOnly()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let score = 75;
+let grade = 0;
+let executedBranches = 0;
+
+if (score > 90)
+{
+    grade = 1;
+    executedBranches = executedBranches + 1;
+}
+else if (score > 80)
+{
+    grade = 2;
+    executedBranches = executedBranches + 1;
+}
+else if (score > 70)
+{
+    grade = 3;
+    executedBranches = executedBranches + 1;
+}
+else
+{
+    grade = 4;
+    executedBranches = executedBranches + 1;
+}
+""");
+
+        Assert.Equal(3, env.GetValue("grade"));
+        Assert.Equal(1, env.GetValue("executedBranches"));
+    }
+
+    [Fact]
+    public void Evaluate_ElseIfChain_ExecutesElseWhenNoConditionsMatch()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let score = 65;
+let grade = 0;
+
+if (score > 90)
+{
+    grade = 1;
+}
+else if (score > 80)
+{
+    grade = 2;
+}
+else if (score > 70)
+{
+    grade = 3;
+}
+else
+{
+    grade = 4;
+}
+""");
+
+        Assert.Equal(4, env.GetValue("grade"));
+    }
+
+    [Fact]
+    public void Evaluate_ElseIfChainWithoutElse_LeavesStateUnchangedWhenNoConditionsMatch()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let score = 65;
+let grade = 0;
+
+if (score > 90)
+{
+    grade = 1;
+}
+else if (score > 80)
+{
+    grade = 2;
+}
+else if (score > 70)
+{
+    grade = 3;
+}
+""");
+
+        Assert.Equal(0, env.GetValue("grade"));
+    }
+
+    [Fact]
+    public void Evaluate_WhileLoop_MutatesStateUntilConditionIsFalse()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let x = 0;
+while (x < 5)
+{
+    x = x + 1;
+}
+""");
+
+        Assert.Equal(5, env.GetValue("x"));
+    }
+
+    [Fact]
+    public void Evaluate_NestedLoops_MaintainAccumulatedState()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let totalCycles = 0;
+let outer = 0;
+while (outer < 3)
+{
+    let inner = 0;
+    while (inner < 4)
+    {
+        totalCycles = totalCycles + 1;
+        inner = inner + 1;
+    }
+    outer = outer + 1;
+}
+""");
+
+        Assert.Equal(12, env.GetValue("totalCycles"));
+        Assert.Equal(3, env.GetValue("outer"));
+    }
+
+    [Fact]
+    public void Evaluate_BreakAndContinue_ControlLoopExecution()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let i = 0;
+let total = 0;
+
+while (i < 5)
+{
+    i = i + 1;
+
+    if (i == 2)
+    {
+        continue;
+    }
+
+    if (i == 4)
+    {
+        break;
+    }
+
+    total = total + i;
+}
+""");
+
+        Assert.Equal(4, env.GetValue("i"));
+        Assert.Equal(4, env.GetValue("total"));
+    }
+}
