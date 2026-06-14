@@ -1,0 +1,45 @@
+namespace Fishbone.Engine.Tests;
+
+public class FishboneEngineTests
+{
+    [Fact]
+    public void Run_ParsesAndInterpretsScript_ReturningFinalRootEnvironment()
+    {
+        var env = FishboneEngine.Run("""
+let x = 1;
+x = x + 4;
+let y = x * 2;
+""", new FishboneConfiguration());
+
+        Assert.Equal(5, env.GetValue("x"));
+        Assert.Equal(10, env.GetValue("y"));
+    }
+
+    [Fact]
+    public void Run_SeedsRegisteredVariablesForScriptUse()
+    {
+        var config = new FishboneConfiguration()
+            .RegisterVariable("baseValue", 10);
+
+        var env = FishboneEngine.Run("""
+let result = baseValue + 5;
+""", config);
+
+        Assert.Equal(10, env.GetValue("baseValue"));
+        Assert.Equal(15, env.GetValue("result"));
+    }
+
+    [Fact]
+    public void Run_ReturnedEnvironmentRetainsTopLevelDeclarationsAndGlobals()
+    {
+        var config = new FishboneConfiguration()
+            .RegisterVariable("globalValue", 3);
+
+        var env = FishboneEngine.Run("""
+let scriptValue = globalValue + 7;
+""", config);
+
+        Assert.Equal(3, env.GetValue("globalValue"));
+        Assert.Equal(10, env.GetValue("scriptValue"));
+    }
+}

@@ -1,10 +1,12 @@
 <Solution>
-  <Project Path="Fishbone.Core.Tests/Fishbone.Core.Tests.csproj" />
-  <Project Path="Fishbone.Core/Fishbone.Core.csproj" />
-  <Project Path="Fishbone.Engine.Tests/Fishbone.Engine.Tests.csproj" />
-  <Project Path="Fishbone.Engine/Fishbone.Engine.csproj" />
-  <Project Path="Fishbone.Interpreter.Tests/Fishbone.Interpreter.Tests.csproj" />
-  <Project Path="Fishbone.Interpreter/Fishbone.Interpreter.csproj" />
-  <Project Path="Fishbone.Parser.Tests/Fishbone.Parser.Tests.csproj" />
-  <Project Path="Fishbone.Parser/Fishbone.Parser.csproj" />
+  <Folder Name="/Tests/">
+    <Project Path="tests/Fishbone.Core.Tests/Fishbone.Core.Tests.csproj" />
+    <Project Path="tests/Fishbone.Engine.Tests/Fishbone.Engine.Tests.csproj" />
+    <Project Path="tests/Fishbone.Interpreter.Tests/Fishbone.Interpreter.Tests.csproj" />
+    <Project Path="tests/Fishbone.Parser.Tests/Fishbone.Parser.Tests.csproj" />
+  </Folder>
+  <Project Path="src/Fishbone.Core/Fishbone.Core.csproj" />
+  <Project Path="src/Fishbone.Engine/Fishbone.Engine.csproj" />
+  <Project Path="src/Fishbone.Interpreter/Fishbone.Interpreter.csproj" />
+  <Project Path="src/Fishbone.Parser/Fishbone.Parser.csproj" />
 </Solution>
