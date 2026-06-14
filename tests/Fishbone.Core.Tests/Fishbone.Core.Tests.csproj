@@ -15,7 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Fishbone.Engine\Fishbone.Engine.csproj" />
+    <ProjectReference Include="..\..\src\Fishbone.Core\Fishbone.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -15,11 +15,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Fishbone.Core\Fishbone.Core.csproj" />
+    <Using Include="Xunit" />
   </ItemGroup>
 
   <ItemGroup>
-    <Using Include="Xunit" />
+    <ProjectReference Include="..\..\src\Fishbone.Parser\Fishbone.Parser.csproj" />
   </ItemGroup>
 
 </Project>
