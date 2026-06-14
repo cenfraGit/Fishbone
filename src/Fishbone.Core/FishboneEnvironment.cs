@@ -6,9 +6,22 @@ public class FishboneEnvironment
     private readonly Dictionary<string, object> _values = [];
     public Dictionary<string, object> Values { get => _values; }
 
+    public TextWriter StdOut { get; set; } = Console.Out;
+
     public FishboneEnvironment(FishboneEnvironment? parent = null)
     {
         _parent = parent;
+
+        if (parent is null)
+            RegisterCoreLibraries();
+    }
+
+    private void RegisterCoreLibraries()
+    {
+        _values["print"] = new Action<object?>(value =>
+        {
+            StdOut.WriteLine(value?.ToString());
+        });
     }
 
     public void Declare(string name, object value)
