@@ -127,6 +127,12 @@ public class FishboneEnvironment
             throw new Exception($"Object is not an indexable collection.");
         });
 
+        _values["setIndex"] = new Action<IList, int, object>((targetList, index, value) =>
+        {
+            if (targetList == null) throw new ArgumentNullException(nameof(targetList));
+            targetList[index] = value;
+        });
+
         _values["getKey"] = new Func<object, object, object?>((dictionary, key) =>
         {
             if (dictionary is System.Collections.IDictionary dict)
