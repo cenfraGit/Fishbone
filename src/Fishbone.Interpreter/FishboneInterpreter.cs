@@ -43,6 +43,14 @@ public class FishboneInterpreter
         // eval right side
         object rawValue = Evaluate(env, node.Value);
 
+        // if declaring single var, skip deconstruction
+        // prevents collections from being unpacked
+        if (node.Names.Count == 1)
+        {
+            env.Declare(node.Names[0], rawValue);
+            return rawValue;
+        }
+
         // right side is always handled as list
         List<object> valueList = rawValue is List<object> list
             ? list
@@ -64,7 +72,15 @@ public class FishboneInterpreter
     {
         // eval right side
         object rawValue = Evaluate(env, node.Value);
-        
+
+        // if declaring single var, skip deconstruction
+        // prevents collections from being unpacked
+        if (node.Names.Count == 1)
+        {
+            env.Assign(node.Names[0], rawValue);
+            return rawValue;
+        }
+
         // right side is always handled as list
         List<object> valueList = rawValue is List<object> list
             ? list
