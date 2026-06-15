@@ -1,0 +1,13 @@
+print("Program: area of a circle\n");
+
+func get_circle_area(radius)
+{
+    return PI * pow(radius, 2);
+}
+
+printl("Enter the circle's radius: ");
+let radius = double(input());
+let area = get_circle_area(radius);
+
+printl("The area of the circle is: ");
+print(round(area, 3));
