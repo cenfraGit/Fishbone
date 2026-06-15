@@ -37,7 +37,9 @@ public class FishboneFunction : ICallable
         }
         catch (ReturnException ret)
         {
-            return ret.Values;
+            return ret.Values is List<object> list && list.Count == 1
+                ? list[0]
+                : ret.Values;
         }
 
         return null!;
