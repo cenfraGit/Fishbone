@@ -1,3 +1,6 @@
+using System.Collections;
+using System.Reflection;
+
 namespace Fishbone.Core;
 
 public class FishboneEnvironment
@@ -77,6 +80,59 @@ public class FishboneEnvironment
 
         // string(someValue)
         _values["string"] = new Func<object?, string>(value => value?.ToString() ?? string.Empty);
+
+        // temporary: interfacing with c# types (no grammar for these yet)
+
+        // for creating lists
+        _values["List"] = new Func<IList>(() => new List<object>());
+        // for creating maps
+        _values["Dict"] = new Func<IDictionary>(() => new Dictionary<string, object>(StringComparer.Ordinal));
+
+        // add to list
+        _values["addToList"] = new Action<IList, object>((targetList, item) =>
+        {
+            if (targetList == null) throw new ArgumentNullException(nameof(targetList));
+            targetList.Add(item);
+        });
+
+        // add to dictionary
+        _values["addToDict"] = new Action<IDictionary, string, object>((targetDict, key, value) =>
+        {
+            if (targetDict == null) throw new ArgumentNullException(nameof(targetDict));
+            targetDict[key] = value;
+        });
+
+        // for object properties and fields
+        _values["getMember"] = new Func<object, string, object?>((obj, memberName) =>
+        {
+            if (obj is null) return null;
+            var type = obj.GetType();
+
+            // check if property
+            var prop = type.GetProperty(memberName, BindingFlags.Public | BindingFlags.Instance);
+            if (prop is not null) return prop.GetValue(obj);
+
+            // check if field
+            var field = type.GetField(memberName, BindingFlags.Public | BindingFlags.Instance);
+            if (field is not null) return field.GetValue(obj);
+
+            throw new Exception($"Type \"{type.Name}\" does not have a public property or field named \"{memberName}\".");
+        });
+
+        // for arrays/list indexing
+        _values["getIndex"] = new Func<object, int, object?>((collection, index) =>
+        {
+            if (collection is System.Collections.IList list)
+                return list[index];
+            throw new Exception($"Object is not an indexable collection.");
+        });
+
+        _values["getKey"] = new Func<object, object, object?>((dictionary, key) =>
+        {
+            if (dictionary is System.Collections.IDictionary dict)
+                return dict[key];
+                throw new Exception($"Object is not a dictionary.");
+        });
     }
 
     public void Declare(string name, object value)
