@@ -1,0 +1,51 @@
+print("Bubble Sort\n");
+
+func bubble_sort(arr, size)
+{
+    let i = 0;
+    while (i < size)
+    {
+        let j = 0;
+        while (j < (size - i - 1))
+        {
+            let left = getIndex(arr, j);
+            let right = getIndex(arr, j + 1);
+
+            // if left greater, swap
+            if (left > right)
+            {
+                setIndex(arr, j, right);
+                setIndex(arr, j + 1, left);
+            }
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+}
+
+// create list and populate
+let numbers = List();
+addToList(numbers, 54);
+addToList(numbers, 12);
+addToList(numbers, 89);
+addToList(numbers, 3);
+addToList(numbers, 21);
+
+let total_elements = getMember(numbers, "Count");
+
+print("Before sorting:");
+print(getIndex(numbers, 0));
+print(getIndex(numbers, 1));
+print(getIndex(numbers, 2));
+print(getIndex(numbers, 3));
+print(getIndex(numbers, 4));
+
+// sort
+bubble_sort(numbers, total_elements);
+
+print("\nAfter sorting:");
+print(getIndex(numbers, 0));
+print(getIndex(numbers, 1));
+print(getIndex(numbers, 2));
+print(getIndex(numbers, 3));
+print(getIndex(numbers, 4));
