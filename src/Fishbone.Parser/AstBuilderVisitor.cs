@@ -1,7 +1,6 @@
 using Fishbone.Core;
-using Antlr4.Runtime;
-using Antlr4.Runtime.Misc;
 using System.Collections.Immutable;
+using System.Text.RegularExpressions;
 
 namespace Fishbone.Parser;
 
@@ -160,7 +159,9 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
     public override AstNode VisitStringExpr(FishboneParser.StringExprContext context)
     {
         var text = context.STRING().GetText();
-        return new LiteralNode(text[1..^1]);
+        var trimmed = text[1..^1];
+        string unescaped = Regex.Unescape(trimmed);
+        return new LiteralNode(unescaped);
     }
 
     public override AstNode VisitBoolExpr(FishboneParser.BoolExprContext context)
