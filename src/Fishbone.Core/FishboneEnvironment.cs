@@ -27,8 +27,8 @@ public class FishboneEnvironment
         _values["E"] = Math.E;
 
         // input/output
-        _values["println"] = new Action<object?>(value => { StdOut.Write(value?.ToString()); }); // print line
-        _values["print"] = new Action<object?>(value => { StdOut.WriteLine(value?.ToString()); });
+        _values["print"] = new Action<object?>(value => { StdOut.Write(value?.ToString()); }); 
+        _values["println"] = new Action<object?>(value => { StdOut.WriteLine(value?.ToString()); });
         _values["input"] = new Func<string>(() => StdIn.ReadLine() ?? string.Empty);
 
         // basic math
