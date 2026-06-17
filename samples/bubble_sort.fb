@@ -1,4 +1,4 @@
-print("Bubble Sort\n");
+println("Bubble Sort\n");
 
 func bubble_sort(arr, size)
 {
@@ -33,19 +33,19 @@ addToList(numbers, 21);
 
 let total_elements = getMember(numbers, "Count");
 
-print("Before sorting:");
-print(getIndex(numbers, 0));
-print(getIndex(numbers, 1));
-print(getIndex(numbers, 2));
-print(getIndex(numbers, 3));
-print(getIndex(numbers, 4));
+println("Before sorting:");
+println(getIndex(numbers, 0));
+println(getIndex(numbers, 1));
+println(getIndex(numbers, 2));
+println(getIndex(numbers, 3));
+println(getIndex(numbers, 4));
 
 // sort
 bubble_sort(numbers, total_elements);
 
-print("\nAfter sorting:");
-print(getIndex(numbers, 0));
-print(getIndex(numbers, 1));
-print(getIndex(numbers, 2));
-print(getIndex(numbers, 3));
-print(getIndex(numbers, 4));
+println("\nAfter sorting:");
+println(getIndex(numbers, 0));
+println(getIndex(numbers, 1));
+println(getIndex(numbers, 2));
+println(getIndex(numbers, 3));
+println(getIndex(numbers, 4));

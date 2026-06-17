@@ -1,13 +1,13 @@
-print("Program: area of a circle\n");
+println("Program: area of a circle\n");
 
 func get_circle_area(radius)
 {
     return PI * pow(radius, 2);
 }
 
-println("Enter the circle's radius: ");
+print("Enter the circle's radius: ");
 let radius = double(input());
 let area = get_circle_area(radius);
 
-println("The area of the circle is: ");
-print(round(area, 3));
+print("The area of the circle is: ");
+println(round(area, 3));
