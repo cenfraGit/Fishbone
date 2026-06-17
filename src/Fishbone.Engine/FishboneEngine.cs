@@ -11,9 +11,9 @@ public static class FishboneEngine
         var ast = ASTParser.Parse(sourceCode);
         var envRoot = new FishboneEnvironment();
 
-        // seed root env with config globals
-        foreach (var kvp in configuration.Globals)
-            envRoot.Declare(kvp.Key, kvp.Value);
+        // seed root env with config built-ins
+        foreach (var kvp in configuration.BuiltIns)
+            envRoot.AddBuiltIn(kvp.Key, kvp.Value);
 
         // eval program
         var interpreter = new FishboneInterpreter();
