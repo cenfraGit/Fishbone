@@ -2,7 +2,7 @@
 using Fishbone.Engine;
 using System.CommandLine;
 
-namespace Fishbone.CLI;
+namespace SpineCLI;
 
 internal class Program
 {

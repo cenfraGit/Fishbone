@@ -5,9 +5,12 @@
     <Project Path="tests/Fishbone.Interpreter.Tests/Fishbone.Interpreter.Tests.csproj" />
     <Project Path="tests/Fishbone.Parser.Tests/Fishbone.Parser.Tests.csproj" />
   </Folder>
+  <Folder Name="/IDE/">
+    <Project Path="ide/SpineIDE/SpineIDE.csproj" />
+    <Project Path="ide/SpineCLI/SpineCLI.csproj" />
+  </Folder>
   <Project Path="src/Fishbone.Core/Fishbone.Core.csproj" />
   <Project Path="src/Fishbone.Engine/Fishbone.Engine.csproj" />
   <Project Path="src/Fishbone.Interpreter/Fishbone.Interpreter.csproj" />
   <Project Path="src/Fishbone.Parser/Fishbone.Parser.csproj" />
-  <Project Path="src/Fishbone.CLI/Fishbone.CLI.csproj" />
 </Solution>

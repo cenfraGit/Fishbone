@@ -9,11 +9,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Fishbone.Engine\Fishbone.Engine.csproj" />
+    <PackageReference Include="System.CommandLine" Version="2.0.9" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.CommandLine" Version="2.0.9" />
+    <ProjectReference Include="..\..\src\Fishbone.Engine\Fishbone.Engine.csproj" />
   </ItemGroup>
 
 </Project>
