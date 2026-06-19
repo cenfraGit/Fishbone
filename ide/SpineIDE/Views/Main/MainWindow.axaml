@@ -1,0 +1,270 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:dock="clr-namespace:Dock.Avalonia.Controls;assembly=Dock.Avalonia"
+        xmlns:vm="clr-namespace:SpineIDE.Views.Main"
+        xmlns:panels="clr-namespace:SpineIDE.Panels"
+        xmlns:editor="clr-namespace:SpineIDE.Views.Editor"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        x:Class="SpineIDE.Views.Main.MainWindow"
+        x:DataType="vm:MainWindowVM"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="SpineIDE">
+
+    <Window.DataTemplates>
+        <DataTemplate DataType="{x:Type panels:VariableExplorerVM}">
+            <DataGrid ItemsSource="{Binding Variables}"
+                      SelectedItem="{Binding SelectedVariable}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      GridLinesVisibility="All"
+                      BorderThickness="1" BorderBrush="Gray">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Name"
+                                        Binding="{Binding Name}"
+                                        Width="1*" />
+
+                    <DataGridTextColumn Header="Type"
+                                        Binding="{Binding Type}"
+                                        Width="1*" />
+
+                    <DataGridTextColumn Header="Value"
+                                        Binding="{Binding ValueDisplay}"
+                                        Width="2*" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type panels:ImagePreviewVM}">
+            <Border Background="#252526">
+                <DockPanel>
+                    <Image Source="{Binding DisplayedImage}"
+                           Stretch="Uniform"
+                           HorizontalAlignment="Stretch"
+                           VerticalAlignment="Stretch"
+                           RenderOptions.BitmapInterpolationMode="HighQuality" />
+                </DockPanel>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type editor:ScriptEditorVM}">
+            <editor:ScriptEditorView />
+        </DataTemplate>
+    </Window.DataTemplates>
+
+    <Window.KeyBindings>
+        <KeyBinding Gesture="F5" Command="{Binding ButtonRunCommand}" />
+    </Window.KeyBindings>
+
+    <DockPanel>
+
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_File">
+                <MenuItem Header="_New" InputGesture="Ctrl+N" Command="{Binding NewFileCommand}" />
+                <MenuItem Header="_Open" InputGesture="Ctrl+O" Command="{Binding OpenFileCommand}" />
+                <MenuItem Header="_Save" InputGesture="Ctrl+S" Command="{Binding SaveFileCommand}" />
+                <MenuItem Header="Save _As..." Command="{Binding SaveFileAsCommand}" />
+                <Separator />
+                <MenuItem Header="_Exit" />
+            </MenuItem>
+
+            <MenuItem Header="_Script">
+                <MenuItem Header="_Run" Command="{Binding ButtonRunCommand}" InputGesture="F5" />
+                <Separator />
+                <MenuItem Header="_Functions" ItemsSource="{Binding FunctionMenuItems}">
+
+                    <MenuItem.DataTemplates>
+                        <TreeDataTemplate DataType="vm:MenuItemViewModel" ItemsSource="{Binding Items}">
+                            <TextBlock Text="{Binding Header}" />
+                        </TreeDataTemplate>
+                    </MenuItem.DataTemplates>
+
+                </MenuItem>
+            </MenuItem>
+
+            <MenuItem Header="_Views">
+                <MenuItem Header="Show Variable Explorer" ToggleType="CheckBox" />
+                <MenuItem Header="Show Image Preview" ToggleType="CheckBox" />
+            </MenuItem>
+
+            <MenuItem Header="_Help">
+                <MenuItem Header="_About" />
+            </MenuItem>
+        </Menu>
+
+        <Border DockPanel.Dock="Top" Padding="4" Margin="5"
+                BorderBrush="#333333" BorderThickness="0.7" CornerRadius="2">
+
+            <DockPanel  LastChildFill="False">
+
+                <Button DockPanel.Dock="Left" ToolTip.Tip="Open"
+                        Command="{Binding OpenFileCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <PathIcon Data="{StaticResource folder_open_regular}"
+                                  Foreground="Gray" Width="16" Height="16" />
+                    </StackPanel>
+                </Button>
+
+                <Button DockPanel.Dock="Left" ToolTip.Tip="Save" Margin="0,0,13,0"
+                        Command="{Binding SaveFileCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <PathIcon Data="{StaticResource save_regular}"
+                                  Foreground="Orange" Width="16" Height="16" />
+                    </StackPanel>
+                </Button>
+
+                <Button DockPanel.Dock="Left" ToolTip.Tip="Copy" Command="{Binding CopyCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <PathIcon Data="{StaticResource copy_regular}"
+                                  Width="16" Height="16" />
+                    </StackPanel>
+                </Button>
+
+                <Button DockPanel.Dock="Left" ToolTip.Tip="Cut" Command="{Binding CutCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <PathIcon Data="{StaticResource cut_regular}"
+                                  Width="16" Height="16" />
+                    </StackPanel>
+                </Button>
+
+                <Button DockPanel.Dock="Left" ToolTip.Tip="Paste" Command="{Binding PasteCommand}"
+                        Margin="0,0,13,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <PathIcon Data="{StaticResource clipboard_paste_regular}"
+                                  Width="16" Height="16" />
+                    </StackPanel>
+                </Button>
+
+                <Button DockPanel.Dock="Left" ToolTip.Tip="Undo"
+                        Command="{Binding UndoCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <PathIcon Data="{StaticResource arrow_undo_regular}"
+                                  Foreground="DarkSlateGray" Width="16" Height="16" />
+                    </StackPanel>
+                </Button>
+
+                <Button DockPanel.Dock="Left" ToolTip.Tip="Redo"
+                        Command="{Binding RedoCommand}" Margin="0,0,13,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <PathIcon Data="{StaticResource arrow_undo_regular}"
+                                  Foreground="DarkSlateGray" Width="16" Height="16">
+                            <!-- redo symbol outputs same as undo. gh issue unanswered, -->
+                            <!-- so just flip? -->
+                            <PathIcon.RenderTransform>
+                                <ScaleTransform ScaleX="-1" />
+                            </PathIcon.RenderTransform>
+                        </PathIcon>
+                    </StackPanel>
+                </Button>
+
+                <Button DockPanel.Dock="Left" ToolTip.Tip="Remove line comment"
+                        Command="{Binding RemoveLineCommentCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <PathIcon Data="{StaticResource text_bullet_list_add_regular}"
+                                  Foreground="DarkRed" Width="16" Height="16" />
+                    </StackPanel>
+                </Button>
+
+                <Button DockPanel.Dock="Left" ToolTip.Tip="Add line comment"
+                        Command="{Binding AddLineCommentCommand}" Margin="0,0,13,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <PathIcon Data="{StaticResource text_bullet_list_add_regular}"
+                                  Foreground="Green" Width="16" Height="16" />
+                    </StackPanel>
+                </Button>
+
+                <Button DockPanel.Dock="Right" Command="{Binding ButtonRunCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <PathIcon Data="{StaticResource play_regular}"
+                                  Width="16" Height="16" Foreground="Green" />
+                        <TextBlock Text="Run" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+
+            </DockPanel>
+
+        </Border>
+
+        <DockPanel DockPanel.Dock="Bottom" LastChildFill="False">
+
+            <TextBlock DockPanel.Dock="Left"
+                       Text="SpineIDE v0.1"
+					   FontSize="12"
+                       VerticalAlignment="Center"
+                       Margin="8,3" />
+
+            <!--<Button Name="ErrorButton"
+                    DockPanel.Dock="Right"
+                    Width="120"
+                    Margin="3"
+                    HorizontalContentAlignment="Center">
+                <Button.Flyout>
+                    <Flyout Placement="Top">
+                        <DockPanel MinWidth="350" MaxWidth="350" MinHeight="500" MaxHeight="500">
+
+                            <TextBlock DockPanel.Dock="Top" Text="Current errors" />
+
+                            <ListBox DockPanel.Dock="Top" ItemsSource="{Binding ErrorService.Errors}">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel Margin="5,5,5,0">
+                                            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal">
+
+                                                <TextBlock DockPanel.Dock="Top"
+                                                           Foreground="Orange"
+                                                           Text="Error in line "
+                                                           VerticalAlignment="Center"/>
+
+                                                <TextBlock DockPanel.Dock="Top"
+                                                           Foreground="Orange"
+                                                       Text="{Binding Line}"
+                                                       FontWeight="Bold"
+                                                       VerticalAlignment="Center"/>
+
+                                                <TextBlock DockPanel.Dock="Top"
+                                                           Foreground="Orange"
+                                                           Text=", column "
+                                                           VerticalAlignment="Center"/>
+
+                                                <TextBlock DockPanel.Dock="Top"
+                                                           Foreground="Orange"
+                                                           Text="{Binding Column}"
+                                                           FontWeight="Bold"
+                                                           VerticalAlignment="Center"/>
+                                            </StackPanel>
+
+                                            <TextBlock DockPanel.Dock="Top"
+                                                       Text="{Binding ExMessage}"
+                                                       TextWrapping="Wrap"/>
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </DockPanel>
+                    </Flyout>
+                </Button.Flyout>
+
+                <StackPanel Orientation="Horizontal" Spacing="5">
+                    <TextBlock Text="Errors"/>
+                    <Border Background="Red"
+                            CornerRadius="10"
+                            Padding="5,0"
+                            IsVisible="{Binding ErrorService.Errors.Count}">
+                        <TextBlock Text="{Binding ErrorService.Errors.Count}"
+                                   FontSize="10"
+                                   Foreground="White"
+                                   VerticalAlignment="Center"
+                                   HorizontalAlignment="Center"
+                                   FontWeight="Bold"/>
+                    </Border>
+                </StackPanel>
+            </Button>-->
+
+        </DockPanel>
+
+        <dock:DockControl DockPanel.Dock="Top" Layout="{Binding Layout}" />
+
+    </DockPanel>
+
+</Window>
