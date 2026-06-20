@@ -6,6 +6,7 @@
         xmlns:vm="clr-namespace:SpineIDE.Views.Main"
         xmlns:panels="clr-namespace:SpineIDE.Panels"
         xmlns:editor="clr-namespace:SpineIDE.Views.Editor"
+        xmlns:variables="clr-namespace:SpineIDE.Views.Variables"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="SpineIDE.Views.Main.MainWindow"
         x:DataType="vm:MainWindowVM"
@@ -14,26 +15,7 @@
 
     <Window.DataTemplates>
         <DataTemplate DataType="{x:Type panels:VariableExplorerVM}">
-            <DataGrid ItemsSource="{Binding Variables}"
-                      SelectedItem="{Binding SelectedVariable}"
-                      AutoGenerateColumns="False"
-                      IsReadOnly="True"
-                      GridLinesVisibility="All"
-                      BorderThickness="1" BorderBrush="Gray">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="Name"
-                                        Binding="{Binding Name}"
-                                        Width="1*" />
-
-                    <DataGridTextColumn Header="Type"
-                                        Binding="{Binding Type}"
-                                        Width="1*" />
-
-                    <DataGridTextColumn Header="Value"
-                                        Binding="{Binding ValueDisplay}"
-                                        Width="2*" />
-                </DataGrid.Columns>
-            </DataGrid>
+            <variables:VariableExplorerView />
         </DataTemplate>
 
         <DataTemplate DataType="{x:Type panels:ImagePreviewVM}">

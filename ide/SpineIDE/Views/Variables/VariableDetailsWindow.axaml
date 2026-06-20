@@ -1,0 +1,40 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:panels="clr-namespace:SpineIDE.Panels"
+        x:Class="SpineIDE.Views.Variables.VariableDetailsWindow"
+        x:DataType="panels:VariableDetailsVM"
+        Width="720"
+        Height="480"
+        MinWidth="420"
+        MinHeight="280"
+        WindowStartupLocation="CenterOwner"
+        Title="{Binding Title}">
+    <DockPanel>
+        <TextBlock DockPanel.Dock="Top"
+                   Text="{Binding Summary}"
+                   Margin="10,8"
+                   FontWeight="SemiBold" />
+
+        <DataGrid ItemsSource="{Binding Rows}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  GridLinesVisibility="All"
+                  BorderThickness="1"
+                  BorderBrush="Gray"
+                  Margin="10,0,10,10">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Path"
+                                    Binding="{Binding PathDisplay}"
+                                    Width="2*" />
+
+                <DataGridTextColumn Header="Type"
+                                    Binding="{Binding Type}"
+                                    Width="1*" />
+
+                <DataGridTextColumn Header="Value"
+                                    Binding="{Binding Value}"
+                                    Width="3*" />
+            </DataGrid.Columns>
+        </DataGrid>
+    </DockPanel>
+</Window>

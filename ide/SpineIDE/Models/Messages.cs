@@ -33,5 +33,7 @@ public class MessageVariableSelected
     }
 }
 
+public record MessageVariableDetailsRequested(string Name, object? Value);
+
 public enum EditorAction { Cut, Copy, Paste, Undo, Redo, AddLineComment, RemoveLineComment }
 public record MessageEditorAction(EditorAction Action);

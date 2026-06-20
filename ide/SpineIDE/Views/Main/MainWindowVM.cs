@@ -16,7 +16,7 @@ using SpineIDE.Views.Editor;
 
 namespace SpineIDE.Views.Main;
 
-public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
+public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>, IRecipient<MessageVariableDetailsRequested>
 {
     // --------------------------------------------------------------------------------
     // fields and properties
@@ -46,7 +46,8 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         if (Layout != null)
             Factory?.InitLayout(Layout);
 
-        WeakReferenceMessenger.Default.Register(this);
+        WeakReferenceMessenger.Default.Register<MessageExecute>(this);
+        WeakReferenceMessenger.Default.Register<MessageVariableDetailsRequested>(this);
 
         LoadFunctionsMenu();
     }
@@ -84,6 +85,11 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         {
             Directory.SetCurrentDirectory(currentDirectory);
         }
+    }
+
+    public async void Receive(MessageVariableDetailsRequested m)
+    {
+        await _dialogService.ShowVariableDetailsAsync(m.Name, m.Value);
     }
 
     private static IDocumentDock? GetScriptsDock(IDockable? root)

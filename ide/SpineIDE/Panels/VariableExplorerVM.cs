@@ -1,6 +1,7 @@
 using Dock.Model.Mvvm.Controls;
 using System;
 using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using SpineIDE.Models.Messages;
 
@@ -47,7 +48,7 @@ public partial class VariableExplorerVM : Tool, IRecipient<MessageExecutionFinis
     // methods
     // --------------------------------------------------------------------------------
 
-    public async void Receive(MessageExecutionFinished m)
+    public void Receive(MessageExecutionFinished m)
     {
         this.Title = $"Variable Explorer ({m.ScriptName})";
         Variables.Clear();
@@ -57,18 +58,22 @@ public partial class VariableExplorerVM : Tool, IRecipient<MessageExecutionFinis
                 continue;
 
             string variableName = v.Key;
-            string variableType = v.Value?.GetType().Name ?? "null";
-            string variableValue = v.Value?.ToString() ?? "null";
-
-            // handle when matrix (generic)
-            variableType = variableType.Contains("`")
-                ? variableType.Substring(0, variableType.IndexOf('`'))
-                : variableType;
+            string variableType = VariableDisplayFormatter.FormatType(v.Value);
+            string variableValue = VariableDisplayFormatter.FormatValue(v.Value);
 
             Variables.Add(new VariableItem { Name = variableName,
                                              Type = variableType,
                                              ValueDisplay = variableValue,
                                              ValueRaw = v.Value });
         }
+    }
+
+    [RelayCommand]
+    private void OpenVariableDetails(VariableItem? variable)
+    {
+        if (variable is null || !VariableDisplayFormatter.IsCollection(variable.ValueRaw))
+            return;
+
+        WeakReferenceMessenger.Default.Send(new MessageVariableDetailsRequested(variable.Name, variable.ValueRaw));
     }
 }
