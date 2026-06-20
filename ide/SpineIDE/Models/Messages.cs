@@ -21,18 +21,6 @@ public class MessageExecutionFinished
     }
 }
 
-public class MessageVariableSelected
-{
-    public string Name { get; }
-    public object? Value { get; }
-
-    public MessageVariableSelected(string name, object? value)
-    {
-        this.Name = name;
-        this.Value = value;
-    }
-}
-
 public record MessageVariableDetailsRequested(string Name, object? Value);
 
 public enum EditorAction { Cut, Copy, Paste, Undo, Redo, AddLineComment, RemoveLineComment }

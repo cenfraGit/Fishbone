@@ -21,15 +21,12 @@ public class DockFactory : Factory
         public override IRootDock CreateLayout()
         {
             var variableExplorer = new VariableExplorerVM { Id = "Variables", Title = "Variable Explorer" };
-            var imagePreview = new ImagePreviewVM { Id = "Preview", Title = "Image Preview" };
             var scriptEditor = new ScriptEditorVM("New", null, "");
 
-            //var previewToolDock = new ToolDock { ActiveDockable = imagePreview, VisibleDockables = CreateList<IDockable>(imagePreview) };
             var variablesToolDock = new ToolDock { ActiveDockable = variableExplorer, VisibleDockables = CreateList<IDockable>(variableExplorer) };
             var outputToolDock = new ToolDock { ActiveDockable = _outputPanel, VisibleDockables = CreateList<IDockable>(_outputPanel) };
             var documentDock = new DocumentDock { Id = "Scripts", ActiveDockable = scriptEditor, VisibleDockables = CreateList<IDockable>(scriptEditor) };
 
-            //previewToolDock.Proportion = 0.5;
             //variablesToolDock.Proportion = 0.5;
             _outputPanel.Id = "Output";
             _outputPanel.Title = "Output";
@@ -40,8 +37,6 @@ public class DockFactory : Factory
                 Proportion = 0.25,
                 VisibleDockables = CreateList<IDockable>
                 (
-                    //previewToolDock,
-                    //new ProportionalDockSplitter(),
                     variablesToolDock
                 )
             };
@@ -88,7 +83,6 @@ public class DockFactory : Factory
             ContextLocator = new Dictionary<string, Func<object?>>
             {
                 ["Variables"] = () => layout,
-                ["Preview"]   = () => layout,
                 ["Output"]    = () => layout,
                 ["Editor"]    = () => layout
             };

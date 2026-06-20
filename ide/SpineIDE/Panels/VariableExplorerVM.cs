@@ -29,9 +29,7 @@ public partial class VariableExplorerVM : Tool, IRecipient<MessageExecutionFinis
         get => _selectedVariable;
         set
         {
-            if (SetProperty(ref _selectedVariable, value))
-                if (_selectedVariable is not null)
-                    WeakReferenceMessenger.Default.Send(new MessageVariableSelected(_selectedVariable.Name, _selectedVariable.ValueRaw));
+            SetProperty(ref _selectedVariable, value);
         }
     }
 

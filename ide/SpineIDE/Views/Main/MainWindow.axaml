@@ -18,18 +18,6 @@
             <variables:VariableExplorerView />
         </DataTemplate>
 
-        <DataTemplate DataType="{x:Type panels:ImagePreviewVM}">
-            <Border Background="#252526">
-                <DockPanel>
-                    <Image Source="{Binding DisplayedImage}"
-                           Stretch="Uniform"
-                           HorizontalAlignment="Stretch"
-                           VerticalAlignment="Stretch"
-                           RenderOptions.BitmapInterpolationMode="HighQuality" />
-                </DockPanel>
-            </Border>
-        </DataTemplate>
-
         <DataTemplate DataType="{x:Type panels:OutputPanelVM}">
             <TextBox Text="{Binding OutputText}"
                      IsReadOnly="True"
@@ -99,7 +87,6 @@
 
             <MenuItem Header="_Views">
                 <MenuItem Header="Show Variable Explorer" ToggleType="CheckBox" />
-                <MenuItem Header="Show Image Preview" ToggleType="CheckBox" />
             </MenuItem>
 
             <MenuItem Header="_Help">
