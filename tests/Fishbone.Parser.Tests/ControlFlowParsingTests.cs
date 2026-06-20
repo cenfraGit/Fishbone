@@ -116,4 +116,32 @@ while (x < 5)
 
         Assert.Equal(expectedAst, ast);
     }
+
+    [Fact]
+    public void Parse_Foreach_ReturnsForeachNode()
+    {
+        var ast = ParserTestHelpers.ParseProgram("""
+foreach (value in values)
+{
+    total = total + value;
+}
+""");
+
+        var expectedAst = new ProgramNode(new List<AstNode>
+        {
+            new ForeachNode(
+                "value",
+                new IdentifierNode("values"),
+                new BlockNode(new List<AstNode>
+                {
+                    new AssignmentNode(
+                        ["total"],
+                        new BinaryOpNode("+", new IdentifierNode("total"), new IdentifierNode("value"))
+                    )
+                })
+            )
+        });
+
+        Assert.Equal(expectedAst, ast);
+    }
 }

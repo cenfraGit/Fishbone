@@ -172,4 +172,74 @@ while (i < 5)
         Assert.Equal(4, env.GetValue("i"));
         Assert.Equal(4, env.GetValue("total"));
     }
+
+    [Fact]
+    public void Evaluate_ForeachOverList_VisitsEachValue()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let values = [1, 2, 3];
+let total = 0;
+
+foreach (value in values)
+{
+    total = total + value;
+}
+""");
+
+        Assert.Equal(6, env.GetValue("total"));
+    }
+
+    [Fact]
+    public void Evaluate_ForeachOverDictionary_VisitsKeys()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let values = {"first": 2, "second": 3};
+let total = 0;
+
+foreach (key in values)
+{
+    total = total + values[key];
+}
+""");
+
+        Assert.Equal(5, env.GetValue("total"));
+    }
+
+    [Fact]
+    public void Evaluate_ForeachBreakAndContinue_ControlLoopExecution()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let values = [1, 2, 3, 4, 5];
+let total = 0;
+
+foreach (value in values)
+{
+    if (value == 2)
+    {
+        continue;
+    }
+
+    if (value == 4)
+    {
+        break;
+    }
+
+    total = total + value;
+}
+""");
+
+        Assert.Equal(4, env.GetValue("total"));
+    }
+
+    [Fact]
+    public void Evaluate_ForeachIterator_DoesNotLeakOutsideLoop()
+    {
+        var env = InterpreterTestHelpers.Run("""
+foreach (value in [1])
+{
+}
+""");
+
+        Assert.Throws<Exception>(() => env.GetValue("value"));
+    }
 }
