@@ -11,6 +11,13 @@ namespace SpineIDE.Models.Layout;
 
 public class DockFactory : Factory
     {
+        private readonly OutputPanelVM _outputPanel;
+
+        public DockFactory(OutputPanelVM outputPanel)
+        {
+            _outputPanel = outputPanel;
+        }
+
         public override IRootDock CreateLayout()
         {
             var variableExplorer = new VariableExplorerVM { Id = "Variables", Title = "Variable Explorer" };
@@ -19,10 +26,13 @@ public class DockFactory : Factory
 
             //var previewToolDock = new ToolDock { ActiveDockable = imagePreview, VisibleDockables = CreateList<IDockable>(imagePreview) };
             var variablesToolDock = new ToolDock { ActiveDockable = variableExplorer, VisibleDockables = CreateList<IDockable>(variableExplorer) };
+            var outputToolDock = new ToolDock { ActiveDockable = _outputPanel, VisibleDockables = CreateList<IDockable>(_outputPanel) };
             var documentDock = new DocumentDock { Id = "Scripts", ActiveDockable = scriptEditor, VisibleDockables = CreateList<IDockable>(scriptEditor) };
 
             //previewToolDock.Proportion = 0.5;
             //variablesToolDock.Proportion = 0.5;
+            _outputPanel.Id = "Output";
+            _outputPanel.Title = "Output";
 
             var leftVerticalPanel = new ProportionalDock
             {
@@ -37,16 +47,29 @@ public class DockFactory : Factory
             };
 
             documentDock.Proportion = 0.75;
+            outputToolDock.Proportion = 0.25;
 
-            // main layout
-            var proportionalDock = new ProportionalDock
+            var editorLayout = new ProportionalDock
             {
                 Orientation = Orientation.Horizontal,
+                Proportion = 0.75,
                 VisibleDockables = CreateList<IDockable>
                 (
                     leftVerticalPanel, // nested vertical
                     new ProportionalDockSplitter(),
                     documentDock
+                )
+            };
+
+            // main layout
+            var proportionalDock = new ProportionalDock
+            {
+                Orientation = Orientation.Vertical,
+                VisibleDockables = CreateList<IDockable>
+                (
+                    editorLayout,
+                    new ProportionalDockSplitter(),
+                    outputToolDock
                 )
             };
 
@@ -66,6 +89,7 @@ public class DockFactory : Factory
             {
                 ["Variables"] = () => layout,
                 ["Preview"]   = () => layout,
+                ["Output"]    = () => layout,
                 ["Editor"]    = () => layout
             };
 

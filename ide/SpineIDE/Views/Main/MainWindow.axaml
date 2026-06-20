@@ -48,6 +48,21 @@
             </Border>
         </DataTemplate>
 
+        <DataTemplate DataType="{x:Type panels:OutputPanelVM}">
+            <TextBox Text="{Binding OutputText}"
+                     IsReadOnly="True"
+                     AcceptsReturn="True"
+                     TextWrapping="NoWrap"
+                     FontFamily="Cascadia Code, Consolas"
+                     FontSize="13"
+                     Background="#1E1E1E"
+                     Foreground="#D4D4D4"
+                     BorderThickness="0"
+                     Padding="8"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     ScrollViewer.HorizontalScrollBarVisibility="Auto" />
+        </DataTemplate>
+
         <DataTemplate DataType="{x:Type editor:ScriptEditorVM}">
             <editor:ScriptEditorView />
         </DataTemplate>

@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using CommunityToolkit.Mvvm.Messaging;
 using SpineIDE.Services;
 using System;
+using SpineIDE.Panels;
 
 namespace SpineIDE;
 
@@ -26,6 +27,7 @@ public partial class App : Application
 
         collection.AddSingleton<IMessenger>(WeakReferenceMessenger.Default);
         collection.AddSingleton<IDialogService, DialogService>();
+        collection.AddSingleton<OutputPanelVM>();
         collection.AddTransient<IErrorService, ErrorService>();
 
         collection.AddTransient<MainWindowVM>();

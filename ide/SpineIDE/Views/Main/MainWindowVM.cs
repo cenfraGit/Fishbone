@@ -1,7 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -11,6 +10,7 @@ using Dock.Model.Core;
 using Fishbone.Engine;
 using SpineIDE.Models.Layout;
 using SpineIDE.Models.Messages;
+using SpineIDE.Panels;
 using SpineIDE.Services;
 using SpineIDE.Views.Editor;
 
@@ -23,6 +23,7 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
     // --------------------------------------------------------------------------------
 
     IDialogService _dialogService;
+    private readonly OutputPanelVM _outputPanel;
     public IErrorService ErrorService { get; set; }
 
     private static int _newFileCounter = 1;
@@ -34,12 +35,13 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
     // construtor
     // --------------------------------------------------------------------------------
 
-    public MainWindowVM(IDialogService dialogService, IErrorService errorService)
+    public MainWindowVM(IDialogService dialogService, IErrorService errorService, OutputPanelVM outputPanel)
     {
         this._dialogService = dialogService;
         this.ErrorService = errorService;
+        this._outputPanel = outputPanel;
 
-        Factory = new DockFactory();
+        Factory = new DockFactory(outputPanel);
         Layout = Factory?.CreateLayout();
         if (Layout != null)
             Factory?.InitLayout(Layout);
@@ -58,6 +60,7 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         // whenever we receive the requested script code, execute it
 
         this.ErrorService.ClearErrors();
+        _outputPanel.Clear();
 
         string currentDirectory = Directory.GetCurrentDirectory();
 
@@ -67,6 +70,9 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
                 Directory.SetCurrentDirectory(m.Script.Directory);
 
             var configuration = new FishboneConfiguration();
+            configuration.RegisterFunction("print", new Action<object?>(_outputPanel.Append));
+            configuration.RegisterFunction("println", new Action<object?>(_outputPanel.AppendLine));
+
             var environment = FishboneEngine.Run(m.Script.Code, configuration);
             WeakReferenceMessenger.Default.Send(new MessageExecutionFinished(m.Script.Name, environment));
         }
