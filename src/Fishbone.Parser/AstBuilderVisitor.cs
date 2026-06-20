@@ -84,6 +84,15 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         return innerExpr;
     }
 
+    public override AstNode VisitListExpr(FishboneParser.ListExprContext context)
+    {
+        var elements = new List<AstNode>();
+        for (int i = 0; i < context.expr().Length; i++)
+            elements.Add(Visit(context.expr(i)));
+
+        return new ListNode(elements.ToImmutableArray());
+    }
+
     public override AstNode VisitDeclarationStat(FishboneParser.DeclarationStatContext context)
     {
         var names = context.ID().Select(id => id.GetText()).ToList();

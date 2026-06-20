@@ -23,6 +23,7 @@ public class FishboneInterpreter
             BlockNode block => EvaluateBlock(env, block),
             FunctionDefinitionNode functionDefinition => EvaluateFunctionDefinition(env, functionDefinition),
             FunctionCallNode functionCall => EvaluateFunctionCall(env, functionCall),
+            ListNode listNode => EvaluateListNode(env, listNode),
             ReturnNode returnNode => EvaluateReturn(env, returnNode),
             BreakNode breakNode => EvaluateBreak(env, breakNode),
             ContinueNode continueNode => EvaluateContinue(env, continueNode),
@@ -247,6 +248,11 @@ public class FishboneInterpreter
         }
 
         throw new Exception($"Symbol \"{node.Name}\" is not a callable target.");
+    }
+
+    internal object EvaluateListNode(FishboneEnvironment env, ListNode node)
+    {
+        return node.Elements.Select(i => Evaluate(env, i)).ToList();
     }
 
     internal object EvaluateReturn(FishboneEnvironment env, ReturnNode node)

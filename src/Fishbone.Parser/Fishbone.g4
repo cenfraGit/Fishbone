@@ -41,6 +41,7 @@ continueStat : 'continue' ;
 
 expr
     : '(' expr ')'                    #ParenthesesExpr
+    | '[' (expr (COMMA expr)*)? ']'   #ListExpr
     | functionCallStat                #FunctionCallExpr
     | (MINUS|NOT) expr                #UnaryExpr
     | expr (MUL|DIV) expr             #BinaryExpr

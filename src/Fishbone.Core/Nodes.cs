@@ -172,3 +172,26 @@ public record FunctionCallNode(
         return hash.ToHashCode();
     }
 }
+
+public record ListNode(
+    ImmutableArray<AstNode> Elements
+) : AstNode
+{
+    public virtual bool Equals(ListNode? other)
+    {
+        if (other is null) return false;
+        if (ReferenceEquals(this, other)) return true;
+
+        return Elements.SequenceEqual(other.Elements);
+    }
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        foreach (var element in Elements)
+        {
+            hash.Add(element);
+        }
+        return hash.ToHashCode();
+    }
+}
