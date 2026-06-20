@@ -1,5 +1,6 @@
 using Fishbone.Core;
 using System.Collections;
+using System.Reflection;
 
 namespace Fishbone.Interpreter;
 
@@ -28,6 +29,7 @@ public class FishboneInterpreter
             ListNode listNode => EvaluateListNode(env, listNode),
             DictionaryNode dictionaryNode => EvaluateDictionaryNode(env, dictionaryNode),
             IndexingNode indexingNode => EvaluateIndexingNode(env, indexingNode),
+            MemberAccessNode memberAccessNode => EvaluateMemberAccessNode(env, memberAccessNode),
             ReturnNode returnNode => EvaluateReturn(env, returnNode),
             BreakNode breakNode => EvaluateBreak(env, breakNode),
             ContinueNode continueNode => EvaluateContinue(env, continueNode),
@@ -236,9 +238,9 @@ public class FishboneInterpreter
             if (argumentNodes.Count != fishboneFunction.Arity)
                 throw new Exception($"Expected {fishboneFunction.Arity} args but got {argumentNodes.Count}.");
 
-        var evaluatedArgs = new List<object>();
+            var evaluatedArgs = new List<object>();
             foreach (var argNode in argumentNodes)
-            evaluatedArgs.Add(Evaluate(env, argNode));
+                evaluatedArgs.Add(Evaluate(env, argNode));
 
             return fishboneFunction.Call(this, evaluatedArgs);
         }
@@ -256,7 +258,7 @@ public class FishboneInterpreter
     }
 
     internal object InvokeBoundMethod(FishboneEnvironment env, BoundMethod boundMethod, IReadOnlyList<AstNode> argumentNodes)
-        {
+    {
         foreach (var method in boundMethod.Methods)
             if (TryBuildInvocation(env, method.GetParameters(), argumentNodes, out var args, out var writeBacks))
                 return InvokeMethod(env, boundMethod.Target, method, args, writeBacks);
@@ -299,7 +301,7 @@ public class FishboneInterpreter
         IReadOnlyList<AstNode> argumentNodes,
         out object?[] args,
         out List<(string Name, int Index)> writeBacks)
-            {
+    {
         args = new object?[parameters.Length];
         writeBacks = [];
 
@@ -307,7 +309,7 @@ public class FishboneInterpreter
             return false;
 
         for (int i = 0; i < parameters.Length; i++)
-                {
+        {
             var parameter = parameters[i];
             var parameterType = parameter.ParameterType;
             var isByRef = parameterType.IsByRef;
@@ -323,40 +325,40 @@ public class FishboneInterpreter
                 env.GetValue(identifier.Name);
                 args[i] = GetDefaultValue(targetType);
                 writeBacks.Add((identifier.Name, i));
-                    continue;
-                }
+                continue;
+            }
 
             object? rawArg;
             if (isByRef)
-                {
+            {
                 if (argumentNodes[i] is not IdentifierNode identifier)
                     throw new Exception($"Ref argument \"{parameter.Name}\" must be a variable.");
 
                 rawArg = env.GetValue(identifier.Name);
                 writeBacks.Add((identifier.Name, i));
-                }
-                else
-                {
+            }
+            else
+            {
                 rawArg = Evaluate(env, argumentNodes[i]);
-                }
+            }
 
             if (!TryConvertArgument(rawArg, targetType, out var convertedArg))
                 return false;
 
             args[i] = convertedArg;
-            }
+        }
 
         return true;
     }
 
     private static object? GetDefaultValue(Type type)
-            {
+    {
         var targetType = Nullable.GetUnderlyingType(type) ?? type;
         return targetType.IsValueType ? Activator.CreateInstance(targetType) : null;
-            }
+    }
 
     private static bool TryConvertArgument(object? rawArg, Type targetType, out object? convertedArg)
-            {
+    {
         var nullableType = Nullable.GetUnderlyingType(targetType);
         var conversionType = nullableType ?? targetType;
 
@@ -364,7 +366,7 @@ public class FishboneInterpreter
         {
             convertedArg = GetDefaultValue(conversionType);
             return !conversionType.IsValueType || nullableType is not null || convertedArg is not null;
-            }
+        }
 
         if (targetType.IsInstanceOfType(rawArg))
         {
@@ -386,7 +388,7 @@ public class FishboneInterpreter
             {
                 convertedArg = Convert.ChangeType(rawArg, conversionType);
                 return true;
-        }
+            }
         }
         catch
         {
@@ -422,6 +424,37 @@ public class FishboneInterpreter
             return dict[index]!;
         else
             throw new Exception("Object is not indexable");
+    }
+
+    internal object EvaluateMemberAccessNode(FishboneEnvironment env,  MemberAccessNode node)
+    {
+        var target = Evaluate(env, node.Target);
+        if (target is null)
+            throw new Exception($"Cannot access member \"{node.MemberName}\" on null.");
+
+        const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
+        var type = target.GetType();
+
+        var property = type
+            .GetProperties(flags)
+            .FirstOrDefault(prop => prop.Name == node.MemberName && prop.GetIndexParameters().Length == 0);
+        if (property is not null)
+            return property.GetValue(target)!;
+
+        var field = type
+            .GetFields(flags)
+            .FirstOrDefault(fieldInfo => fieldInfo.Name == node.MemberName);
+        if (field is not null)
+            return field.GetValue(target)!;
+
+        var methods = type
+            .GetMethods(flags)
+            .Where(method => method.Name == node.MemberName && !method.IsSpecialName)
+            .ToArray();
+        if (methods.Length > 0)
+            return new BoundMethod(target, methods);
+
+        throw new Exception($"Type \"{type.Name}\" does not have a public member named \"{node.MemberName}\".");
     }
 
     internal object EvaluateReturn(FishboneEnvironment env, ReturnNode node)

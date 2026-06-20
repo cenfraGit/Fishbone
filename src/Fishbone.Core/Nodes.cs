@@ -236,3 +236,21 @@ public record IndexingNode(
         return HashCode.Combine(Target, Index);
     }
 }
+
+public record MemberAccessNode(
+    AstNode Target,
+    string MemberName
+) : AstNode
+{
+    public virtual bool Equals(MemberAccessNode? other)
+    {
+        if (other is null) return false;
+        if (ReferenceEquals(this, other)) return true;
+        return Target.Equals(other.Target) && MemberName == other.MemberName;
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(Target, MemberName);
+    }
+}

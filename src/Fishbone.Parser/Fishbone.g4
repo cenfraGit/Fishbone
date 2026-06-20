@@ -44,6 +44,7 @@ expr
     | '[' (expr (COMMA expr)*)? ']'           #ListExpr
     | '{' (dictPair (COMMA dictPair)*)? '}'   #DictionaryExpr
     | expr '(' (expr (COMMA expr)*)? ')'      #CallExpr
+    | expr '.' ID                             #MemberAccessExpr
     | expr '[' expr ']'                       #IndexingExpr
     | (MINUS|NOT) expr                        #UnaryExpr
     | expr (MUL|DIV) expr                     #BinaryExpr
