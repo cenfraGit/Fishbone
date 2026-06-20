@@ -1,8 +1,11 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using AvaloniaEdit;
-using AvaloniaEdit.Indentation.CSharp;
+using AvaloniaEdit.Document;
 using AvaloniaEdit.TextMate;
+using System;
 using TextMateSharp.Grammars;
 using SpineIDE.Models.Messages;
 using CommunityToolkit.Mvvm.Messaging;
@@ -45,7 +48,70 @@ public partial class ScriptEditorView : UserControl
 
             editor.Options.ConvertTabsToSpaces = true;
             editor.Options.IndentationSize = 4;
-            editor.TextArea.IndentationStrategy = new CSharpIndentationStrategy(editor.Options);
+            editor.AddHandler(InputElement.KeyDownEvent, OnEditorKeyDown, RoutingStrategies.Tunnel, handledEventsToo: true);
+            editor.AddHandler(InputElement.TextInputEvent, OnEditorTextInput, RoutingStrategies.Tunnel, handledEventsToo: true);
+        }
+    }
+
+    private void OnEditorKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+            return;
+
+        var document = Editor.Document;
+        int caretOffset = Editor.CaretOffset;
+        var line = document.GetLineByOffset(caretOffset);
+        string lineBeforeCaret = document.GetText(line.Offset, caretOffset - line.Offset);
+        string indent = FishboneEditorIndentation.IndentForNewLine(document.Text, line.Offset, caretOffset, Editor.Options.IndentationSize);
+        string newline = Environment.NewLine;
+
+        e.Handled = true;
+
+        using (document.RunUpdate())
+        {
+            if (FishboneEditorIndentation.IsBetweenBraces(document.Text, caretOffset))
+            {
+                string closingIndent = FishboneEditorIndentation.LeadingWhitespace(lineBeforeCaret);
+                string insertion = newline + indent + newline + closingIndent;
+                document.Insert(caretOffset, insertion);
+                Editor.CaretOffset = caretOffset + newline.Length + indent.Length;
+                return;
+            }
+
+            document.Insert(caretOffset, newline + indent);
+            Editor.CaretOffset = caretOffset + newline.Length + indent.Length;
+        }
+    }
+
+    private void OnEditorTextInput(object? sender, TextInputEventArgs e)
+    {
+        if (e.Text != "}")
+            return;
+
+        var document = Editor.Document;
+        int caretOffset = Editor.CaretOffset;
+        if (caretOffset < 0)
+            return;
+
+        DocumentLine line = document.GetLineByOffset(caretOffset);
+        string lineBeforeBrace = document.GetText(line.Offset, caretOffset - line.Offset);
+        if (!FishboneEditorIndentation.ShouldDedentClosingBrace(lineBeforeBrace))
+            return;
+
+        string currentIndent = FishboneEditorIndentation.LeadingWhitespace(lineBeforeBrace);
+        string newIndent = FishboneEditorIndentation.Dedent(currentIndent, Editor.Options.IndentationSize);
+        int removeLength = currentIndent.Length - newIndent.Length;
+
+        e.Handled = true;
+
+        using (document.RunUpdate())
+        {
+            if (removeLength > 0)
+                document.Remove(line.Offset, removeLength);
+
+            int insertOffset = caretOffset - removeLength;
+            document.Insert(insertOffset, "}");
+            Editor.CaretOffset = insertOffset + 1;
         }
     }
 

@@ -4,6 +4,7 @@
     <Project Path="tests/Fishbone.Engine.Tests/Fishbone.Engine.Tests.csproj" />
     <Project Path="tests/Fishbone.Interpreter.Tests/Fishbone.Interpreter.Tests.csproj" />
     <Project Path="tests/Fishbone.Parser.Tests/Fishbone.Parser.Tests.csproj" />
+    <Project Path="tests/SpineIDE.Tests/SpineIDE.Tests.csproj" />
   </Folder>
   <Folder Name="/IDE/">
     <Project Path="ide/SpineIDE/SpineIDE.csproj" />
