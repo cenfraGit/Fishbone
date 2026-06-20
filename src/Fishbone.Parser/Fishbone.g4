@@ -62,7 +62,7 @@ expr
 COMMA  : ',' ;
 SEMI   : ';' ;
 
-INT    : [0-9]+;
+INT    : [0-9]+ ('_'+ [0-9]+)* ;
 FLOAT  : [0-9]* '.' [0-9]+ ;
 STRING : '"' ~["]* '"' ; // anything that isnt a quote
 

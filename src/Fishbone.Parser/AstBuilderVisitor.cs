@@ -148,7 +148,9 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
 
     public override AstNode VisitIntExpr(FishboneParser.IntExprContext context)
     {
-        return new LiteralNode(int.Parse(context.INT().GetText()));
+        var text = context.INT().GetText();
+        text = text.Replace("_", string.Empty);
+        return new LiteralNode(int.Parse(text));
     }
 
     public override AstNode VisitFloatExpr(FishboneParser.FloatExprContext context)
