@@ -52,4 +52,36 @@ let scriptResult = explode();
 
         Assert.Equal("boom", exception.Message);
     }
+
+    [Fact]
+    public void Run_CSharpDelegateBridge_AssignsOutAndRefIdentifierArguments()
+    {
+        var config = new FishboneConfiguration()
+            .RegisterFunction("tryParse", new TryParseDelegate(TryParse))
+            .RegisterFunction("increment", new IncrementDelegate(Increment));
+
+        var env = FishboneEngine.Run("""
+let parsed = 0;
+let ok = tryParse("42", parsed);
+let value = 10;
+increment(value);
+""", config);
+
+        Assert.Equal(true, env.GetValue("ok"));
+        Assert.Equal(42, env.GetValue("parsed"));
+        Assert.Equal(11, env.GetValue("value"));
+    }
+
+    private delegate bool TryParseDelegate(string text, out int value);
+    private delegate void IncrementDelegate(ref int value);
+
+    private static bool TryParse(string text, out int value)
+    {
+        return int.TryParse(text, out value);
+    }
+
+    private static void Increment(ref int value)
+    {
+        value++;
+    }
 }
