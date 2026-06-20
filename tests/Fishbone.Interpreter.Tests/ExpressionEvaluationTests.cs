@@ -128,4 +128,27 @@ let nested = {"list": [1, x], "dict": {"inner": x + 1}};
         Assert.Equal(11, inner["inner"]);
     }
 
+    [Fact]
+    public void Evaluate_IndexingExpressions_ReadsListsAndDictionaries()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let values = [10, 20, 30];
+let first = values[0];
+let i = 1;
+let expressionIndex = values[i + 1];
+let keyed = {"name": "Fishbone", 7: "seven"};
+let name = keyed["name"];
+let number = keyed[7];
+let matrix = [[1, 2], [3, 4]];
+let nestedListValue = matrix[1][0];
+let nestedDictValue = {"outer": {"inner": 42}}["outer"]["inner"];
+""");
+
+        Assert.Equal(10, env.GetValue("first"));
+        Assert.Equal(30, env.GetValue("expressionIndex"));
+        Assert.Equal("Fishbone", env.GetValue("name"));
+        Assert.Equal("seven", env.GetValue("number"));
+        Assert.Equal(3, env.GetValue("nestedListValue"));
+        Assert.Equal(42, env.GetValue("nestedDictValue"));
+    }
 }

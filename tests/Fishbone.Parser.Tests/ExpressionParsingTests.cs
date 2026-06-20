@@ -199,4 +199,43 @@ let nested = {"list": [1, 2], "dict": {"inner": 3}};
 
         Assert.Equal(expectedAst, ast);
     }
+
+    [Fact]
+    public void Parse_IndexingExpressions_ReturnsIndexingNodes()
+    {
+        var ast = ParserTestHelpers.ParseProgram("""
+let first = values[0];
+let keyed = values["name"];
+let nested = matrix[0][1];
+let expressionIndex = values[i + 1];
+""");
+
+        var expectedAst = new ProgramNode(new List<AstNode>
+        {
+            new DeclarationNode(
+                ["first"],
+                new IndexingNode(new IdentifierNode("values"), new LiteralNode(0))
+            ),
+            new DeclarationNode(
+                ["keyed"],
+                new IndexingNode(new IdentifierNode("values"), new LiteralNode("name"))
+            ),
+            new DeclarationNode(
+                ["nested"],
+                new IndexingNode(
+                    new IndexingNode(new IdentifierNode("matrix"), new LiteralNode(0)),
+                    new LiteralNode(1)
+                )
+            ),
+            new DeclarationNode(
+                ["expressionIndex"],
+                new IndexingNode(
+                    new IdentifierNode("values"),
+                    new BinaryOpNode("+", new IdentifierNode("i"), new LiteralNode(1))
+                )
+            )
+        });
+
+        Assert.Equal(expectedAst, ast);
+    }
 }

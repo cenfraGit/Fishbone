@@ -129,6 +129,22 @@ public class AstNodeEqualityTests
     }
 
     [Fact]
+    public void IndexingNode_UsesStructuralTargetAndIndexEquality()
+    {
+        var left = new IndexingNode(
+            new IdentifierNode("values"),
+            new BinaryOpNode("+", new IdentifierNode("i"), new LiteralNode(1))
+        );
+        var right = new IndexingNode(
+            new IdentifierNode("values"),
+            new BinaryOpNode("+", new IdentifierNode("i"), new LiteralNode(1))
+        );
+
+        Assert.Equal(left, right);
+        Assert.Equal(left.GetHashCode(), right.GetHashCode());
+    }
+
+    [Fact]
     public void ListBackedNodes_WhenOrderDiffers_AreNotEqual()
     {
         var left = new ProgramNode(new List<AstNode>
@@ -165,6 +181,15 @@ public class AstNodeEqualityTests
             new KeyValuePairNode(new LiteralNode("y"), new LiteralNode(2)),
             new KeyValuePairNode(new LiteralNode("x"), new LiteralNode(1))
         ]);
+
+        Assert.NotEqual(left, right);
+    }
+
+    [Fact]
+    public void IndexingNode_WhenIndexDiffers_IsNotEqual()
+    {
+        var left = new IndexingNode(new IdentifierNode("values"), new LiteralNode(0));
+        var right = new IndexingNode(new IdentifierNode("values"), new LiteralNode(1));
 
         Assert.NotEqual(left, right);
     }
