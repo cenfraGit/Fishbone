@@ -38,22 +38,24 @@ functionDefinitionStat : FUNC ID '(' (ID (COMMA ID)*)? ')' blockStat ;
 returnStat : RETURN (expr (COMMA expr)*)? ;
 breakStat : 'break' ;
 continueStat : 'continue' ;
+dictPair : expr COLON expr ;
 
 expr
-    : '(' expr ')'                    #ParenthesesExpr
-    | '[' (expr (COMMA expr)*)? ']'   #ListExpr
-    | functionCallStat                #FunctionCallExpr
-    | (MINUS|NOT) expr                #UnaryExpr
-    | expr (MUL|DIV) expr             #BinaryExpr
-    | expr (PLUS|MINUS) expr          #BinaryExpr
-    | expr (GE|LE|GT|LT) expr         #BinaryExpr
-    | expr (EQ|NEQ) expr              #BinaryExpr
-    | expr (AND|OR|XOR) expr          #BoolOperatorExpr
-    | ID                              #IdExpr
-    | INT                             #IntExpr
-    | FLOAT                           #FloatExpr
-    | STRING                          #StringExpr
-    | (TRUE|FALSE)                    #BoolExpr
+    : '(' expr ')'                            #ParenthesesExpr
+    | '[' (expr (COMMA expr)*)? ']'           #ListExpr
+    | '{' (dictPair (COMMA dictPair)*)? '}'   #DictionaryExpr
+    | functionCallStat                        #FunctionCallExpr
+    | (MINUS|NOT) expr                        #UnaryExpr
+    | expr (MUL|DIV) expr                     #BinaryExpr
+    | expr (PLUS|MINUS) expr                  #BinaryExpr
+    | expr (GE|LE|GT|LT) expr                 #BinaryExpr
+    | expr (EQ|NEQ) expr                      #BinaryExpr
+    | expr (AND|OR|XOR) expr                  #BoolOperatorExpr
+    | ID                                      #IdExpr
+    | INT                                     #IntExpr
+    | FLOAT                                   #FloatExpr
+    | STRING                                  #StringExpr
+    | (TRUE|FALSE)                            #BoolExpr
     ;
 
 // --------------------------------------------------------------------------------
@@ -62,6 +64,7 @@ expr
 
 COMMA  : ',' ;
 SEMI   : ';' ;
+COLON  : ':' ;
 
 INT    : [0-9]+ ('_'+ [0-9]+)* ;
 FLOAT  : [0-9]* '.' [0-9]+ ;

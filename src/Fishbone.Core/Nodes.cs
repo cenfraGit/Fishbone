@@ -195,3 +195,25 @@ public record ListNode(
         return hash.ToHashCode();
     }
 }
+
+public record KeyValuePairNode(AstNode Key, AstNode Value) : AstNode;
+
+public record DictionaryNode(
+    ImmutableArray<KeyValuePairNode> Pairs
+) : AstNode
+{
+    public virtual bool Equals(DictionaryNode? other)
+    {
+        if (other is null) return false;
+        if (ReferenceEquals(this, other)) return true;
+        return Pairs.SequenceEqual(other.Pairs);
+    }
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        foreach (var pair in Pairs)
+            hash.Add(pair);
+        return hash.ToHashCode();
+    }
+}

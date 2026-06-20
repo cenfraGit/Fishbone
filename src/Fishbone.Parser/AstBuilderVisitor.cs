@@ -93,6 +93,19 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         return new ListNode(elements.ToImmutableArray());
     }
 
+    public override AstNode VisitDictionaryExpr(FishboneParser.DictionaryExprContext context)
+    {
+        var keyValuePairs = new List<KeyValuePairNode>();
+        for (int i = 0; i < context.dictPair().Count(); i++)
+        {
+            var dictPair = context.dictPair(i);
+            var key = Visit(dictPair.expr(0));
+            var value = Visit(dictPair.expr(1));
+            keyValuePairs.Add(new KeyValuePairNode(key, value));
+        }
+        return new DictionaryNode(keyValuePairs.ToImmutableArray());
+    }
+
     public override AstNode VisitDeclarationStat(FishboneParser.DeclarationStatContext context)
     {
         var names = context.ID().Select(id => id.GetText()).ToList();

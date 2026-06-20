@@ -24,6 +24,7 @@ public class FishboneInterpreter
             FunctionDefinitionNode functionDefinition => EvaluateFunctionDefinition(env, functionDefinition),
             FunctionCallNode functionCall => EvaluateFunctionCall(env, functionCall),
             ListNode listNode => EvaluateListNode(env, listNode),
+            DictionaryNode dictionaryNode => EvaluateDictionaryNode(env, dictionaryNode),
             ReturnNode returnNode => EvaluateReturn(env, returnNode),
             BreakNode breakNode => EvaluateBreak(env, breakNode),
             ContinueNode continueNode => EvaluateContinue(env, continueNode),
@@ -253,6 +254,14 @@ public class FishboneInterpreter
     internal object EvaluateListNode(FishboneEnvironment env, ListNode node)
     {
         return node.Elements.Select(i => Evaluate(env, i)).ToList();
+    }
+
+    internal object EvaluateDictionaryNode(FishboneEnvironment env, DictionaryNode node)
+    {
+        Dictionary<object, object?> newDict = [];
+        foreach (var item in node.Pairs)
+            newDict.Add(Evaluate(env, item.Key), Evaluate(env, item.Value));
+        return newDict;
     }
 
     internal object EvaluateReturn(FishboneEnvironment env, ReturnNode node)
