@@ -95,8 +95,8 @@ let boolValue = true;
         {
             new DeclarationNode(
                 ["formatted"],
-                new FunctionCallNode(
-                    "formatValue",
+                new CallNode(
+                    new IdentifierNode("formatValue"),
                     [new LiteralNode(42), new IdentifierNode("precision")]
                 )
             )
@@ -131,7 +131,7 @@ let nested = [[1, 2], [3, 4]];
                 new ListNode([
                     new IdentifierNode("x"),
                     new BinaryOpNode("+", new IdentifierNode("x"), new LiteralNode(1)),
-                    new FunctionCallNode("format", [new LiteralNode(42)])
+                    new CallNode(new IdentifierNode("format"), [new LiteralNode(42)])
                 ])
             ),
             new DeclarationNode(
@@ -175,7 +175,7 @@ let nested = {"list": [1, 2], "dict": {"inner": 3}};
                         new BinaryOpNode("+", new IdentifierNode("x"), new LiteralNode(1))
                     ),
                     new KeyValuePairNode(
-                        new FunctionCallNode("format", [new LiteralNode(42)]),
+                        new CallNode(new IdentifierNode("format"), [new LiteralNode(42)]),
                         new IdentifierNode("value")
                     )
                 ])
@@ -232,6 +232,62 @@ let expressionIndex = values[i + 1];
                 new IndexingNode(
                     new IdentifierNode("values"),
                     new BinaryOpNode("+", new IdentifierNode("i"), new LiteralNode(1))
+                )
+            )
+        });
+
+        Assert.Equal(expectedAst, ast);
+    }
+
+    [Fact]
+    public void Parse_MemberAccessExpressions_ReturnsMemberAccessNodes()
+    {
+        var ast = ParserTestHelpers.ParseProgram("""
+let property = obj.Name;
+let chain = obj.Child.Name;
+let indexed = obj.Items[0].Name;
+let called = obj.GetChild().Name;
+let method = obj.Resize(100, 200);
+""");
+
+        var expectedAst = new ProgramNode(new List<AstNode>
+        {
+            new DeclarationNode(
+                ["property"],
+                new MemberAccessNode(new IdentifierNode("obj"), "Name")
+            ),
+            new DeclarationNode(
+                ["chain"],
+                new MemberAccessNode(
+                    new MemberAccessNode(new IdentifierNode("obj"), "Child"),
+                    "Name"
+                )
+            ),
+            new DeclarationNode(
+                ["indexed"],
+                new MemberAccessNode(
+                    new IndexingNode(
+                        new MemberAccessNode(new IdentifierNode("obj"), "Items"),
+                        new LiteralNode(0)
+                    ),
+                    "Name"
+                )
+            ),
+            new DeclarationNode(
+                ["called"],
+                new MemberAccessNode(
+                    new CallNode(
+                        new MemberAccessNode(new IdentifierNode("obj"), "GetChild"),
+                        []
+                    ),
+                    "Name"
+                )
+            ),
+            new DeclarationNode(
+                ["method"],
+                new CallNode(
+                    new MemberAccessNode(new IdentifierNode("obj"), "Resize"),
+                    [new LiteralNode(100), new LiteralNode(200)]
                 )
             )
         });

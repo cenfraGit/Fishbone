@@ -25,8 +25,8 @@ first, second = getValues();
                     new BinaryOpNode("*", new LiteralNode(3), new LiteralNode(2))
                 )
             ),
-            new DeclarationNode(["first", "second"], new FunctionCallNode("getValues", [])),
-            new AssignmentNode(["first", "second"], new FunctionCallNode("getValues", []))
+            new DeclarationNode(["first", "second"], new CallNode(new IdentifierNode("getValues"), [])),
+            new AssignmentNode(["first", "second"], new CallNode(new IdentifierNode("getValues"), []))
         });
 
         Assert.Equal(expectedAst, ast);

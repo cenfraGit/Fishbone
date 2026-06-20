@@ -65,10 +65,10 @@ public class AstNodeEqualityTests
     }
 
     [Fact]
-    public void FunctionCallNode_UsesStructuralArgumentEquality()
+    public void CallNode_UsesStructuralCalleeAndArgumentEquality()
     {
-        var left = new FunctionCallNode("record", [new LiteralNode(1), new IdentifierNode("value")]);
-        var right = new FunctionCallNode("record", [new LiteralNode(1), new IdentifierNode("value")]);
+        var left = new CallNode(new IdentifierNode("record"), [new LiteralNode(1), new IdentifierNode("value")]);
+        var right = new CallNode(new IdentifierNode("record"), [new LiteralNode(1), new IdentifierNode("value")]);
 
         Assert.Equal(left, right);
         Assert.Equal(left.GetHashCode(), right.GetHashCode());
@@ -139,6 +139,16 @@ public class AstNodeEqualityTests
             new IdentifierNode("values"),
             new BinaryOpNode("+", new IdentifierNode("i"), new LiteralNode(1))
         );
+
+        Assert.Equal(left, right);
+        Assert.Equal(left.GetHashCode(), right.GetHashCode());
+    }
+
+    [Fact]
+    public void MemberAccessNode_UsesStructuralTargetAndMemberEquality()
+    {
+        var left = new MemberAccessNode(new IdentifierNode("target"), "Name");
+        var right = new MemberAccessNode(new IdentifierNode("target"), "Name");
 
         Assert.Equal(left, right);
         Assert.Equal(left.GetHashCode(), right.GetHashCode());

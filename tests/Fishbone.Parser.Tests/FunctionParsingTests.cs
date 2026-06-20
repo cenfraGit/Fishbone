@@ -64,8 +64,8 @@ record(1, value);
 
         var expectedAst = new ProgramNode(new List<AstNode>
         {
-            new FunctionCallNode("reset", []),
-            new FunctionCallNode("record", [new LiteralNode(1), new IdentifierNode("value")])
+            new CallNode(new IdentifierNode("reset"), []),
+            new CallNode(new IdentifierNode("record"), [new LiteralNode(1), new IdentifierNode("value")])
         });
 
         Assert.Equal(expectedAst, ast);
