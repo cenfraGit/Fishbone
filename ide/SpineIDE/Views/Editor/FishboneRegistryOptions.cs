@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System;
 using TextMateSharp.Internal.Grammars.Reader;
 using TextMateSharp.Internal.Themes.Reader;
 using TextMateSharp.Internal.Types;
@@ -9,25 +10,22 @@ using TextMateSharp.Themes;
 
 namespace SpineIDE.Views.Editor;
 
-public class FishboneRegistryOptions : IRegistryOptions
+public sealed class FishboneRegistryOptions : IRegistryOptions
 {
-    private readonly string _grammarResource = "SpineIDE.Assets.fishbone.tmLanguage.json";
+    private const string GrammarResource = "SpineIDE.Assets.fishbone.tmLanguage.json";
+    private const string ThemeResource = "SpineIDE.Assets.Themes.onedark-color-theme.json";
+
+    private static readonly Lazy<IRawGrammar> CachedGrammar = new(ReadGrammar);
+    private static readonly Lazy<IRawTheme> CachedTheme = new(ReadTheme);
 
     public IRawTheme GetDefaultTheme()
     {
-        return ThemeReader.ReadThemeSync(new StreamReader(
-             Assembly.GetExecutingAssembly().GetManifestResourceStream("SpineIDE.Assets.Themes.onedark-color-theme.json")!));
+        return CachedTheme.Value;
     }
 
     public IRawGrammar? GetGrammar(string scopeName)
     {
-        if (scopeName == "source.fb")
-        {
-            using Stream? stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(_grammarResource);
-            if (stream == null) throw new FileNotFoundException("Grammar resource not found.");
-            return GrammarReader.ReadGrammarSync(new StreamReader(stream));
-        }
-        return null;
+        return scopeName == "source.fb" ? CachedGrammar.Value : null;
     }
 
     public ICollection<string>? GetInjections(string scopeName)
@@ -37,8 +35,26 @@ public class FishboneRegistryOptions : IRegistryOptions
 
     public IRawTheme GetTheme(string scopeName)
     {
-        var names = Assembly.GetExecutingAssembly().GetManifestResourceNames();
-        return ThemeReader.ReadThemeSync(new StreamReader(
-             Assembly.GetExecutingAssembly().GetManifestResourceStream("SpineIDE.Assets.Themes.onedark-color-theme.json")!));
+        return CachedTheme.Value;
+    }
+
+    private static IRawGrammar ReadGrammar()
+    {
+        using Stream? stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(GrammarResource);
+        if (stream == null)
+            throw new FileNotFoundException("Grammar resource not found.", GrammarResource);
+
+        using var reader = new StreamReader(stream);
+        return GrammarReader.ReadGrammarSync(reader);
+    }
+
+    private static IRawTheme ReadTheme()
+    {
+        using Stream? stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(ThemeResource);
+        if (stream == null)
+            throw new FileNotFoundException("Theme resource not found.", ThemeResource);
+
+        using var reader = new StreamReader(stream);
+        return ThemeReader.ReadThemeSync(reader);
     }
 }

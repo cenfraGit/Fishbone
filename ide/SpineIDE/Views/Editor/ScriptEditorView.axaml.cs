@@ -13,12 +13,54 @@ namespace SpineIDE.Views.Editor;
 
 public partial class ScriptEditorView : UserControl
 {
+    private static readonly FishboneRegistryOptions RegistryOptions = new();
     private TextMate.Installation? _textMateInstallation = null;
     private static ScriptEditorView? _activeEditor;
+    private bool _isMessengerRegistered;
 
     public ScriptEditorView()
     {
         InitializeComponent();
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        RegisterMessengerRecipients();
+
+        var editor = this.FindControl<TextEditor>("Editor");
+        if (editor != null && _textMateInstallation == null)
+        {
+            _textMateInstallation = editor.InstallTextMate(RegistryOptions);
+            _textMateInstallation.SetGrammar("source.fb");
+
+            editor.Options.ConvertTabsToSpaces = true;
+            editor.Options.IndentationSize = 4;
+            editor.AddHandler(InputElement.KeyDownEvent, OnEditorKeyDown, RoutingStrategies.Tunnel, handledEventsToo: true);
+            editor.AddHandler(InputElement.TextInputEvent, OnEditorTextInput, RoutingStrategies.Tunnel, handledEventsToo: true);
+            editor.AddHandler(InputElement.GotFocusEvent, OnEditorGotFocus, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+            editor.AddHandler(InputElement.PointerPressedEvent, OnEditorPointerPressed, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+            editor.TextArea.AddHandler(InputElement.GotFocusEvent, OnEditorGotFocus, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+            editor.TextArea.AddHandler(InputElement.PointerPressedEvent, OnEditorPointerPressed, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+            _activeEditor = this;
+        }
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+
+        WeakReferenceMessenger.Default.UnregisterAll(this);
+        _isMessengerRegistered = false;
+
+        if (ReferenceEquals(_activeEditor, this))
+            _activeEditor = null;
+    }
+
+    private void RegisterMessengerRecipients()
+    {
+        if (_isMessengerRegistered)
+            return;
 
         WeakReferenceMessenger.Default.Register<MessageEditorAction>(this, (r, m) =>
         {
@@ -41,29 +83,8 @@ public partial class ScriptEditorView : UserControl
 
             InsertSnippet(m.Text);
         });
-    }
 
-    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
-    {
-        base.OnAttachedToVisualTree(e);
-
-        var editor = this.FindControl<TextEditor>("Editor");
-        if (editor != null && _textMateInstallation == null)
-        {
-            var registryOptions = new FishboneRegistryOptions();
-            _textMateInstallation = editor.InstallTextMate(registryOptions);
-            _textMateInstallation.SetGrammar("source.fb");
-
-            editor.Options.ConvertTabsToSpaces = true;
-            editor.Options.IndentationSize = 4;
-            editor.AddHandler(InputElement.KeyDownEvent, OnEditorKeyDown, RoutingStrategies.Tunnel, handledEventsToo: true);
-            editor.AddHandler(InputElement.TextInputEvent, OnEditorTextInput, RoutingStrategies.Tunnel, handledEventsToo: true);
-            editor.AddHandler(InputElement.GotFocusEvent, OnEditorGotFocus, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
-            editor.AddHandler(InputElement.PointerPressedEvent, OnEditorPointerPressed, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
-            editor.TextArea.AddHandler(InputElement.GotFocusEvent, OnEditorGotFocus, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
-            editor.TextArea.AddHandler(InputElement.PointerPressedEvent, OnEditorPointerPressed, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
-            _activeEditor = this;
-        }
+        _isMessengerRegistered = true;
     }
 
     private void OnEditorGotFocus(object? sender, RoutedEventArgs e)

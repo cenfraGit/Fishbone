@@ -59,7 +59,7 @@ if ($caret$condition)
         string expected = string.Join(Environment.NewLine,
             "if (condition)",
             "    {",
-            "        ",
+            "    ",
             "    }");
 
         Assert.Equal(expected, prepared.Text);
