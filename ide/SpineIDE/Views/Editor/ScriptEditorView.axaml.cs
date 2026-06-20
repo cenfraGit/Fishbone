@@ -6,7 +6,6 @@ using AvaloniaEdit;
 using AvaloniaEdit.Document;
 using AvaloniaEdit.TextMate;
 using System;
-using TextMateSharp.Grammars;
 using SpineIDE.Models.Messages;
 using CommunityToolkit.Mvvm.Messaging;
 
@@ -15,6 +14,7 @@ namespace SpineIDE.Views.Editor;
 public partial class ScriptEditorView : UserControl
 {
     private TextMate.Installation? _textMateInstallation = null;
+    private static ScriptEditorView? _activeEditor;
 
     public ScriptEditorView()
     {
@@ -33,6 +33,14 @@ public partial class ScriptEditorView : UserControl
                 case EditorAction.RemoveLineComment: ToggleLineComment(false); break;
             }
         });
+
+        WeakReferenceMessenger.Default.Register<MessageInsertSnippet>(this, (r, m) =>
+        {
+            if (!ReferenceEquals(_activeEditor, this))
+                return;
+
+            InsertSnippet(m.Text);
+        });
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -50,7 +58,43 @@ public partial class ScriptEditorView : UserControl
             editor.Options.IndentationSize = 4;
             editor.AddHandler(InputElement.KeyDownEvent, OnEditorKeyDown, RoutingStrategies.Tunnel, handledEventsToo: true);
             editor.AddHandler(InputElement.TextInputEvent, OnEditorTextInput, RoutingStrategies.Tunnel, handledEventsToo: true);
+            editor.AddHandler(InputElement.GotFocusEvent, OnEditorGotFocus, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+            editor.AddHandler(InputElement.PointerPressedEvent, OnEditorPointerPressed, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+            editor.TextArea.AddHandler(InputElement.GotFocusEvent, OnEditorGotFocus, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+            editor.TextArea.AddHandler(InputElement.PointerPressedEvent, OnEditorPointerPressed, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+            _activeEditor = this;
         }
+    }
+
+    private void OnEditorGotFocus(object? sender, RoutedEventArgs e)
+    {
+        _activeEditor = this;
+    }
+
+    private void OnEditorPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        _activeEditor = this;
+    }
+
+    private void InsertSnippet(string template)
+    {
+        var document = Editor.Document;
+        int insertOffset = Editor.SelectionLength > 0 ? Editor.SelectionStart : Editor.CaretOffset;
+        var line = document.GetLineByOffset(insertOffset);
+        string lineBeforeInsert = document.GetText(line.Offset, insertOffset - line.Offset);
+        string lineIndent = FishboneEditorIndentation.LeadingWhitespace(lineBeforeInsert);
+        var snippet = FishboneSnippets.Prepare(template, lineIndent);
+
+        using (document.RunUpdate())
+        {
+            if (Editor.SelectionLength > 0)
+                document.Remove(Editor.SelectionStart, Editor.SelectionLength);
+
+            document.Insert(insertOffset, snippet.Text);
+            Editor.CaretOffset = insertOffset + snippet.CaretOffset;
+        }
+
+        Editor.Focus();
     }
 
     private void OnEditorKeyDown(object? sender, KeyEventArgs e)

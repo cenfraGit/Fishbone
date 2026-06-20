@@ -239,6 +239,22 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
 
     [RelayCommand]
     private void OnRemoveLineComment() => WeakReferenceMessenger.Default.Send(new MessageEditorAction(EditorAction.RemoveLineComment));
+
+    [RelayCommand]
+    private void InsertSnippet(string? header)
+    {
+        if (string.IsNullOrWhiteSpace(header))
+            return;
+
+        foreach (var snippet in FishboneSnippets.Core)
+        {
+            if (snippet.Header != header)
+                continue;
+
+            WeakReferenceMessenger.Default.Send(new MessageInsertSnippet(snippet.Template));
+            return;
+        }
+    }
 }
 
 public class MenuItemViewModel

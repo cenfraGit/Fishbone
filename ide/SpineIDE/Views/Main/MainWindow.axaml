@@ -78,6 +78,23 @@
                     </MenuItem.DataTemplates>
 
                 </MenuItem>
+
+                <Separator />
+                <MenuItem Header="_Insert">
+                    <MenuItem Header="let" Command="{Binding InsertSnippetCommand}" CommandParameter="let" />
+                    <MenuItem Header="func" Command="{Binding InsertSnippetCommand}" CommandParameter="func" />
+                    <MenuItem Header="if / else if / else" Command="{Binding InsertSnippetCommand}" CommandParameter="if / else if / else" />
+                    <MenuItem Header="while" Command="{Binding InsertSnippetCommand}" CommandParameter="while" />
+                    <MenuItem Header="foreach" Command="{Binding InsertSnippetCommand}" CommandParameter="foreach" />
+                    <Separator />
+                    <MenuItem Header="return" Command="{Binding InsertSnippetCommand}" CommandParameter="return" />
+                    <MenuItem Header="break" Command="{Binding InsertSnippetCommand}" CommandParameter="break" />
+                    <MenuItem Header="continue" Command="{Binding InsertSnippetCommand}" CommandParameter="continue" />
+                    <Separator />
+                    <MenuItem Header="list" Command="{Binding InsertSnippetCommand}" CommandParameter="list" />
+                    <MenuItem Header="dictionary" Command="{Binding InsertSnippetCommand}" CommandParameter="dictionary" />
+                    <MenuItem Header="import" Command="{Binding InsertSnippetCommand}" CommandParameter="import" />
+                </MenuItem>
             </MenuItem>
 
             <MenuItem Header="_Views">
