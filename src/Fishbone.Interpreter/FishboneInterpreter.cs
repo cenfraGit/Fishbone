@@ -21,6 +21,7 @@ public class FishboneInterpreter
             BinaryOpNode binary => EvaluateBinary(env, binary),
             IfNode ifNode => EvaluateIf(env, ifNode),
             WhileNode whileNode => EvaluateWhile(env, whileNode),
+            ForeachNode foreachNode => EvaluateForeach(env, foreachNode),
             BlockNode block => EvaluateBlock(env, block),
             FunctionDefinitionNode functionDefinition => EvaluateFunctionDefinition(env, functionDefinition),
             FunctionCallNode functionCall => EvaluateFunctionCall(env, functionCall),
@@ -154,6 +155,41 @@ public class FishboneInterpreter
             try
             {
                 lastValue = Evaluate(env, node.Body);
+            }
+            catch (ContinueException)
+            {
+                continue;
+            }
+            catch (BreakException)
+            {
+                break;
+            }
+        }
+
+        return lastValue;
+    }
+
+    internal object EvaluateForeach(FishboneEnvironment env, ForeachNode node)
+    {
+        var iterable = Evaluate(env, node.Iterable);
+        IEnumerable values = iterable switch
+        {
+            IDictionary dictionary => dictionary.Keys,
+            IEnumerable enumerable when enumerable is not string => enumerable,
+            _ => throw new Exception("Object is not iterable.")
+        };
+
+        var loopEnv = new FishboneEnvironment(env);
+        loopEnv.Declare(node.IteratorName, null!);
+        object lastValue = null!;
+
+        foreach (var value in values)
+        {
+            loopEnv.Assign(node.IteratorName, value!);
+
+            try
+            {
+                lastValue = Evaluate(loopEnv, node.Body);
             }
             catch (ContinueException)
             {

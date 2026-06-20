@@ -8,6 +8,7 @@ public record UnaryOpNode(string Operator, AstNode Right) : AstNode;
 public record BinaryOpNode(string Operator, AstNode Left, AstNode Right) : AstNode;
 public record IfNode(AstNode Condition, AstNode ThenBranch, AstNode? ElseBranch) : AstNode;
 public record WhileNode(AstNode Condition, AstNode Body) : AstNode;
+public record ForeachNode(string IteratorName, AstNode Iterable, AstNode Body) : AstNode;
 public record IdentifierNode(string Name) : AstNode;
 public record LiteralNode(object Value) : AstNode;
 

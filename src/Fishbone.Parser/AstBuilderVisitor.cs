@@ -170,6 +170,14 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         return new WhileNode(condition, body);
     }
 
+    public override AstNode VisitForeachStat(FishboneParser.ForeachStatContext context)
+    {
+        var iteratorName = context.ID().GetText();
+        var iterable = Visit(context.expr());
+        var body = Visit(context.blockStat());
+        return new ForeachNode(iteratorName, iterable, body);
+    }
+
     public override AstNode VisitIdExpr(FishboneParser.IdExprContext context)
     {
         return new IdentifierNode(context.ID().GetText());
