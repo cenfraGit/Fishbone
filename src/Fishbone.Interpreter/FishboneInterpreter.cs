@@ -24,7 +24,7 @@ public class FishboneInterpreter
             ForeachNode foreachNode => EvaluateForeach(env, foreachNode),
             BlockNode block => EvaluateBlock(env, block),
             FunctionDefinitionNode functionDefinition => EvaluateFunctionDefinition(env, functionDefinition),
-            FunctionCallNode functionCall => EvaluateFunctionCall(env, functionCall),
+            CallNode callNode => EvaluateCallNode(env, callNode),
             ListNode listNode => EvaluateListNode(env, listNode),
             DictionaryNode dictionaryNode => EvaluateDictionaryNode(env, dictionaryNode),
             IndexingNode indexingNode => EvaluateIndexingNode(env, indexingNode),
@@ -223,70 +223,179 @@ public class FishboneInterpreter
         return null!;
     }
 
-    internal object EvaluateFunctionCall(FishboneEnvironment env, FunctionCallNode node)
+    internal object EvaluateCallNode(FishboneEnvironment env, CallNode node)
     {
-        object callee = env.GetValue(node.Name);
+        var callee = Evaluate(env, node.Callee);
+        return EvaluateCall(env, callee, node.Arguments);
+    }
 
-        // eval arguments
-        var evaluatedArgs = new List<object>();
-        foreach (var argNode in node.Arguments)
-            evaluatedArgs.Add(Evaluate(env, argNode));
-
-        // check if c# delegate
-        if (callee is Delegate csharpDelegate)
-        {
-            var methodParameters = csharpDelegate.Method.GetParameters();
-
-            // check arg count
-            if (evaluatedArgs.Count != methodParameters.Length)
-                throw new Exception($"Expected {methodParameters.Length} args but got {evaluatedArgs.Count}.");
-
-            var marshalledArgs = new object[evaluatedArgs.Count];
-            for (int i = 0; i < evaluatedArgs.Count; i++)
-            {
-                object rawArg = evaluatedArgs[i];
-                Type targetType = methodParameters[i].ParameterType;
-
-                if (rawArg == null)
-                {
-                    marshalledArgs[i] = targetType.IsValueType ? Activator.CreateInstance(targetType)! : null!;
-                    continue;
-                }
-
-                // convert primitives
-                if (targetType.IsPrimitive && rawArg.GetType().IsPrimitive)
-                {
-                    marshalledArgs[i] = Convert.ChangeType(rawArg, targetType);
-                }
-                else
-                {
-                    marshalledArgs[i] = rawArg;
-                }
-            }
-
-            try
-            {
-                // execute with new types
-                return csharpDelegate.DynamicInvoke(marshalledArgs)!;
-            }
-            catch (System.Reflection.TargetInvocationException ex)
-            {
-                throw ex.InnerException ?? ex;
-            }
-        }
-
-        // check if fishbone callable
+    internal object EvaluateCall(FishboneEnvironment env, object callee, IReadOnlyList<AstNode> argumentNodes)
+    {
         if (callee is ICallable fishboneFunction)
         {
-            // check arg count
-            if (evaluatedArgs.Count != fishboneFunction.Arity)
-                throw new Exception($"Expected {fishboneFunction.Arity} args but got {evaluatedArgs.Count}.");
+            if (argumentNodes.Count != fishboneFunction.Arity)
+                throw new Exception($"Expected {fishboneFunction.Arity} args but got {argumentNodes.Count}.");
 
-            // execute
+        var evaluatedArgs = new List<object>();
+            foreach (var argNode in argumentNodes)
+            evaluatedArgs.Add(Evaluate(env, argNode));
+
             return fishboneFunction.Call(this, evaluatedArgs);
         }
 
-        throw new Exception($"Symbol \"{node.Name}\" is not a callable target.");
+        if (callee is Delegate csharpDelegate)
+            return InvokeReflectedCallable(env, csharpDelegate.Target, csharpDelegate.Method, argumentNodes);
+
+        if (callee is BoundMethod boundMethod)
+            return InvokeBoundMethod(env, boundMethod, argumentNodes);
+
+        if (callee is null)
+            throw new Exception("Null is not callable.");
+
+        throw new Exception($"Object of type \"{callee.GetType().Name}\" is not callable.");
+    }
+
+    internal object InvokeBoundMethod(FishboneEnvironment env, BoundMethod boundMethod, IReadOnlyList<AstNode> argumentNodes)
+        {
+        foreach (var method in boundMethod.Methods)
+            if (TryBuildInvocation(env, method.GetParameters(), argumentNodes, out var args, out var writeBacks))
+                return InvokeMethod(env, boundMethod.Target, method, args, writeBacks);
+
+        throw new Exception($"No overload of \"{boundMethod.Methods[0].Name}\" accepts {argumentNodes.Count} argument(s).");
+    }
+
+    internal object InvokeReflectedCallable(FishboneEnvironment env, object? target, MethodInfo method, IReadOnlyList<AstNode> argumentNodes)
+    {
+        if (!TryBuildInvocation(env, method.GetParameters(), argumentNodes, out var args, out var writeBacks))
+            throw new Exception($"Expected compatible args for \"{method.Name}\" but got {argumentNodes.Count}.");
+
+        return InvokeMethod(env, target, method, args, writeBacks);
+    }
+
+    private object InvokeMethod(
+        FishboneEnvironment env,
+        object? target,
+        MethodInfo method,
+        object?[] args,
+        List<(string Name, int Index)> writeBacks)
+    {
+        try
+        {
+            var result = method.Invoke(target, args);
+            foreach (var writeBack in writeBacks)
+                env.Assign(writeBack.Name, args[writeBack.Index]!);
+
+            return result!;
+        }
+        catch (TargetInvocationException ex)
+        {
+            throw ex.InnerException ?? ex;
+        }
+    }
+
+    private bool TryBuildInvocation(
+        FishboneEnvironment env,
+        ParameterInfo[] parameters,
+        IReadOnlyList<AstNode> argumentNodes,
+        out object?[] args,
+        out List<(string Name, int Index)> writeBacks)
+            {
+        args = new object?[parameters.Length];
+        writeBacks = [];
+
+        if (parameters.Length != argumentNodes.Count)
+            return false;
+
+        for (int i = 0; i < parameters.Length; i++)
+                {
+            var parameter = parameters[i];
+            var parameterType = parameter.ParameterType;
+            var isByRef = parameterType.IsByRef;
+            var targetType = isByRef
+                ? parameterType.GetElementType()!
+                : parameterType;
+
+            if (parameter.IsOut)
+            {
+                if (argumentNodes[i] is not IdentifierNode identifier)
+                    throw new Exception($"Out argument \"{parameter.Name}\" must be a variable.");
+
+                env.GetValue(identifier.Name);
+                args[i] = GetDefaultValue(targetType);
+                writeBacks.Add((identifier.Name, i));
+                    continue;
+                }
+
+            object? rawArg;
+            if (isByRef)
+                {
+                if (argumentNodes[i] is not IdentifierNode identifier)
+                    throw new Exception($"Ref argument \"{parameter.Name}\" must be a variable.");
+
+                rawArg = env.GetValue(identifier.Name);
+                writeBacks.Add((identifier.Name, i));
+                }
+                else
+                {
+                rawArg = Evaluate(env, argumentNodes[i]);
+                }
+
+            if (!TryConvertArgument(rawArg, targetType, out var convertedArg))
+                return false;
+
+            args[i] = convertedArg;
+            }
+
+        return true;
+    }
+
+    private static object? GetDefaultValue(Type type)
+            {
+        var targetType = Nullable.GetUnderlyingType(type) ?? type;
+        return targetType.IsValueType ? Activator.CreateInstance(targetType) : null;
+            }
+
+    private static bool TryConvertArgument(object? rawArg, Type targetType, out object? convertedArg)
+            {
+        var nullableType = Nullable.GetUnderlyingType(targetType);
+        var conversionType = nullableType ?? targetType;
+
+        if (rawArg is null)
+        {
+            convertedArg = GetDefaultValue(conversionType);
+            return !conversionType.IsValueType || nullableType is not null || convertedArg is not null;
+            }
+
+        if (targetType.IsInstanceOfType(rawArg))
+        {
+            convertedArg = rawArg;
+            return true;
+        }
+
+        try
+        {
+            if (conversionType.IsEnum)
+            {
+                convertedArg = rawArg is string enumName
+                    ? Enum.Parse(conversionType, enumName)
+                    : Enum.ToObject(conversionType, rawArg);
+                return true;
+            }
+
+            if (rawArg is IConvertible && typeof(IConvertible).IsAssignableFrom(conversionType))
+            {
+                convertedArg = Convert.ChangeType(rawArg, conversionType);
+                return true;
+        }
+        }
+        catch
+        {
+            convertedArg = null;
+            return false;
+        }
+
+        convertedArg = null;
+        return false;
     }
 
     internal object EvaluateListNode(FishboneEnvironment env, ListNode node)

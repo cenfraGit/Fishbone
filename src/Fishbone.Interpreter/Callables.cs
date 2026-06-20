@@ -1,4 +1,5 @@
-﻿using Fishbone.Core;
+using Fishbone.Core;
+using System.Reflection;
 
 namespace Fishbone.Interpreter;
 
@@ -44,4 +45,16 @@ public class FishboneFunction : ICallable
 
         return null!;
     }
+}
+
+public sealed class BoundMethod
+{
+    public BoundMethod(object target, IReadOnlyList<MethodInfo> methods)
+    {
+        Target = target;
+        Methods = methods;
+    }
+
+    public object Target { get; }
+    public IReadOnlyList<MethodInfo> Methods { get; }
 }

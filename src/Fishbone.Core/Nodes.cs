@@ -149,23 +149,23 @@ public record FunctionDefinitionNode(
     }
 }
 
-public record FunctionCallNode(
-    string Name,
+public record CallNode(
+    AstNode Callee,
     ImmutableArray<AstNode> Arguments
 ) : AstNode
 {
-    public virtual bool Equals(FunctionCallNode? other)
+    public virtual bool Equals(CallNode? other)
     {
         if (other is null) return false;
         if (ReferenceEquals(this, other)) return true;
 
-        return Name == other.Name && Arguments.SequenceEqual(other.Arguments);
+        return Equals(Callee, other.Callee) && Arguments.SequenceEqual(other.Arguments);
     }
 
     public override int GetHashCode()
     {
         var hash = new HashCode();
-        hash.Add(Name);
+        hash.Add(Callee);
         foreach (var argument in Arguments)
         {
             hash.Add(argument);

@@ -12,7 +12,7 @@ statement
     : declarationStat SEMI
     | assignmentStat SEMI
     | ID (COMMA ID)* ASSIGN expr SEMI
-    | functionCallStat SEMI
+    | expr SEMI
     | functionDefinitionStat
     | ifStat
     | whileStat
@@ -33,7 +33,6 @@ ifStat : IF '(' expr ')' blockStat (ELSEIF '(' expr ')' blockStat)* (ELSE blockS
 whileStat : WHILE '(' expr ')' blockStat ;
 foreachStat : FOREACH '(' ID IN expr ')' blockStat ;
 
-functionCallStat : ID '(' (expr (COMMA expr)*)? ')' ;
 functionDefinitionStat : FUNC ID '(' (ID (COMMA ID)*)? ')' blockStat ;
 returnStat : RETURN (expr (COMMA expr)*)? ;
 breakStat : 'break' ;
@@ -44,7 +43,7 @@ expr
     : '(' expr ')'                            #ParenthesesExpr
     | '[' (expr (COMMA expr)*)? ']'           #ListExpr
     | '{' (dictPair (COMMA dictPair)*)? '}'   #DictionaryExpr
-    | functionCallStat                        #FunctionCallExpr
+    | expr '(' (expr (COMMA expr)*)? ')'      #CallExpr
     | expr '[' expr ']'                       #IndexingExpr
     | (MINUS|NOT) expr                        #UnaryExpr
     | expr (MUL|DIV) expr                     #BinaryExpr

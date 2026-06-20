@@ -39,20 +39,15 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         return new FunctionDefinitionNode(funcName, funcParams.ToImmutableArray(), (BlockNode)block);
     }
 
-    public override AstNode VisitFunctionCallStat(FishboneParser.FunctionCallStatContext context)
+    public override AstNode VisitCallExpr(FishboneParser.CallExprContext context)
     {
-        var funcName = context.ID().GetText();
+        var callee = Visit(context.expr(0));
         var funcArgs = new List<AstNode>();
 
-        for (int i = 0; i < context.expr().Length; i++)
+        for (int i = 1; i < context.expr().Length; i++)
             funcArgs.Add(Visit(context.expr(i)));
 
-        return new FunctionCallNode(funcName, funcArgs.ToImmutableArray());
-    }
-
-    public override AstNode VisitFunctionCallExpr(FishboneParser.FunctionCallExprContext context)
-    {
-        return Visit(context.functionCallStat());
+        return new CallNode(callee, funcArgs.ToImmutableArray());
     }
 
     public override AstNode VisitReturnStat(FishboneParser.ReturnStatContext context)
