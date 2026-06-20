@@ -199,4 +199,9 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
     {
         return (context.TRUE() is not null) ? new LiteralNode(true) : new LiteralNode(false);
     }
+
+    public override AstNode VisitNullExpr(FishboneParser.NullExprContext context)
+    {
+        return new LiteralNode(null!);
+    }
 }

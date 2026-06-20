@@ -52,6 +52,7 @@ expr
     | expr (GE|LE|GT|LT) expr                 #BinaryExpr
     | expr (EQ|NEQ) expr                      #BinaryExpr
     | expr (AND|OR|XOR) expr                  #BoolOperatorExpr
+    | NULL                                    #NullExpr
     | ID                                      #IdExpr
     | INT                                     #IntExpr
     | FLOAT                                   #FloatExpr
@@ -82,6 +83,8 @@ GE  : '>=' ;
 LE  : '<=' ;
 GT  : '>' ;
 LT  : '<' ;
+
+NULL : 'null' ;
 
 AND : 'and' ;
 OR  : 'or' ;
