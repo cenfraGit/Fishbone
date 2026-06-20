@@ -6,7 +6,9 @@ namespace Fishbone.Engine;
 
 public static class FishboneEngine
 {
-    public static FishboneEnvironment Run(string sourceCode, FishboneConfiguration configuration)
+    public static FishboneEnvironment Run(string sourceCode,
+                                          FishboneConfiguration configuration,
+                                          CancellationToken cancellationToken = default)
     {
         var ast = ASTParser.Parse(sourceCode);
         var envRoot = new FishboneEnvironment();
@@ -16,7 +18,7 @@ public static class FishboneEngine
             envRoot.AddBuiltIn(kvp.Key, kvp.Value);
 
         // eval program
-        var interpreter = new FishboneInterpreter();
+        var interpreter = new FishboneInterpreter(cancellationToken);
         interpreter.Evaluate(envRoot, ast);
 
         return envRoot;

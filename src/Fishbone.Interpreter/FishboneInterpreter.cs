@@ -6,10 +6,19 @@ namespace Fishbone.Interpreter;
 
 public class FishboneInterpreter
 {
+    private readonly CancellationToken _cancellationToken;
+
+    public FishboneInterpreter(CancellationToken cancellationToken = default)
+    {
+        _cancellationToken = cancellationToken;
+    }
+
     public object Evaluate(FishboneEnvironment env, AstNode node)
     {
         if (node is null)
             throw new ArgumentNullException(nameof(node));
+
+        _cancellationToken.ThrowIfCancellationRequested();
 
         return node switch
         {

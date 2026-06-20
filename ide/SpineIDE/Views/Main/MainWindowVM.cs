@@ -1,12 +1,15 @@
 using System;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using Dock.Model.Controls;
 using Dock.Model.Core;
+using Fishbone.Core;
 using Fishbone.Engine;
 using SpineIDE.Models.Layout;
 using SpineIDE.Models.Messages;
@@ -27,6 +30,11 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
     public IErrorService ErrorService { get; set; }
 
     private static int _newFileCounter = 1;
+
+    private readonly SemaphoreSlim _executionGate = new(1, 1);
+    private CancellationTokenSource? _scriptCTS;
+    private int _executionVersion;
+
     public ObservableCollection<MenuItemViewModel> FunctionMenuItems { get; } = new();
     [ObservableProperty] IFactory? _factory;
     [ObservableProperty] IRootDock? _layout;
@@ -60,30 +68,56 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
     {
         // whenever we receive the requested script code, execute it
 
-        this.ErrorService.ClearErrors();
-        _outputPanel.Clear();
-
-        string currentDirectory = Directory.GetCurrentDirectory();
+        int executionVersion = Interlocked.Increment(ref _executionVersion);
+        _scriptCTS?.Cancel();
+        await _executionGate.WaitAsync();
 
         try
         {
-            if (m.Script.Directory is not null && Directory.Exists(m.Script.Directory))
-                Directory.SetCurrentDirectory(m.Script.Directory);
+            if (executionVersion != Volatile.Read(ref _executionVersion))
+                return;
 
-            var configuration = new FishboneConfiguration();
-            configuration.RegisterFunction("print", new Action<object?>(_outputPanel.Append));
-            configuration.RegisterFunction("println", new Action<object?>(_outputPanel.AppendLine));
+            using var currentCTS = new CancellationTokenSource();
+            _scriptCTS = currentCTS;
+            CancellationToken localToken = currentCTS.Token;
 
-            var environment = FishboneEngine.Run(m.Script.Code, configuration);
-            WeakReferenceMessenger.Default.Send(new MessageExecutionFinished(m.Script.Name, environment));
-        }
-        catch (Exception ex)
-        {
-            this.ErrorService.AddError(new ScriptExecutionError(ex.Message));
+            this.ErrorService.ClearErrors();
+            _outputPanel.Clear();
+
+            string currentDirectory = Directory.GetCurrentDirectory();
+
+            try
+            {
+                if (m.Script.Directory is not null && Directory.Exists(m.Script.Directory))
+                    Directory.SetCurrentDirectory(m.Script.Directory);
+
+                var environment = await ExecuteScriptAsync(m, executionVersion, localToken);
+                if (executionVersion == Volatile.Read(ref _executionVersion) && !localToken.IsCancellationRequested)
+                    WeakReferenceMessenger.Default.Send(new MessageExecutionFinished(m.Script.Name, environment));
+            }
+            catch (OperationCanceledException) when (localToken.IsCancellationRequested)
+            {
+                if (executionVersion == Volatile.Read(ref _executionVersion))
+                    _outputPanel.AppendLine("[FishboneEngine] Execution cancelled.");
+            }
+            catch (Exception ex)
+            {
+                if (executionVersion == Volatile.Read(ref _executionVersion))
+                {
+                    _outputPanel.AppendLine($"[FishboneEngine] Exception: {ex.Message}");
+                    this.ErrorService.AddError(new ScriptExecutionError(ex.Message));
+                }
+            }
+            finally
+            {
+                Directory.SetCurrentDirectory(currentDirectory);
+                if (ReferenceEquals(_scriptCTS, currentCTS))
+                    _scriptCTS = null;
+            }
         }
         finally
         {
-            Directory.SetCurrentDirectory(currentDirectory);
+            _executionGate.Release();
         }
     }
 
@@ -128,6 +162,36 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         //    }
         //    FunctionMenuItems.Add(groupMenuItem);
         //}
+    }
+
+    private Task<FishboneEnvironment> ExecuteScriptAsync(
+        MessageExecute m,
+        int executionVersion,
+        CancellationToken cancellationToken)
+    {
+        string scriptCode = m.Script.Code;
+        var configuration = new FishboneConfiguration();
+
+        configuration.RegisterBuiltIn("print", new Action<object?>(value =>
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (executionVersion == Volatile.Read(ref _executionVersion) && !cancellationToken.IsCancellationRequested)
+                    _outputPanel.Append(value);
+            });
+        }));
+        configuration.RegisterBuiltIn("println", new Action<object?>(value =>
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (executionVersion == Volatile.Read(ref _executionVersion) && !cancellationToken.IsCancellationRequested)
+                    _outputPanel.AppendLine(value);
+            });
+        }));
+
+        return Task.Run(
+            () => FishboneEngine.Run(scriptCode, configuration, cancellationToken),
+            cancellationToken);
     }
 
     // --------------------------------------------------------------------------------
