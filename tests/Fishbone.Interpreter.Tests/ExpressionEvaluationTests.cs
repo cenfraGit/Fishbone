@@ -69,4 +69,36 @@ let nonEmptyStringIsTruthy = not "hello";
 
         Assert.Equal("hello world", env.GetValue("greeting"));
     }
+
+    [Fact]
+    public void Evaluate_ListExpressions_ProducesEvaluatedRuntimeLists()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let x = 10;
+let empty = [];
+let values = [1, x, x + 5, "hi"];
+let nested = [[1, 2], [3]];
+""");
+
+        var empty = Assert.IsType<List<object>>(env.GetValue("empty"));
+        Assert.Empty(empty);
+
+        var values = Assert.IsType<List<object>>(env.GetValue("values"));
+        Assert.Equal([1, 10, 15, "hi"], values);
+
+        var nested = Assert.IsType<List<object>>(env.GetValue("nested"));
+        Assert.Equal([1, 2], Assert.IsType<List<object>>(nested[0]));
+        Assert.Equal([3], Assert.IsType<List<object>>(nested[1]));
+    }
+
+    [Fact]
+    public void Evaluate_ListExpressions_CanBeDestructured()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let first, second = [1, 2];
+""");
+
+        Assert.Equal(1, env.GetValue("first"));
+        Assert.Equal(2, env.GetValue("second"));
+    }
 }

@@ -104,4 +104,45 @@ let boolValue = true;
 
         Assert.Equal(expectedAst, ast);
     }
+
+    [Fact]
+    public void Parse_ListExpressions_ReturnsListNodes()
+    {
+        var ast = ParserTestHelpers.ParseProgram("""
+let empty = [];
+let mixed = [1, "two", true];
+let expressions = [x, x + 1, format(42)];
+let nested = [[1, 2], [3, 4]];
+""");
+
+        var expectedAst = new ProgramNode(new List<AstNode>
+        {
+            new DeclarationNode(["empty"], new ListNode([])),
+            new DeclarationNode(
+                ["mixed"],
+                new ListNode([
+                    new LiteralNode(1),
+                    new LiteralNode("two"),
+                    new LiteralNode(true)
+                ])
+            ),
+            new DeclarationNode(
+                ["expressions"],
+                new ListNode([
+                    new IdentifierNode("x"),
+                    new BinaryOpNode("+", new IdentifierNode("x"), new LiteralNode(1)),
+                    new FunctionCallNode("format", [new LiteralNode(42)])
+                ])
+            ),
+            new DeclarationNode(
+                ["nested"],
+                new ListNode([
+                    new ListNode([new LiteralNode(1), new LiteralNode(2)]),
+                    new ListNode([new LiteralNode(3), new LiteralNode(4)])
+                ])
+            )
+        });
+
+        Assert.Equal(expectedAst, ast);
+    }
 }

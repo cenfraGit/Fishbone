@@ -103,6 +103,16 @@ public class AstNodeEqualityTests
     }
 
     [Fact]
+    public void ListNode_UsesStructuralElementEquality()
+    {
+        var left = new ListNode([new LiteralNode(1), new IdentifierNode("x")]);
+        var right = new ListNode([new LiteralNode(1), new IdentifierNode("x")]);
+
+        Assert.Equal(left, right);
+        Assert.Equal(left.GetHashCode(), right.GetHashCode());
+    }
+
+    [Fact]
     public void ListBackedNodes_WhenOrderDiffers_AreNotEqual()
     {
         var left = new ProgramNode(new List<AstNode>
@@ -115,6 +125,15 @@ public class AstNodeEqualityTests
             new DeclarationNode(["y"], new LiteralNode(2)),
             new DeclarationNode(["x"], new LiteralNode(1))
         });
+
+        Assert.NotEqual(left, right);
+    }
+
+    [Fact]
+    public void ListNode_WhenOrderDiffers_IsNotEqual()
+    {
+        var left = new ListNode([new LiteralNode(1), new LiteralNode(2)]);
+        var right = new ListNode([new LiteralNode(2), new LiteralNode(1)]);
 
         Assert.NotEqual(left, right);
     }
