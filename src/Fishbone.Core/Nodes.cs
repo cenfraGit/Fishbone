@@ -217,3 +217,21 @@ public record DictionaryNode(
         return hash.ToHashCode();
     }
 }
+
+public record IndexingNode(
+    AstNode Target,
+    AstNode Index
+) : AstNode
+{
+    public virtual bool Equals(IndexingNode? other)
+    {
+        if (other is null) return false;
+        if (ReferenceEquals(this, other)) return true;
+        return Target.Equals(other.Target) && Index.Equals(other.Index);
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(Target, Index);
+    }
+}

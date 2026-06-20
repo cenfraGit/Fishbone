@@ -1,4 +1,5 @@
 using Fishbone.Core;
+using System.Collections;
 
 namespace Fishbone.Interpreter;
 
@@ -25,6 +26,7 @@ public class FishboneInterpreter
             FunctionCallNode functionCall => EvaluateFunctionCall(env, functionCall),
             ListNode listNode => EvaluateListNode(env, listNode),
             DictionaryNode dictionaryNode => EvaluateDictionaryNode(env, dictionaryNode),
+            IndexingNode indexingNode => EvaluateIndexingNode(env, indexingNode),
             ReturnNode returnNode => EvaluateReturn(env, returnNode),
             BreakNode breakNode => EvaluateBreak(env, breakNode),
             ContinueNode continueNode => EvaluateContinue(env, continueNode),
@@ -262,6 +264,19 @@ public class FishboneInterpreter
         foreach (var item in node.Pairs)
             newDict.Add(Evaluate(env, item.Key), Evaluate(env, item.Value));
         return newDict;
+    }
+
+    internal object EvaluateIndexingNode(FishboneEnvironment env, IndexingNode node)
+    {
+        var target = Evaluate(env, node.Target);
+        var index = Evaluate(env, node.Index);
+
+        if (target is IList list)
+            return list[(int)index]!;
+        else if (target is IDictionary dict)
+            return dict[index]!;
+        else
+            throw new Exception("Object is not indexable");
     }
 
     internal object EvaluateReturn(FishboneEnvironment env, ReturnNode node)

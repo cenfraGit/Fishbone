@@ -45,6 +45,7 @@ expr
     | '[' (expr (COMMA expr)*)? ']'           #ListExpr
     | '{' (dictPair (COMMA dictPair)*)? '}'   #DictionaryExpr
     | functionCallStat                        #FunctionCallExpr
+    | expr '[' expr ']'                       #IndexingExpr
     | (MINUS|NOT) expr                        #UnaryExpr
     | expr (MUL|DIV) expr                     #BinaryExpr
     | expr (PLUS|MINUS) expr                  #BinaryExpr

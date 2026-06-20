@@ -106,6 +106,13 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         return new DictionaryNode(keyValuePairs.ToImmutableArray());
     }
 
+    public override AstNode VisitIndexingExpr(FishboneParser.IndexingExprContext context)
+    {
+        var target = Visit(context.expr(0));
+        var index = Visit(context.expr(1));
+        return new IndexingNode(target, index);
+    }
+
     public override AstNode VisitDeclarationStat(FishboneParser.DeclarationStatContext context)
     {
         var names = context.ID().Select(id => id.GetText()).ToList();
