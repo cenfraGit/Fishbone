@@ -113,6 +113,22 @@ public class AstNodeEqualityTests
     }
 
     [Fact]
+    public void DictionaryNode_UsesStructuralPairEquality()
+    {
+        var left = new DictionaryNode([
+            new KeyValuePairNode(new LiteralNode("x"), new LiteralNode(1)),
+            new KeyValuePairNode(new IdentifierNode("key"), new IdentifierNode("value"))
+        ]);
+        var right = new DictionaryNode([
+            new KeyValuePairNode(new LiteralNode("x"), new LiteralNode(1)),
+            new KeyValuePairNode(new IdentifierNode("key"), new IdentifierNode("value"))
+        ]);
+
+        Assert.Equal(left, right);
+        Assert.Equal(left.GetHashCode(), right.GetHashCode());
+    }
+
+    [Fact]
     public void ListBackedNodes_WhenOrderDiffers_AreNotEqual()
     {
         var left = new ProgramNode(new List<AstNode>
@@ -134,6 +150,21 @@ public class AstNodeEqualityTests
     {
         var left = new ListNode([new LiteralNode(1), new LiteralNode(2)]);
         var right = new ListNode([new LiteralNode(2), new LiteralNode(1)]);
+
+        Assert.NotEqual(left, right);
+    }
+
+    [Fact]
+    public void DictionaryNode_WhenPairOrderDiffers_IsNotEqual()
+    {
+        var left = new DictionaryNode([
+            new KeyValuePairNode(new LiteralNode("x"), new LiteralNode(1)),
+            new KeyValuePairNode(new LiteralNode("y"), new LiteralNode(2))
+        ]);
+        var right = new DictionaryNode([
+            new KeyValuePairNode(new LiteralNode("y"), new LiteralNode(2)),
+            new KeyValuePairNode(new LiteralNode("x"), new LiteralNode(1))
+        ]);
 
         Assert.NotEqual(left, right);
     }

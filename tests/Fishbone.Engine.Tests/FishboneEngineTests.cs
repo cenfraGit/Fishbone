@@ -42,4 +42,17 @@ let scriptValue = globalValue + 7;
         Assert.Equal(3, env.GetValue("globalValue"));
         Assert.Equal(10, env.GetValue("scriptValue"));
     }
+
+    [Fact]
+    public void Run_DefaultGetKeyReadsDictionaryLiteralValues()
+    {
+        var env = FishboneEngine.Run("""
+let values = {"name": "Fishbone", 7: "seven"};
+let name = getKey(values, "name");
+let number = getKey(values, 7);
+""", new FishboneConfiguration());
+
+        Assert.Equal("Fishbone", env.GetValue("name"));
+        Assert.Equal("seven", env.GetValue("number"));
+    }
 }

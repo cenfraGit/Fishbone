@@ -145,4 +145,58 @@ let nested = [[1, 2], [3, 4]];
 
         Assert.Equal(expectedAst, ast);
     }
+
+    [Fact]
+    public void Parse_DictionaryExpressions_ReturnsDictionaryNodes()
+    {
+        var ast = ParserTestHelpers.ParseProgram("""
+let empty = {};
+let mixed = {"one": 1, 2: "two", true: false};
+let expressions = {key: x + 1, format(42): value};
+let nested = {"list": [1, 2], "dict": {"inner": 3}};
+""");
+
+        var expectedAst = new ProgramNode(new List<AstNode>
+        {
+            new DeclarationNode(["empty"], new DictionaryNode([])),
+            new DeclarationNode(
+                ["mixed"],
+                new DictionaryNode([
+                    new KeyValuePairNode(new LiteralNode("one"), new LiteralNode(1)),
+                    new KeyValuePairNode(new LiteralNode(2), new LiteralNode("two")),
+                    new KeyValuePairNode(new LiteralNode(true), new LiteralNode(false))
+                ])
+            ),
+            new DeclarationNode(
+                ["expressions"],
+                new DictionaryNode([
+                    new KeyValuePairNode(
+                        new IdentifierNode("key"),
+                        new BinaryOpNode("+", new IdentifierNode("x"), new LiteralNode(1))
+                    ),
+                    new KeyValuePairNode(
+                        new FunctionCallNode("format", [new LiteralNode(42)]),
+                        new IdentifierNode("value")
+                    )
+                ])
+            ),
+            new DeclarationNode(
+                ["nested"],
+                new DictionaryNode([
+                    new KeyValuePairNode(
+                        new LiteralNode("list"),
+                        new ListNode([new LiteralNode(1), new LiteralNode(2)])
+                    ),
+                    new KeyValuePairNode(
+                        new LiteralNode("dict"),
+                        new DictionaryNode([
+                            new KeyValuePairNode(new LiteralNode("inner"), new LiteralNode(3))
+                        ])
+                    )
+                ])
+            )
+        });
+
+        Assert.Equal(expectedAst, ast);
+    }
 }

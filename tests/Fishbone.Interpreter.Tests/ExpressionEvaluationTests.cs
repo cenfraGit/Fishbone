@@ -101,4 +101,31 @@ let first, second = [1, 2];
         Assert.Equal(1, env.GetValue("first"));
         Assert.Equal(2, env.GetValue("second"));
     }
+
+    [Fact]
+    public void Evaluate_DictionaryExpressions_ProducesEvaluatedRuntimeDictionaries()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let key = "answer";
+let x = 10;
+let empty = {};
+let values = {key: x + 5, 2: "two", true: false};
+let nested = {"list": [1, x], "dict": {"inner": x + 1}};
+""");
+
+        var empty = Assert.IsType<Dictionary<object, object?>>(env.GetValue("empty"));
+        Assert.Empty(empty);
+
+        var values = Assert.IsType<Dictionary<object, object?>>(env.GetValue("values"));
+        Assert.Equal(15, values["answer"]);
+        Assert.Equal("two", values[2]);
+        Assert.Equal(false, values[true]);
+
+        var nested = Assert.IsType<Dictionary<object, object?>>(env.GetValue("nested"));
+        Assert.Equal([1, 10], Assert.IsType<List<object>>(nested["list"]));
+
+        var inner = Assert.IsType<Dictionary<object, object?>>(nested["dict"]);
+        Assert.Equal(11, inner["inner"]);
+    }
+
 }
