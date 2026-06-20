@@ -22,7 +22,6 @@ public class FishboneConfiguration
         RegisterDefaultConstants();
         RegisterDefaultIO();
         RegisterDefaultMath();
-        RegisterDefaultCollections();
         RegisterDefaultReflection();
     }
 
@@ -47,22 +46,6 @@ public class FishboneConfiguration
         BuiltIns["max"] = new Func<double, double, double>(Math.Max);
         BuiltIns["pow"] = new Func<double, double, double>(Math.Pow);
         BuiltIns["sqrt"] = new Func<double, double>(Math.Sqrt);
-    }
-
-    public void RegisterDefaultCollections()
-    {
-        BuiltIns["List"] = new Func<IList>(() => new List<object>());
-        BuiltIns["Dict"] = new Func<IDictionary>(() => new Dictionary<string, object>(StringComparer.Ordinal));
-        BuiltIns["addToList"] = new Action<IList, object>((targetList, item) =>
-        {
-            if (targetList == null) throw new ArgumentNullException(nameof(targetList));
-            targetList.Add(item);
-        });
-        BuiltIns["addToDict"] = new Action<IDictionary, string, object>((targetDict, key, value) =>
-        {
-            if (targetDict == null) throw new ArgumentNullException(nameof(targetDict));
-            targetDict[key] = value;
-        });
     }
 
     public void RegisterDefaultReflection()
