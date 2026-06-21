@@ -8,8 +8,8 @@ func bubble_sort(arr, size)
         let j = 0;
         while (j < (size - i - 1))
         {
-            let left = getIndex(arr, j);
-            let right = getIndex(arr, j + 1);
+            let left = arr[j];
+            let right = arr[j + 1];
 
             // if left greater, swap
             if (left > right)
@@ -23,29 +23,23 @@ func bubble_sort(arr, size)
     }
 }
 
-// create list and populate
-let numbers = List();
-addToList(numbers, 54);
-addToList(numbers, 12);
-addToList(numbers, 89);
-addToList(numbers, 3);
-addToList(numbers, 21);
-
-let total_elements = getMember(numbers, "Count");
+// create list
+let numbers = [54, 12, 89, 3, 21];
+let total_elements = numbers.Count;
 
 println("Before sorting:");
-println(getIndex(numbers, 0));
-println(getIndex(numbers, 1));
-println(getIndex(numbers, 2));
-println(getIndex(numbers, 3));
-println(getIndex(numbers, 4));
+println(numbers[0]);
+println(numbers[1]);
+println(numbers[2]);
+println(numbers[3]);
+println(numbers[4]);
 
 // sort
 bubble_sort(numbers, total_elements);
 
 println("\nAfter sorting:");
-println(getIndex(numbers, 0));
-println(getIndex(numbers, 1));
-println(getIndex(numbers, 2));
-println(getIndex(numbers, 3));
-println(getIndex(numbers, 4));
+println(numbers[0]);
+println(numbers[1]);
+println(numbers[2]);
+println(numbers[3]);
+println(numbers[4]);

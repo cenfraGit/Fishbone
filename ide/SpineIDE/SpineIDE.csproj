@@ -12,6 +12,9 @@
     <EmbeddedResource Include="Assets\fishbone.tmLanguage.json" />
     <EmbeddedResource Include="Assets\Themes\dark_plus.json" />
     <EmbeddedResource Include="Assets\Themes\onedark-color-theme.json" />
+    <EmbeddedResource Include="..\..\samples\*.fb">
+      <LogicalName>SpineIDE.Samples.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
   <ItemGroup>

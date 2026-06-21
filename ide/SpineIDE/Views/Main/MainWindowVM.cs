@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
@@ -94,7 +95,7 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
                 if (executionVersion == Volatile.Read(ref _executionVersion) && !localToken.IsCancellationRequested)
                     WeakReferenceMessenger.Default.Send(new MessageExecutionFinished(m.Script.Name, environment));
             }
-            catch (OperationCanceledException) when (localToken.IsCancellationRequested)
+            catch (OperationCanceledException)
             {
                 if (executionVersion == Volatile.Read(ref _executionVersion))
                     _outputPanel.AppendLine("[FishboneEngine] Execution cancelled.");
@@ -268,14 +269,7 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
     private async Task OnNewFile()
     {
         var scriptEditor = new ScriptEditorVM($"New{_newFileCounter++}", null, "");
-        var documentDock = GetScriptsDock(Layout);
-
-        if (documentDock != null)
-        {
-            documentDock.VisibleDockables ??= [];
-            documentDock.VisibleDockables.Add(scriptEditor);
-            documentDock.ActiveDockable = scriptEditor;
-        }
+        OpenEditorDocument(scriptEditor);
     }
 
     [RelayCommand]
@@ -288,15 +282,29 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
             var fileName = files[0].Name;
 
             var scriptEditor = new ScriptEditorVM(fileName, path, await File.ReadAllTextAsync(path));
-            var documentDock = GetScriptsDock(Layout);
-
-            if (documentDock != null)
-            {
-                documentDock.VisibleDockables ??= [];
-                documentDock.VisibleDockables.Add(scriptEditor);
-                documentDock.ActiveDockable = scriptEditor;
-            }
+            OpenEditorDocument(scriptEditor);
         }
+    }
+
+    [RelayCommand]
+    private void OpenSample(string? fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+            return;
+
+        string code = SampleCatalog.Load(fileName);
+        OpenEditorDocument(new ScriptEditorVM(fileName, null, code));
+    }
+
+    private void OpenEditorDocument(ScriptEditorVM scriptEditor)
+    {
+        var documentDock = GetScriptsDock(Layout);
+        if (documentDock is null)
+            return;
+
+        documentDock.VisibleDockables ??= [];
+        documentDock.VisibleDockables.Add(scriptEditor);
+        documentDock.ActiveDockable = scriptEditor;
     }
 
     [RelayCommand]

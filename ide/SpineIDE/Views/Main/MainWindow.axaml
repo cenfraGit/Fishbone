@@ -90,6 +90,15 @@
             </MenuItem>
 
             <MenuItem Header="_Help">
+                <MenuItem Header="_Samples">
+                    <MenuItem Header="Area of a Circle"
+                              Command="{Binding OpenSampleCommand}"
+                              CommandParameter="area_circle.fb" />
+                    <MenuItem Header="Bubble Sort"
+                              Command="{Binding OpenSampleCommand}"
+                              CommandParameter="bubble_sort.fb" />
+                </MenuItem>
+                <Separator />
                 <MenuItem Header="_About" />
             </MenuItem>
         </Menu>
