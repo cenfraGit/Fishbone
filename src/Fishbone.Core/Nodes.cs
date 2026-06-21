@@ -2,7 +2,22 @@ using System.Collections.Immutable;
 
 namespace Fishbone.Core;
 
-public abstract record AstNode;
+public abstract record AstNode
+{
+    // Source positions are 1-based; zero indicates an unknown or synthetic location.
+    public int Line { get; init; }
+    public int Column { get; init; }
+    public static IEqualityComparer<AstNode> ReferenceComparer { get; } = ReferenceEqualityComparer.Instance;
+
+    public virtual bool Equals(AstNode? other)
+    {
+        if (other is null) return false;
+        if (ReferenceEquals(this, other)) return true;
+        return other.GetType() == GetType();
+    }
+
+    public override int GetHashCode() => GetType().GetHashCode();
+}
 
 public record UnaryOpNode(string Operator, AstNode Right) : AstNode;
 public record BinaryOpNode(string Operator, AstNode Left, AstNode Right) : AstNode;
