@@ -1,13 +1,15 @@
+using System.Collections.Generic;
 using Fishbone.Core;
-using SpineIDE.Models;
+using Fishbone.Debugging;
 
 namespace SpineIDE.Models.Messages;
 
 // used to "request" the active script's code
-public class MessageRunActiveScript { }
+public enum ScriptLaunchMode { Run, Debug }
+public record MessageRunActiveScript(ScriptLaunchMode Mode);
 
 // used to broadcast the script code
-public record MessageExecute(Script Script);
+public record MessageExecute(Script Script, ScriptLaunchMode Mode, IReadOnlyList<int> BreakpointLines);
 
 public class MessageExecutionFinished
 {
@@ -22,6 +24,8 @@ public class MessageExecutionFinished
 }
 
 public record MessageVariableDetailsRequested(string Name, object? Value);
+public record MessageDebugPaused(DebugPauseSnapshot Snapshot);
+public record MessageDebugLocationChanged(string SourceId, int? Line);
 
 public enum EditorAction { Cut, Copy, Paste, Undo, Redo, AddLineComment, RemoveLineComment }
 public record MessageEditorAction(EditorAction Action);

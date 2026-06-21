@@ -39,7 +39,8 @@
     </Window.DataTemplates>
 
     <Window.KeyBindings>
-        <KeyBinding Gesture="F5" Command="{Binding ButtonRunCommand}" />
+        <KeyBinding Gesture="F5" Command="{Binding DebugCommand}" />
+        <KeyBinding Gesture="Ctrl+F5" Command="{Binding ButtonRunCommand}" />
     </Window.KeyBindings>
 
     <DockPanel>
@@ -55,7 +56,15 @@
             </MenuItem>
 
             <MenuItem Header="_Script">
-                <MenuItem Header="_Run" Command="{Binding ButtonRunCommand}" InputGesture="F5" />
+                <MenuItem Header="_Debug" Command="{Binding DebugCommand}" InputGesture="F5" />
+                <MenuItem Header="_Run without debugging" Command="{Binding ButtonRunCommand}" InputGesture="Ctrl+F5" />
+                <Separator />
+                <MenuItem Header="_Continue" Command="{Binding ContinueCommand}" />
+                <MenuItem Header="_Pause" Command="{Binding PauseCommand}" />
+                <MenuItem Header="Step _Into" Command="{Binding StepIntoCommand}" />
+                <MenuItem Header="Step _Over" Command="{Binding StepOverCommand}" />
+                <MenuItem Header="Step O_ut" Command="{Binding StepOutCommand}" />
+                <MenuItem Header="_Stop" Command="{Binding StopCommand}" />
                 <Separator />
                 <MenuItem Header="_Functions" ItemsSource="{Binding FunctionMenuItems}">
 
@@ -184,11 +193,42 @@
                     </StackPanel>
                 </Button>
 
-                <Button DockPanel.Dock="Right" Command="{Binding ButtonRunCommand}">
+                <Button DockPanel.Dock="Right" Command="{Binding StopCommand}" ToolTip.Tip="Stop">
+                    <TextBlock Text="Stop" />
+                </Button>
+
+                <Button DockPanel.Dock="Right" Command="{Binding StepOutCommand}" ToolTip.Tip="Step Out">
+                    <TextBlock Text="Out" />
+                </Button>
+
+                <Button DockPanel.Dock="Right" Command="{Binding StepOverCommand}" ToolTip.Tip="Step Over">
+                    <TextBlock Text="Over" />
+                </Button>
+
+                <Button DockPanel.Dock="Right" Command="{Binding StepIntoCommand}" ToolTip.Tip="Step Into">
+                    <TextBlock Text="Into" />
+                </Button>
+
+                <Button DockPanel.Dock="Right" Command="{Binding PauseCommand}" ToolTip.Tip="Pause">
+                    <TextBlock Text="Pause" />
+                </Button>
+
+                <Button DockPanel.Dock="Right" Command="{Binding ContinueCommand}" ToolTip.Tip="Continue">
+                    <PathIcon Data="{StaticResource play_regular}" Width="16" Height="16" Foreground="Green" />
+                </Button>
+
+                <Button DockPanel.Dock="Right" Command="{Binding ButtonRunCommand}" ToolTip.Tip="Run without debugging">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <PathIcon Data="{StaticResource play_regular}"
                                   Width="16" Height="16" Foreground="Green" />
                         <TextBlock Text="Run" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+
+                <Button DockPanel.Dock="Right" Command="{Binding DebugCommand}" ToolTip.Tip="Debug">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <PathIcon Data="{StaticResource play_regular}" Width="16" Height="16" Foreground="Orange" />
+                        <TextBlock Text="Debug" VerticalAlignment="Center" />
                     </StackPanel>
                 </Button>
 

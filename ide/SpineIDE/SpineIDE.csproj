@@ -53,6 +53,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Fishbone.Debugging\Fishbone.Debugging.csproj" />
     <ProjectReference Include="..\..\src\Fishbone.Engine\Fishbone.Engine.csproj" />
   </ItemGroup>
 </Project>

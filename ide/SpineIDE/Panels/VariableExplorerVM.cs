@@ -15,7 +15,7 @@ public class VariableItem
     public object? ValueRaw { get; set; }
 }
 
-public partial class VariableExplorerVM : Tool, IRecipient<MessageExecutionFinished>
+public partial class VariableExplorerVM : Tool, IRecipient<MessageExecutionFinished>, IRecipient<MessageDebugPaused>
 {
     // --------------------------------------------------------------------------------
     // fields and properties
@@ -39,7 +39,8 @@ public partial class VariableExplorerVM : Tool, IRecipient<MessageExecutionFinis
 
     public VariableExplorerVM()
     {
-        WeakReferenceMessenger.Default.Register(this);
+        WeakReferenceMessenger.Default.Register<MessageExecutionFinished>(this);
+        WeakReferenceMessenger.Default.Register<MessageDebugPaused>(this);
     }
 
     // --------------------------------------------------------------------------------
@@ -63,6 +64,25 @@ public partial class VariableExplorerVM : Tool, IRecipient<MessageExecutionFinis
                                              Type = variableType,
                                              ValueDisplay = variableValue,
                                              ValueRaw = v.Value });
+        }
+    }
+
+    public void Receive(MessageDebugPaused m)
+    {
+        Title = $"Variable Explorer ({m.Snapshot.Location.SourceId})";
+        Variables.Clear();
+        foreach (var variable in m.Snapshot.VisibleVariables)
+        {
+            if (variable.Value is Delegate)
+                continue;
+
+            Variables.Add(new VariableItem
+            {
+                Name = variable.Name,
+                Type = VariableDisplayFormatter.FormatType(variable.Value),
+                ValueDisplay = VariableDisplayFormatter.FormatValue(variable.Value),
+                ValueRaw = variable.Value
+            });
         }
     }
 

@@ -17,10 +17,13 @@ public partial class ScriptEditorView : UserControl
     private TextMate.Installation? _textMateInstallation = null;
     private static ScriptEditorView? _activeEditor;
     private bool _isMessengerRegistered;
+    private BreakpointMargin? _breakpointMargin;
+    private PausedLineRenderer? _pausedLineRenderer;
 
     public ScriptEditorView()
     {
         InitializeComponent();
+        DataContextChanged += OnDataContextChanged;
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -42,8 +45,22 @@ public partial class ScriptEditorView : UserControl
             editor.AddHandler(InputElement.PointerPressedEvent, OnEditorPointerPressed, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
             editor.TextArea.AddHandler(InputElement.GotFocusEvent, OnEditorGotFocus, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
             editor.TextArea.AddHandler(InputElement.PointerPressedEvent, OnEditorPointerPressed, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+            AttachDebugAdornments(editor);
             _activeEditor = this;
         }
+    }
+
+    private void OnDataContextChanged(object? sender, EventArgs e) => AttachDebugAdornments(Editor);
+
+    private void AttachDebugAdornments(TextEditor editor)
+    {
+        if (_breakpointMargin is not null || DataContext is not ScriptEditorVM viewModel)
+            return;
+
+        _breakpointMargin = new BreakpointMargin(editor, () => DataContext as ScriptEditorVM);
+        editor.TextArea.LeftMargins.Insert(0, _breakpointMargin);
+        _pausedLineRenderer = new PausedLineRenderer();
+        editor.TextArea.TextView.BackgroundRenderers.Add(_pausedLineRenderer);
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
@@ -82,6 +99,18 @@ public partial class ScriptEditorView : UserControl
                 return;
 
             InsertSnippet(m.Text);
+        });
+
+        WeakReferenceMessenger.Default.Register<MessageDebugLocationChanged>(this, (r, m) =>
+        {
+            if (DataContext is not ScriptEditorVM viewModel || viewModel.SourceId != m.SourceId)
+                return;
+
+            if (_pausedLineRenderer is not null)
+                _pausedLineRenderer.Line = m.Line;
+            Editor.TextArea.TextView.InvalidateVisual();
+            if (m.Line is int line)
+                Editor.ScrollToLine(line);
         });
 
         _isMessengerRegistered = true;

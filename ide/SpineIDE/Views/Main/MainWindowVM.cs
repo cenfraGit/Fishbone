@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Threading;
@@ -11,6 +12,7 @@ using Dock.Model.Controls;
 using Dock.Model.Core;
 using Fishbone.Core;
 using Fishbone.Engine;
+using Fishbone.Debugging;
 using SpineIDE.Models.Layout;
 using SpineIDE.Models.Messages;
 using SpineIDE.Panels;
@@ -33,7 +35,10 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
 
     private readonly SemaphoreSlim _executionGate = new(1, 1);
     private CancellationTokenSource? _scriptCTS;
+    private BreakpointCoordinator? _debugger;
     private int _executionVersion;
+
+    [ObservableProperty] private DebugSessionState _debugState = DebugSessionState.Completed;
 
     public ObservableCollection<MenuItemViewModel> FunctionMenuItems { get; } = new();
     [ObservableProperty] IFactory? _factory;
@@ -193,13 +198,24 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         configuration.RegisterBuiltIn("input", new Func<string>(() =>
             ReadScriptInput(outputBuffer, executionVersion, cancellationToken)));
 
+        BreakpointCoordinator? coordinator = null;
+        if (m.Mode == ScriptLaunchMode.Debug)
+        {
+            coordinator = new BreakpointCoordinator(m.Script.SourceId, cancellationToken);
+            coordinator.ReplaceBreakpoints(m.BreakpointLines);
+            coordinator.Paused += OnDebuggerPaused;
+            coordinator.StateChanged += OnDebuggerStateChanged;
+            _debugger = coordinator;
+            DebugState = DebugSessionState.Running;
+        }
+
         Task<ScriptExecutionResult> executionTask = Task.Run(
             () =>
             {
                 try
                 {
                     return new ScriptExecutionResult(
-                        FishboneEngine.Run(scriptCode, configuration, cancellationToken),
+                        FishboneEngine.Run(scriptCode, configuration, cancellationToken, coordinator),
                         null);
                 }
                 catch (OperationCanceledException)
@@ -226,7 +242,55 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         finally
         {
             FlushOutput(outputBuffer, executionVersion, cancellationToken);
+            if (coordinator is not null)
+            {
+                coordinator.Paused -= OnDebuggerPaused;
+                coordinator.StateChanged -= OnDebuggerStateChanged;
+                if (ReferenceEquals(_debugger, coordinator))
+                    _debugger = null;
+                coordinator.Dispose();
+                DebugState = DebugSessionState.Completed;
+                WeakReferenceMessenger.Default.Send(new MessageDebugLocationChanged(m.Script.SourceId, null));
+            }
         }
+    }
+
+    private void OnDebuggerPaused(object? sender, DebugPausedEventArgs e)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            ActivateEditor(e.Snapshot.Location.SourceId);
+            WeakReferenceMessenger.Default.Send(new MessageDebugPaused(e.Snapshot));
+            WeakReferenceMessenger.Default.Send(new MessageDebugLocationChanged(
+                e.Snapshot.Location.SourceId,
+                e.Snapshot.Location.Line));
+        });
+    }
+
+    private void OnDebuggerStateChanged(object? sender, DebugStateChangedEventArgs e)
+    {
+        Dispatcher.UIThread.Post(() => DebugState = e.State);
+    }
+
+    private void ActivateEditor(string sourceId)
+    {
+        var scriptsDock = GetScriptsDock(Layout);
+        var editor = scriptsDock?.VisibleDockables?.OfType<ScriptEditorVM>()
+            .FirstOrDefault(candidate => candidate.SourceId == sourceId);
+        if (scriptsDock is not null && editor is not null)
+            scriptsDock.ActiveDockable = editor;
+    }
+
+    partial void OnDebugStateChanged(DebugSessionState value)
+    {
+        DebugCommand.NotifyCanExecuteChanged();
+        ButtonRunCommand.NotifyCanExecuteChanged();
+        ContinueCommand.NotifyCanExecuteChanged();
+        PauseCommand.NotifyCanExecuteChanged();
+        StepIntoCommand.NotifyCanExecuteChanged();
+        StepOverCommand.NotifyCanExecuteChanged();
+        StepOutCommand.NotifyCanExecuteChanged();
+        StopCommand.NotifyCanExecuteChanged();
     }
 
     private void FlushOutput(
@@ -289,11 +353,40 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
     // commands
     // --------------------------------------------------------------------------------
 
-    [RelayCommand]
+    private bool CanStartExecution() => DebugState == DebugSessionState.Completed;
+    private bool CanPause() => DebugState == DebugSessionState.Running;
+    private bool CanResume() => DebugState == DebugSessionState.Paused;
+    private bool CanStop() => DebugState is DebugSessionState.Running or DebugSessionState.Paused;
+
+    [RelayCommand(CanExecute = nameof(CanStartExecution))]
     private async Task OnButtonRun()
     {
-        // send request to run active script
-        WeakReferenceMessenger.Default.Send(new MessageRunActiveScript());
+        WeakReferenceMessenger.Default.Send(new MessageRunActiveScript(ScriptLaunchMode.Run));
+    }
+
+    [RelayCommand(CanExecute = nameof(CanStartExecution))]
+    private void Debug() => WeakReferenceMessenger.Default.Send(new MessageRunActiveScript(ScriptLaunchMode.Debug));
+
+    [RelayCommand(CanExecute = nameof(CanResume))]
+    private void Continue() => _debugger?.Continue();
+
+    [RelayCommand(CanExecute = nameof(CanPause))]
+    private void Pause() => _debugger?.Pause();
+
+    [RelayCommand(CanExecute = nameof(CanResume))]
+    private void StepInto() => _debugger?.StepInto();
+
+    [RelayCommand(CanExecute = nameof(CanResume))]
+    private void StepOver() => _debugger?.StepOver();
+
+    [RelayCommand(CanExecute = nameof(CanResume))]
+    private void StepOut() => _debugger?.StepOut();
+
+    [RelayCommand(CanExecute = nameof(CanStop))]
+    private void Stop()
+    {
+        _debugger?.Stop();
+        _scriptCTS?.Cancel();
     }
 
     [RelayCommand]
