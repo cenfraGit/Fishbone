@@ -14,11 +14,15 @@ public sealed class FishboneDebugAdapterSession :
     IContinueHandler, INextHandler, IStepInHandler, IStepOutHandler, IPauseHandler,
     IThreadsHandler, IStackTraceHandler, IScopesHandler, IVariablesHandler,
     ISetExceptionBreakpointsHandler, IExceptionInfoHandler, IDisconnectHandler, ITerminateHandler,
+    ILoadedSourcesHandler, ISourceHandler,
     IDisposable
 {
     public const long ThreadId = 1;
+    public const long SourceReference = 1;
     private readonly BreakpointCoordinator _coordinator;
-    private readonly string _sourcePath;
+    private readonly string _sourceIdentity;
+    private readonly string _sourceCode;
+    private readonly Source _source;
     private readonly int _lineCount;
     private readonly Func<CancellationToken, Task> _execute;
     private readonly CancellationTokenSource _executionCancellation = new();
@@ -28,6 +32,8 @@ public sealed class FishboneDebugAdapterSession :
     private IDebugAdapterServer? _server;
     private Task? _eventPump;
     private int _executionStarted;
+    private int _entryStopPending;
+    private bool _stopOnEntry;
     private volatile bool _detached;
 
     public FishboneDebugAdapterSession(
@@ -35,9 +41,28 @@ public sealed class FishboneDebugAdapterSession :
         string sourcePath,
         int lineCount,
         Func<CancellationToken, Task> execute)
+        : this(coordinator, sourcePath, Path.GetFileName(sourcePath), string.Empty, lineCount, execute)
+    {
+    }
+
+    public FishboneDebugAdapterSession(
+        BreakpointCoordinator coordinator,
+        string sourceIdentity,
+        string sourceName,
+        string sourceCode,
+        int lineCount,
+        Func<CancellationToken, Task> execute)
     {
         _coordinator = coordinator;
-        _sourcePath = Path.GetFullPath(sourcePath);
+        _sourceIdentity = sourceIdentity;
+        _sourceCode = sourceCode;
+        _source = new Source
+        {
+            Name = sourceName,
+            Path = sourceIdentity,
+            SourceReference = SourceReference,
+            Origin = "Fishbone debug host"
+        };
         _lineCount = lineCount;
         _execute = execute;
         _coordinator.Paused += OnPaused;
@@ -58,19 +83,31 @@ public sealed class FishboneDebugAdapterSession :
         Output = text
     });
 
-    public Task<AttachResponse> Handle(AttachRequestArguments request, CancellationToken cancellationToken) =>
-        Task.FromResult(new AttachResponse());
+    public Task<AttachResponse> Handle(AttachRequestArguments request, CancellationToken cancellationToken)
+    {
+        if (request.ExtensionData.TryGetValue("stopOnEntry", out object? value))
+            _stopOnEntry = value is bool boolean ? boolean : bool.TryParse(value?.ToString(), out bool parsed) && parsed;
+        return Task.FromResult(new AttachResponse());
+    }
 
     public Task<ConfigurationDoneResponse> Handle(ConfigurationDoneArguments request, CancellationToken cancellationToken)
     {
         if (Interlocked.Exchange(ref _executionStarted, 1) == 0)
+        {
+            if (_stopOnEntry)
+            {
+                Interlocked.Exchange(ref _entryStopPending, 1);
+                _coordinator.Pause();
+            }
             _ = Task.Run(RunExecutionAsync);
+        }
         return Task.FromResult(new ConfigurationDoneResponse());
     }
 
     public Task<SetBreakpointsResponse> Handle(SetBreakpointsArguments request, CancellationToken cancellationToken)
     {
-        bool sourceMatches = PathsEqual(request.Source.Path, _sourcePath);
+        bool sourceMatches = request.Source.SourceReference == SourceReference ||
+            string.Equals(request.Source.Path, _sourceIdentity, StringComparison.OrdinalIgnoreCase);
         var requested = request.Breakpoints?.ToArray() ?? [];
         var accepted = new List<int>();
         var breakpoints = requested.Select(item =>
@@ -81,7 +118,7 @@ public sealed class FishboneDebugAdapterSession :
             {
                 Verified = verified,
                 Line = item.Line,
-                Source = new Source { Name = Path.GetFileName(_sourcePath), Path = _sourcePath },
+                Source = _source,
                 Message = verified ? null : "Breakpoint source or line is outside the active Fishbone script."
             };
         }).ToArray();
@@ -122,6 +159,17 @@ public sealed class FishboneDebugAdapterSession :
     public Task<ThreadsResponse> Handle(ThreadsArguments request, CancellationToken cancellationToken) =>
         Task.FromResult(new ThreadsResponse { Threads = new Container<DapThread>(new DapThread { Id = ThreadId, Name = "Fishbone Script" }) });
 
+    public Task<LoadedSourcesResponse> Handle(LoadedSourcesArguments request, CancellationToken cancellationToken) =>
+        Task.FromResult(new LoadedSourcesResponse { Sources = new Container<Source>(_source) });
+
+    public Task<SourceResponse> Handle(SourceArguments request, CancellationToken cancellationToken)
+    {
+        bool matches = request.SourceReference == SourceReference || request.Source?.SourceReference == SourceReference;
+        if (!matches)
+            throw new InvalidOperationException("The requested source is not available in this debug session.");
+        return Task.FromResult(new SourceResponse { Content = _sourceCode, MimeType = "text/plain" });
+    }
+
     public Task<StackTraceResponse> Handle(StackTraceArguments request, CancellationToken cancellationToken)
     {
         var allFrames = _handles.GetFrames();
@@ -132,7 +180,7 @@ public sealed class FishboneDebugAdapterSession :
         {
             Id = item.Id,
             Name = item.Frame.FunctionName,
-            Source = new Source { Name = Path.GetFileName(item.Frame.Location.SourceId), Path = item.Frame.Location.SourceId },
+            Source = _source,
             Line = item.Frame.Location.Line,
             Column = item.Frame.Location.Column
         });
@@ -237,9 +285,10 @@ public sealed class FishboneDebugAdapterSession :
     private void OnPaused(object? sender, DebugPausedEventArgs args)
     {
         _handles.SetSnapshot(args.Snapshot);
+        bool isEntryStop = Interlocked.Exchange(ref _entryStopPending, 0) == 1;
         Enqueue(new StoppedEvent
         {
-            Reason = args.Snapshot.Reason switch
+            Reason = isEntryStop ? StoppedEventReason.Entry : args.Snapshot.Reason switch
             {
                 DebugPauseReason.Breakpoint => StoppedEventReason.Breakpoint,
                 DebugPauseReason.Step => StoppedEventReason.Step,
@@ -297,9 +346,6 @@ public sealed class FishboneDebugAdapterSession :
         await DrainEventsAsync().ConfigureAwait(false);
         _completion.TrySetResult(1);
     }
-
-    private static bool PathsEqual(string? left, string right) =>
-        left is not null && string.Equals(Path.GetFullPath(left), right, StringComparison.OrdinalIgnoreCase);
 
     public void Dispose()
     {

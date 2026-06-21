@@ -10,5 +10,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Fishbone.Debugging\Fishbone.Debugging.csproj" />
+    <ProjectReference Include="..\Fishbone.Engine\Fishbone.Engine.csproj" />
   </ItemGroup>
 </Project>

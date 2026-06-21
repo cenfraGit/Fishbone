@@ -68,4 +68,30 @@ public class SessionHandlerTests
         Assert.True(session.IsDetached);
         Assert.Equal(1, executions);
     }
+
+    [Fact]
+    public async Task ExposesSourceAndAcceptsBreakpointBySourceReference()
+    {
+        const string sourceCode = "let answer = 42;";
+        using var coordinator = new BreakpointCoordinator("fishbone://embedded/test.fb");
+        using var session = new FishboneDebugAdapterSession(
+            coordinator, "fishbone://embedded/test.fb", "test.fb", sourceCode, 1, _ => Task.CompletedTask);
+
+        LoadedSourcesResponse loaded = await session.Handle(new LoadedSourcesArguments(), CancellationToken.None);
+        Source source = Assert.Single(loaded.Sources);
+        Assert.Equal(FishboneDebugAdapterSession.SourceReference, source.SourceReference);
+        SourceResponse content = await session.Handle(new SourceArguments
+        {
+            Source = source,
+            SourceReference = source.SourceReference!.Value
+        }, CancellationToken.None);
+        SetBreakpointsResponse breakpoints = await session.Handle(new SetBreakpointsArguments
+        {
+            Source = new Source { SourceReference = source.SourceReference },
+            Breakpoints = new Container<SourceBreakpoint>(new SourceBreakpoint { Line = 1 })
+        }, CancellationToken.None);
+
+        Assert.Equal(sourceCode, content.Content);
+        Assert.True(Assert.Single(breakpoints.Breakpoints).Verified);
+    }
 }
