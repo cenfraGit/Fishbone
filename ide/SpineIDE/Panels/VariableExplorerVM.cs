@@ -1,21 +1,80 @@
 using Dock.Model.Mvvm.Controls;
 using System;
 using System.Collections.ObjectModel;
+using System.Collections;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
+using Fishbone.DebugClient;
 using SpineIDE.Models.Messages;
 
 namespace SpineIDE.Panels;
 
-public class VariableItem
+public partial class VariableItem : ObservableObject
 {
     public string Name { get; set; } = string.Empty;
     public string Type { get; set; } = string.Empty;
     public string ValueDisplay { get; set; } = string.Empty;
     public object? ValueRaw { get; set; }
+    public ObservableCollection<VariableItem> Children { get; } = [];
+    public FishboneVariableHandle? ChildrenHandle { get; init; }
+    public IFishboneDebugClientSession? Session { get; init; }
+    [ObservableProperty] private bool _isExpanded;
+    [ObservableProperty] private bool _isLoading;
+    [ObservableProperty] private bool _canLoadChildren = true;
+    public bool HasChildren => Children.Count > 0 || ChildrenHandle is not null;
+
+    [RelayCommand]
+    private async Task ToggleExpanded()
+    {
+        if (IsExpanded)
+        {
+            IsExpanded = false;
+            return;
+        }
+
+        if (Children.Count == 0 && ChildrenHandle is not null && Session is not null && CanLoadChildren)
+        {
+            IsLoading = true;
+            try
+            {
+                foreach (FishboneDebugVariable child in await Session.GetVariablesAsync(ChildrenHandle))
+                    Children.Add(FromDebugVariable(child, Session));
+            }
+            catch (InvalidOperationException)
+            {
+                CanLoadChildren = false;
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+        IsExpanded = true;
+    }
+
+    public static VariableItem FromDebugVariable(FishboneDebugVariable variable, IFishboneDebugClientSession session) => new()
+    {
+        Name = variable.Name,
+        Type = variable.Type ?? string.Empty,
+        ValueDisplay = variable.Value,
+        ChildrenHandle = variable.ChildrenHandle,
+        Session = session
+    };
+
+    public void InvalidateUnloadedHandles()
+    {
+        if (ChildrenHandle is not null && Children.Count == 0)
+            CanLoadChildren = false;
+        foreach (VariableItem child in Children)
+            child.InvalidateUnloadedHandles();
+    }
 }
 
-public partial class VariableExplorerVM : Tool, IRecipient<MessageExecutionFinished>, IRecipient<MessageDebugPaused>
+public partial class VariableExplorerVM : Tool, IRecipient<MessageExecutionFinished>, IRecipient<MessageDebugPaused>, IRecipient<MessageDebugContinued>
 {
     // --------------------------------------------------------------------------------
     // fields and properties
@@ -41,6 +100,7 @@ public partial class VariableExplorerVM : Tool, IRecipient<MessageExecutionFinis
     {
         WeakReferenceMessenger.Default.Register<MessageExecutionFinished>(this);
         WeakReferenceMessenger.Default.Register<MessageDebugPaused>(this);
+        WeakReferenceMessenger.Default.Register<MessageDebugContinued>(this);
     }
 
     // --------------------------------------------------------------------------------
@@ -60,29 +120,62 @@ public partial class VariableExplorerVM : Tool, IRecipient<MessageExecutionFinis
             string variableType = VariableDisplayFormatter.FormatType(v.Value);
             string variableValue = VariableDisplayFormatter.FormatValue(v.Value);
 
-            Variables.Add(new VariableItem { Name = variableName,
-                                             Type = variableType,
-                                             ValueDisplay = variableValue,
-                                             ValueRaw = v.Value });
+            var item = new VariableItem { Name = variableName, Type = variableType, ValueDisplay = variableValue, ValueRaw = v.Value };
+            PopulateLocalChildren(item, v.Value);
+            Variables.Add(item);
         }
     }
 
     public void Receive(MessageDebugPaused m)
     {
-        Title = $"Variable Explorer ({m.Snapshot.Location.SourceId})";
+        string sourceName = m.Snapshot.Frames.FirstOrDefault()?.SourcePath ?? "Fishbone Script";
+        Title = $"Variable Explorer ({Path.GetFileName(sourceName)})";
         Variables.Clear();
-        foreach (var variable in m.Snapshot.VisibleVariables)
+        FishboneDebugFrame? topFrame = m.Snapshot.Frames.FirstOrDefault();
+        if (topFrame is null)
+            return;
+        foreach (FishboneDebugScope scope in topFrame.Scopes)
         {
-            if (variable.Value is Delegate)
-                continue;
-
-            Variables.Add(new VariableItem
+            var scopeItem = new VariableItem
             {
-                Name = variable.Name,
-                Type = VariableDisplayFormatter.FormatType(variable.Value),
-                ValueDisplay = VariableDisplayFormatter.FormatValue(variable.Value),
-                ValueRaw = variable.Value
-            });
+                Name = scope.Name,
+                Type = "Scope",
+                ValueDisplay = $"{scope.Variables.Length} variables",
+                Session = m.Session,
+                IsExpanded = true
+            };
+            foreach (FishboneDebugVariable variable in scope.Variables)
+                scopeItem.Children.Add(VariableItem.FromDebugVariable(variable, m.Session));
+            Variables.Add(scopeItem);
+        }
+    }
+
+    public void Receive(MessageDebugContinued m)
+    {
+        foreach (VariableItem variable in Variables)
+            variable.InvalidateUnloadedHandles();
+    }
+
+    private static void PopulateLocalChildren(VariableItem parent, object? value)
+    {
+        if (value is IDictionary dictionary)
+        {
+            foreach (DictionaryEntry entry in dictionary)
+            {
+                var child = new VariableItem { Name = $"[{VariableDisplayFormatter.FormatValue(entry.Key)}]", Type = VariableDisplayFormatter.FormatType(entry.Value), ValueDisplay = VariableDisplayFormatter.FormatValue(entry.Value), ValueRaw = entry.Value };
+                PopulateLocalChildren(child, entry.Value);
+                parent.Children.Add(child);
+            }
+        }
+        else if (value is IEnumerable enumerable and not string)
+        {
+            int index = 0;
+            foreach (object? element in enumerable)
+            {
+                var child = new VariableItem { Name = $"[{index++}]", Type = VariableDisplayFormatter.FormatType(element), ValueDisplay = VariableDisplayFormatter.FormatValue(element), ValueRaw = element };
+                PopulateLocalChildren(child, element);
+                parent.Children.Add(child);
+            }
         }
     }
 

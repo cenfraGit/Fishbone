@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.Messaging;
 using SpineIDE.Services;
 using System;
 using SpineIDE.Panels;
+using Fishbone.DebugClient;
 
 namespace SpineIDE;
 
@@ -30,6 +31,8 @@ public partial class App : Application
         collection.AddSingleton<OutputPanelVM>();
         collection.AddSingleton<IErrorService, ErrorService>();
         collection.AddSingleton<ErrorPanelVM>();
+        collection.AddSingleton<IFishboneDapHostLocator, FishboneDapHostLocator>();
+        collection.AddSingleton<IFishboneDebugClientSessionFactory, FishboneDebugClientSessionFactory>();
 
         collection.AddTransient<MainWindowVM>();
 

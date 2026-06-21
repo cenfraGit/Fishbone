@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.Messaging;
 using Dock.Model.Mvvm.Controls;
 using SpineIDE.Models;
 using SpineIDE.Models.Messages;
+using Fishbone.DebugClient;
 
 namespace SpineIDE.Views.Editor;
 
@@ -21,7 +22,11 @@ public partial class ScriptEditorVM : Document, IRecipient<MessageRunActiveScrip
 
     [ObservableProperty] TextDocument _scriptDocument;
     private readonly List<TextAnchor> _breakpoints = [];
+    [ObservableProperty] private bool _isDebugging;
     public string SourceId { get; } = Guid.NewGuid().ToString("N");
+    public event EventHandler? BreakpointsChanged;
+    public event EventHandler? BreakpointVisualsChanged;
+    private readonly Dictionary<int, FishboneBreakpointResult> _breakpointResults = [];
 
     public string? ScriptPath { get; set; }
     public string ScriptName
@@ -45,6 +50,11 @@ public partial class ScriptEditorVM : Document, IRecipient<MessageRunActiveScrip
         this.ScriptDocument = new(contents);
 
         WeakReferenceMessenger.Default.Register(this);
+        WeakReferenceMessenger.Default.Register<MessageDebugEditingChanged>(this, (recipient, message) =>
+        {
+            if (message.SourceId == SourceId)
+                IsDebugging = message.IsDebugging;
+        });
     }
 
     // --------------------------------------------------------------------------------
@@ -69,6 +79,15 @@ public partial class ScriptEditorVM : Document, IRecipient<MessageRunActiveScrip
         .ToArray();
 
     public bool HasBreakpoint(int line) => BreakpointLines.Contains(line);
+    public bool IsBreakpointVerified(int line) => !_breakpointResults.TryGetValue(line, out var result) || result.Verified;
+
+    public void ApplyBreakpointResults(IReadOnlyList<FishboneBreakpointResult> results)
+    {
+        _breakpointResults.Clear();
+        foreach (FishboneBreakpointResult result in results)
+            _breakpointResults[result.Line] = result;
+        BreakpointVisualsChanged?.Invoke(this, EventArgs.Empty);
+    }
 
     public void ToggleBreakpoint(int line)
     {
@@ -80,6 +99,8 @@ public partial class ScriptEditorVM : Document, IRecipient<MessageRunActiveScrip
         if (existing is not null)
         {
             _breakpoints.Remove(existing);
+            _breakpointResults.Remove(line);
+            BreakpointsChanged?.Invoke(this, EventArgs.Empty);
             return;
         }
 
@@ -88,5 +109,7 @@ public partial class ScriptEditorVM : Document, IRecipient<MessageRunActiveScrip
         anchor.MovementType = AnchorMovementType.BeforeInsertion;
         anchor.SurviveDeletion = true;
         _breakpoints.Add(anchor);
+        _breakpointResults.Remove(line);
+        BreakpointsChanged?.Invoke(this, EventArgs.Empty);
     }
 }

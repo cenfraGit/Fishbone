@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Fishbone.DebugClient\Fishbone.DebugClient.csproj" />
     <ProjectReference Include="..\..\src\Fishbone.Debugging\Fishbone.Debugging.csproj" />
     <ProjectReference Include="..\..\ide\SpineIDE\SpineIDE.csproj" />
   </ItemGroup>

@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using Fishbone.Core;
-using Fishbone.Debugging;
+using Fishbone.DebugClient;
 
 namespace SpineIDE.Models.Messages;
 
@@ -24,8 +24,10 @@ public class MessageExecutionFinished
 }
 
 public record MessageVariableDetailsRequested(string Name, object? Value);
-public record MessageDebugPaused(DebugPauseSnapshot Snapshot);
+public record MessageDebugPaused(FishbonePauseSnapshot Snapshot, IFishboneDebugClientSession Session);
+public record MessageDebugContinued;
 public record MessageDebugLocationChanged(string SourceId, int? Line);
+public record MessageDebugEditingChanged(string SourceId, bool IsDebugging);
 
 public enum EditorAction { Cut, Copy, Paste, Undo, Redo, AddLineComment, RemoveLineComment }
 public record MessageEditorAction(EditorAction Action);
