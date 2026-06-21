@@ -144,6 +144,14 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         return new BinaryOpNode(op, left, right);
     }
 
+    public override AstNode VisitBoolOperatorExpr(FishboneParser.BoolOperatorExprContext context)
+    {
+        AstNode left = Visit(context.expr(0));
+        AstNode right = Visit(context.expr(1));
+        string op = context.GetChild(1).GetText();
+        return new BinaryOpNode(op, left, right);
+    }
+
     public override AstNode VisitIfStat(FishboneParser.IfStatContext context)
     {
         var condition = Visit(context.expr(0));

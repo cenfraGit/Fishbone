@@ -128,8 +128,17 @@ public class FishboneInterpreter
     internal object EvaluateBinary(FishboneEnvironment env, BinaryOpNode node)
     {
         dynamic left = Evaluate(env, node.Left);
-        dynamic right = Evaluate(env, node.Right);
 
+        if (node.Operator == "and")
+            return IsTruthy(left) && IsTruthy(Evaluate(env, node.Right));
+
+        if (node.Operator == "or")
+            return IsTruthy(left) || IsTruthy(Evaluate(env, node.Right));
+
+        if (node.Operator == "xor")
+            return IsTruthy(left) != IsTruthy(Evaluate(env, node.Right));
+
+        dynamic right = Evaluate(env, node.Right);
         return node.Operator switch
         {
             "+" => left + right,

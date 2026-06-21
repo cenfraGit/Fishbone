@@ -87,6 +87,43 @@ let boolValue = true;
     }
 
     [Fact]
+    public void Parse_BooleanOperators_ReturnsBinaryOperatorNodes()
+    {
+        var ast = ParserTestHelpers.ParseProgram("""
+let conjunction = left and right;
+let disjunction = left or right;
+let exclusive = left xor right;
+let combined = a < b and c != d;
+""");
+
+        var expectedAst = new ProgramNode(new List<AstNode>
+        {
+            new DeclarationNode(
+                ["conjunction"],
+                new BinaryOpNode("and", new IdentifierNode("left"), new IdentifierNode("right"))
+            ),
+            new DeclarationNode(
+                ["disjunction"],
+                new BinaryOpNode("or", new IdentifierNode("left"), new IdentifierNode("right"))
+            ),
+            new DeclarationNode(
+                ["exclusive"],
+                new BinaryOpNode("xor", new IdentifierNode("left"), new IdentifierNode("right"))
+            ),
+            new DeclarationNode(
+                ["combined"],
+                new BinaryOpNode(
+                    "and",
+                    new BinaryOpNode("<", new IdentifierNode("a"), new IdentifierNode("b")),
+                    new BinaryOpNode("!=", new IdentifierNode("c"), new IdentifierNode("d"))
+                )
+            )
+        });
+
+        Assert.Equal(expectedAst, ast);
+    }
+
+    [Fact]
     public void Parse_FunctionCallExpression_ReturnsCallNodeInsideExpression()
     {
         var ast = ParserTestHelpers.ParseProgram("let formatted = formatValue(42, precision);");

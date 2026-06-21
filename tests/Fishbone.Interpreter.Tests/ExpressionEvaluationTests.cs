@@ -63,6 +63,59 @@ let nonEmptyStringIsTruthy = not "hello";
     }
 
     [Fact]
+    public void Evaluate_BooleanOperators_ProduceExpectedTruthTable()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let andTrue = true and true;
+let andFalse = true and false;
+let orTrue = false or true;
+let orFalse = false or false;
+let xorTrue = true xor false;
+let xorFalse = true xor true;
+""");
+
+        Assert.Equal(true, env.GetValue("andTrue"));
+        Assert.Equal(false, env.GetValue("andFalse"));
+        Assert.Equal(true, env.GetValue("orTrue"));
+        Assert.Equal(false, env.GetValue("orFalse"));
+        Assert.Equal(true, env.GetValue("xorTrue"));
+        Assert.Equal(false, env.GetValue("xorFalse"));
+    }
+
+    [Fact]
+    public void Evaluate_BooleanOperators_UseTruthinessAndReturnBooleans()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let numberAndString = 1 and "value";
+let zeroOrEmpty = 0 or "";
+let nullOrObject = null or [1];
+let xorValues = "value" xor 0;
+""");
+
+        Assert.IsType<bool>(env.GetValue("numberAndString"));
+        Assert.IsType<bool>(env.GetValue("zeroOrEmpty"));
+        Assert.IsType<bool>(env.GetValue("nullOrObject"));
+        Assert.IsType<bool>(env.GetValue("xorValues"));
+        Assert.Equal(true, env.GetValue("numberAndString"));
+        Assert.Equal(false, env.GetValue("zeroOrEmpty"));
+        Assert.Equal(true, env.GetValue("nullOrObject"));
+        Assert.Equal(true, env.GetValue("xorValues"));
+    }
+
+    [Fact]
+    public void Evaluate_AndOr_ShortCircuitWhileXorEvaluatesBothSides()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let skippedAnd = false and missingAnd;
+let skippedOr = true or missingOr;
+""");
+
+        Assert.Equal(false, env.GetValue("skippedAnd"));
+        Assert.Equal(true, env.GetValue("skippedOr"));
+        Assert.Throws<Exception>(() => InterpreterTestHelpers.Run("let result = true xor missingXor;"));
+    }
+
+    [Fact]
     public void Evaluate_StringConcatenation_UsesStringLiteralValues()
     {
         var env = InterpreterTestHelpers.Run("""let greeting = "hello" + " " + "world";""");
