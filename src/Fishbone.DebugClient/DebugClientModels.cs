@@ -14,6 +14,15 @@ public enum FishboneDebugSessionState
 
 public enum FishboneDebugOutputCategory { Stdout, Stderr, Console }
 
+public enum FishboneDebugSessionOwnership { Launched, Attached }
+
+public sealed record FishboneDebugSource(
+    string Name,
+    string? Identity,
+    long Reference,
+    string Content,
+    string? MimeType);
+
 public sealed record FishboneBreakpointResult(int Line, bool Verified, string? Message);
 
 public sealed record FishboneVariableHandle(int Generation, long Reference);

@@ -12,6 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Fishbone.DebugClient\Fishbone.DebugClient.csproj" />
+    <ProjectReference Include="..\..\src\Fishbone.DebugAdapter\Fishbone.DebugAdapter.csproj" />
     <ProjectReference Include="..\..\ide\Fishbone.Dap\Fishbone.Dap.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
   <Target Name="CopyFishboneDapHost" AfterTargets="Build">

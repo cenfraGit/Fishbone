@@ -13,39 +13,68 @@ namespace Fishbone.DebugClient;
 public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
 {
     public const long ThreadId = 1;
-    private readonly IFishboneDapHostLocator _hostLocator;
+    private readonly IFishboneDapHostLocator? _hostLocator;
+    private readonly string? _launchScriptPath;
+    private readonly string _host;
+    private readonly int _port;
     private readonly Channel<ProtocolEvent> _events = Channel.CreateUnbounded<ProtocolEvent>(new UnboundedChannelOptions { SingleReader = true });
     private readonly CancellationTokenSource _lifetime = new();
     private readonly SemaphoreSlim _requestGate = new(1, 1);
     private Process? _process;
     private TcpClient? _tcpClient;
     private DebugAdapterClient? _client;
+    private Source? _dapSource;
     private Task? _eventPump;
+    private Task? _transportMonitor;
     private int _generation;
     private int? _exitCode;
     private FishboneDebugException? _lastException;
     private bool _disposed;
+    private int _connected;
+    private int _configured;
+    private IReadOnlyList<FishboneBreakpointResult> _initialBreakpointResults = [];
 
     public FishboneDebugClientSession(string scriptPath, IFishboneDapHostLocator hostLocator)
     {
-        ScriptPath = Path.GetFullPath(scriptPath);
+        _launchScriptPath = Path.GetFullPath(scriptPath);
         _hostLocator = hostLocator;
+        _host = string.Empty;
+        Ownership = FishboneDebugSessionOwnership.Launched;
     }
+
+    private FishboneDebugClientSession(string host, int port)
+    {
+        if (string.IsNullOrWhiteSpace(host)) throw new ArgumentException("A host is required.", nameof(host));
+        if (port is < 1 or > 65535) throw new ArgumentOutOfRangeException(nameof(port));
+        _host = host;
+        _port = port;
+        Ownership = FishboneDebugSessionOwnership.Attached;
+    }
+
+    public static FishboneDebugClientSession Attach(string host, int port) => new(host, port);
 
     public event EventHandler<FishboneDebugEvent>? EventReceived;
     public FishboneDebugSessionState State { get; private set; } = FishboneDebugSessionState.Starting;
-    public string ScriptPath { get; }
+    public FishboneDebugSessionOwnership Ownership { get; }
+    public FishboneDebugSource? Source { get; private set; }
 
-    public async Task StartAsync(IReadOnlyList<int> breakpoints, CancellationToken cancellationToken = default)
+    public async Task<FishboneDebugSource> ConnectAsync(bool stopOnEntry = false, CancellationToken cancellationToken = default)
     {
+        if (Interlocked.Exchange(ref _connected, 1) != 0)
+            return Source ?? throw new InvalidOperationException("The DAP connection is still being initialized.");
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
         try
         {
             PublishState(FishboneDebugSessionState.Starting);
-            _process = StartHost();
-            _process.Exited += OnProcessExited;
-            string endpoint = await ReadEndpointAsync(_process, linked.Token).ConfigureAwait(false);
-            (string host, int port) = ParseEndpoint(endpoint);
+            string host = _host;
+            int port = _port;
+            if (Ownership == FishboneDebugSessionOwnership.Launched)
+            {
+                _process = StartHost();
+                _process.Exited += OnProcessExited;
+                string endpoint = await ReadEndpointAsync(_process, linked.Token).ConfigureAwait(false);
+                (host, port) = ParseEndpoint(endpoint);
+            }
 
             _tcpClient = new TcpClient();
             await _tcpClient.ConnectAsync(host, port, linked.Token).ConfigureAwait(false);
@@ -68,23 +97,70 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
                 options.OnExited(value => _exitCode = checked((int)value.ExitCode));
             });
             _eventPump = PumpEventsAsync(_lifetime.Token);
+            _transportMonitor = MonitorTransportAsync(_tcpClient, _lifetime.Token);
             await _client.Initialize(linked.Token).ConfigureAwait(false);
-            await _client.Attach(new AttachRequestArguments(), linked.Token).ConfigureAwait(false);
-            await _client.SetExceptionBreakpoints(new SetExceptionBreakpointsArguments
+            var attach = new AttachRequestArguments();
+            attach.ExtensionData["stopOnEntry"] = stopOnEntry;
+            await _client.Attach(attach, linked.Token).ConfigureAwait(false);
+            var loaded = await _client.RequestLoadedSources(new LoadedSourcesArguments(), linked.Token).ConfigureAwait(false);
+            _dapSource = loaded.Sources?.FirstOrDefault()
+                ?? throw new InvalidOperationException("The Fishbone debug host did not expose a source.");
+            long sourceReference = _dapSource.SourceReference
+                ?? throw new InvalidOperationException("The Fishbone debug source has no source reference.");
+            var sourceResponse = await _client.RequestSource(new SourceArguments
+            {
+                Source = _dapSource,
+                SourceReference = sourceReference
+            }, linked.Token).ConfigureAwait(false);
+            Source = new FishboneDebugSource(
+                _dapSource.Name ?? "Remote Fishbone Script",
+                _dapSource.Path,
+                sourceReference,
+                sourceResponse.Content,
+                sourceResponse.MimeType);
+            return Source;
+        }
+        catch (Exception exception)
+        {
+            Interlocked.Exchange(ref _connected, 0);
+            PublishState(FishboneDebugSessionState.Faulted);
+            Publish(new FishboneDebugFailed(exception));
+            await DisposeTransportAsync(killProcess: Ownership == FishboneDebugSessionOwnership.Launched).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    public async Task<IReadOnlyList<FishboneBreakpointResult>> ConfigureAsync(IReadOnlyList<int> breakpoints, CancellationToken cancellationToken = default)
+    {
+        if (Source is null) throw new InvalidOperationException("Connect before configuring the debug session.");
+        if (Interlocked.Exchange(ref _configured, 1) != 0) return _initialBreakpointResults;
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
+        try
+        {
+            DebugAdapterClient client = RequireClient();
+            await client.SetExceptionBreakpoints(new SetExceptionBreakpointsArguments
             {
                 Filters = new Container<string>("all")
             }, linked.Token).ConfigureAwait(false);
-            await SetBreakpointsAsync(breakpoints, linked.Token).ConfigureAwait(false);
-            await _client.RequestConfigurationDone(new ConfigurationDoneArguments(), linked.Token).ConfigureAwait(false);
-            PublishState(FishboneDebugSessionState.Running);
+            _initialBreakpointResults = await SetBreakpointsAsync(breakpoints, linked.Token).ConfigureAwait(false);
+            await client.RequestConfigurationDone(new ConfigurationDoneArguments(), linked.Token).ConfigureAwait(false);
+            if (State != FishboneDebugSessionState.Paused)
+                PublishState(FishboneDebugSessionState.Running);
+            return _initialBreakpointResults;
         }
         catch (Exception exception)
         {
             PublishState(FishboneDebugSessionState.Faulted);
             Publish(new FishboneDebugFailed(exception));
-            await DisposeTransportAsync(killProcess: true).ConfigureAwait(false);
+            await DisposeTransportAsync(killProcess: Ownership == FishboneDebugSessionOwnership.Launched).ConfigureAwait(false);
             throw;
         }
+    }
+
+    public async Task StartAsync(IReadOnlyList<int> breakpoints, CancellationToken cancellationToken = default)
+    {
+        await ConnectAsync(stopOnEntry: false, cancellationToken).ConfigureAwait(false);
+        await ConfigureAsync(breakpoints, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<FishboneBreakpointResult>> SetBreakpointsAsync(IReadOnlyList<int> lines, CancellationToken cancellationToken = default)
@@ -95,7 +171,7 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
         {
             var response = await client.SetBreakpoints(new SetBreakpointsArguments
             {
-                Source = new Source { Name = Path.GetFileName(ScriptPath), Path = ScriptPath },
+                Source = _dapSource ?? throw new InvalidOperationException("The debug source is not available."),
                 Breakpoints = new Container<SourceBreakpoint>(lines.Distinct().Order().Select(line => new SourceBreakpoint { Line = line }))
             }, cancellationToken).ConfigureAwait(false);
             var results = (response.Breakpoints ?? []).Select((breakpoint, index) => new FishboneBreakpointResult(
@@ -133,6 +209,11 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
 
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
+        if (Ownership == FishboneDebugSessionOwnership.Attached)
+        {
+            await DisconnectAsync(cancellationToken).ConfigureAwait(false);
+            return;
+        }
         if (State is FishboneDebugSessionState.Completed or FishboneDebugSessionState.Faulted)
             return;
         PublishState(FishboneDebugSessionState.Stopping);
@@ -148,19 +229,37 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
         await WaitForExitOrKillAsync().ConfigureAwait(false);
     }
 
+    public async Task DisconnectAsync(CancellationToken cancellationToken = default)
+    {
+        if (State is FishboneDebugSessionState.Completed or FishboneDebugSessionState.Faulted)
+            return;
+        PublishState(FishboneDebugSessionState.Stopping);
+        try
+        {
+            if (_client is not null)
+                await _client.RequestDisconnect(new DisconnectArguments { TerminateDebuggee = false }, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            PublishState(FishboneDebugSessionState.Completed);
+            Publish(new FishboneDebugTerminated(null));
+            _tcpClient?.Dispose();
+        }
+    }
+
     private Process StartHost()
     {
-        FishboneDapHostCommand host = _hostLocator.Locate();
+        FishboneDapHostCommand host = (_hostLocator ?? throw new InvalidOperationException("No DAP host locator was configured.")).Locate();
         var startInfo = new ProcessStartInfo(host.FileName)
         {
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            WorkingDirectory = Path.GetDirectoryName(ScriptPath) ?? AppContext.BaseDirectory
+            WorkingDirectory = Path.GetDirectoryName(_launchScriptPath) ?? AppContext.BaseDirectory
         };
         foreach (string argument in host.PrefixArguments) startInfo.ArgumentList.Add(argument);
-        startInfo.ArgumentList.Add(ScriptPath);
+        startInfo.ArgumentList.Add(_launchScriptPath!);
         startInfo.ArgumentList.Add("--port");
         startInfo.ArgumentList.Add("0");
         var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
@@ -228,6 +327,8 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
                         Publish(new FishboneDebugTerminated(_exitCode));
                         break;
                     case TransportFailedProtocolEvent failed:
+                        if (State is FishboneDebugSessionState.Completed or FishboneDebugSessionState.Stopping)
+                            break;
                         PublishState(FishboneDebugSessionState.Faulted);
                         Publish(new FishboneDebugFailed(failed.Exception));
                         break;
@@ -298,6 +399,28 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
         Enqueue(new TransportFailedProtocolEvent(new IOException("fishbone-dap exited unexpectedly.")));
     }
 
+    private async Task MonitorTransportAsync(TcpClient client, CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                if (client.Client.Poll(1000, SelectMode.SelectRead) && client.Client.Available == 0)
+                {
+                    Enqueue(new TransportFailedProtocolEvent(new IOException("The DAP connection was closed.")));
+                    return;
+                }
+                await Task.Delay(100, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (ObjectDisposedException) when (_disposed || State is FishboneDebugSessionState.Completed or FishboneDebugSessionState.Stopping) { }
+        catch (Exception exception)
+        {
+            Enqueue(new TransportFailedProtocolEvent(exception));
+        }
+    }
+
     private async Task WaitForExitOrKillAsync()
     {
         if (_process is null || _process.HasExited) return;
@@ -328,7 +451,15 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
         _events.Writer.TryComplete();
         if (_eventPump is not null)
         {
+#pragma warning disable VSTHRD003
             try { await _eventPump.ConfigureAwait(false); } catch (OperationCanceledException) { }
+#pragma warning restore VSTHRD003
+        }
+        if (_transportMonitor is not null)
+        {
+#pragma warning disable VSTHRD003
+            try { await _transportMonitor.ConfigureAwait(false); } catch (OperationCanceledException) { }
+#pragma warning restore VSTHRD003
         }
         await DisposeTransportAsync(killProcess: true).ConfigureAwait(false);
         _requestGate.Dispose();
