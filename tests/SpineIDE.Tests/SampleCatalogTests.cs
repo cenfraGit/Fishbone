@@ -116,5 +116,8 @@ public class SampleCatalogTests
 
         public Task<string> ShowScriptInputAsync(CancellationToken cancellationToken) =>
             Task.FromResult(string.Empty);
+
+        public Task<RemoteAttachEndpoint?> ShowRemoteAttachAsync() =>
+            Task.FromResult<RemoteAttachEndpoint?>(null);
     }
 }

@@ -121,9 +121,16 @@ public class DebuggerModelTests
     {
         public event EventHandler<FishboneDebugEvent>? EventReceived;
         public FishboneDebugSessionState State => FishboneDebugSessionState.Paused;
-        public string ScriptPath => "test.fb";
+        public FishboneDebugSessionOwnership Ownership => FishboneDebugSessionOwnership.Attached;
+        public FishboneDebugSource? Source { get; private set; }
         public IReadOnlyList<FishboneDebugVariable> VariablesToReturn { get; init; } = [];
         public int VariableRequests { get; private set; }
+        public Task<FishboneDebugSource> ConnectAsync(bool stopOnEntry = false, CancellationToken cancellationToken = default)
+        {
+            Source = new FishboneDebugSource("test.fb", "test.fb", 1, string.Empty, "text/plain");
+            return Task.FromResult(Source);
+        }
+        public Task<IReadOnlyList<FishboneBreakpointResult>> ConfigureAsync(IReadOnlyList<int> breakpoints, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<FishboneBreakpointResult>>([]);
         public Task StartAsync(IReadOnlyList<int> breakpoints, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<IReadOnlyList<FishboneBreakpointResult>> SetBreakpointsAsync(IReadOnlyList<int> lines, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<FishboneBreakpointResult>>([]);
         public Task<IReadOnlyList<FishboneDebugVariable>> GetVariablesAsync(FishboneVariableHandle handle, CancellationToken cancellationToken = default)
@@ -136,6 +143,7 @@ public class DebuggerModelTests
         public Task StepIntoAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task StepOverAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task StepOutAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task DisconnectAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task StopAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
@@ -147,5 +155,6 @@ public class DebuggerModelTests
         public Task<IStorageFile?> SaveFileAsync(string suggestedName = "script.fb") => Task.FromResult<IStorageFile?>(null);
         public Task ShowVariableDetailsAsync(string name, object? value) => Task.CompletedTask;
         public Task<string> ShowScriptInputAsync(CancellationToken cancellationToken) => Task.FromResult(string.Empty);
+        public Task<RemoteAttachEndpoint?> ShowRemoteAttachAsync() => Task.FromResult<RemoteAttachEndpoint?>(null);
     }
 }
