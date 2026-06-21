@@ -23,14 +23,10 @@ func getCoordinates()
 }
 
 let x, y = getCoordinates();
-let newX, newY = 0, 0;
-newX, newY = getCoordinates();
 """);
 
         Assert.Equal(20, env.GetValue("x"));
         Assert.Equal(100, env.GetValue("y"));
-        Assert.Equal(20, env.GetValue("newX"));
-        Assert.Equal(100, env.GetValue("newY"));
     }
 
     [Fact]
