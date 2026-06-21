@@ -14,8 +14,8 @@ func bubble_sort(arr, size)
             // if left greater, swap
             if (left > right)
             {
-                setIndex(arr, j, right);
-                setIndex(arr, j + 1, left);
+                arr[j] = right;
+                arr[j + 1] = left;
             }
             j = j + 1;
         }

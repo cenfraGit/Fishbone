@@ -11,6 +11,7 @@ importStat : IMPORT STRING SEMI ;
 statement
     : declarationStat SEMI
     | assignmentStat SEMI
+    | indexedAssignmentStat SEMI
     | ID (COMMA ID)* ASSIGN expr SEMI
     | expr SEMI
     | functionDefinitionStat
@@ -27,6 +28,7 @@ blockStat : '{' statement* '}' ;
 
 declarationStat : 'let' ID (COMMA ID)* ASSIGN expr ;
 assignmentStat : ID (COMMA ID)* ASSIGN expr ;
+indexedAssignmentStat : expr ASSIGN expr ;
 
 ifStat : IF '(' expr ')' blockStat (ELSEIF '(' expr ')' blockStat)* (ELSE blockStat)? ;
 

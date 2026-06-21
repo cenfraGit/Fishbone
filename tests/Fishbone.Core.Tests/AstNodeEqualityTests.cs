@@ -55,6 +55,22 @@ public class AstNodeEqualityTests
     }
 
     [Fact]
+    public void IndexedAssignmentNode_UsesStructuralEquality()
+    {
+        var left = new IndexedAssignmentNode(
+            new IdentifierNode("values"),
+            new LiteralNode(1),
+            new LiteralNode(42));
+        var right = new IndexedAssignmentNode(
+            new IdentifierNode("values"),
+            new LiteralNode(1),
+            new LiteralNode(42));
+
+        Assert.Equal(left, right);
+        Assert.Equal(left.GetHashCode(), right.GetHashCode());
+    }
+
+    [Fact]
     public void ReturnNode_UsesStructuralValueEquality()
     {
         var left = new ReturnNode([new IdentifierNode("x"), new LiteralNode(1)]);

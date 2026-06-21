@@ -27,6 +27,7 @@ public class FishboneInterpreter
             IdentifierNode identifier => env.GetValue(identifier.Name),
             DeclarationNode declaration => EvaluateDeclaration(env, declaration),
             AssignmentNode assignment => EvaluateAssignment(env, assignment),
+            IndexedAssignmentNode indexedAssignment => EvaluateIndexedAssignment(env, indexedAssignment),
             UnaryOpNode unary => EvaluateUnary(env, unary),
             BinaryOpNode binary => EvaluateBinary(env, binary),
             IfNode ifNode => EvaluateIf(env, ifNode),
@@ -111,6 +112,16 @@ public class FishboneInterpreter
         }
 
         return rawValue;
+    }
+
+    internal object EvaluateIndexedAssignment(FishboneEnvironment env, IndexedAssignmentNode node)
+    {
+        object? target = Evaluate(env, node.Target);
+        object? index = Evaluate(env, node.Index);
+        object? value = Evaluate(env, node.Value);
+
+        SetIndexedValue(target, index, value);
+        return value!;
     }
 
     internal object EvaluateUnary(FishboneEnvironment env, UnaryOpNode node)
@@ -433,15 +444,131 @@ public class FishboneInterpreter
 
     internal object EvaluateIndexingNode(FishboneEnvironment env, IndexingNode node)
     {
-        var target = Evaluate(env, node.Target);
-        var index = Evaluate(env, node.Index);
+        object? target = Evaluate(env, node.Target);
+        object? index = Evaluate(env, node.Index);
+        return GetIndexedValue(target, index);
+    }
+
+    private static object GetIndexedValue(object? target, object? index)
+    {
+        if (target is null)
+            throw new Exception("Cannot index null.");
+
+        PropertyInfo[] indexers = GetSingleParameterIndexers(target.GetType());
+        foreach (PropertyInfo indexer in indexers)
+        {
+            if (!indexer.CanRead)
+                continue;
+
+            ParameterInfo indexParameter = indexer.GetIndexParameters()[0];
+            if (!TryConvertArgument(index, indexParameter.ParameterType, out object? convertedIndex))
+                continue;
+
+            try
+            {
+                return indexer.GetValue(target, [convertedIndex])!;
+            }
+            catch (TargetInvocationException ex)
+            {
+                throw ex.InnerException ?? ex;
+            }
+        }
 
         if (target is IList list)
-            return list[(int)index]!;
-        else if (target is IDictionary dict)
-            return dict[index]!;
-        else
-            throw new Exception("Object is not indexable");
+        {
+            if (!TryConvertArgument(index, typeof(int), out object? convertedIndex))
+                throw new Exception($"Index for type \"{target.GetType().Name}\" must be compatible with Int32.");
+
+            return list[(int)convertedIndex!]!;
+        }
+
+        if (target is IDictionary dictionary)
+            return dictionary[index!]!;
+
+        if (indexers.Any(indexer => !indexer.CanRead))
+            throw new Exception($"Indexer on type \"{target.GetType().Name}\" is write-only.");
+
+        if (indexers.Length > 0)
+            throw new Exception($"No readable indexer on type \"{target.GetType().Name}\" accepts the supplied index.");
+
+        throw new Exception($"Object of type \"{target.GetType().Name}\" is not indexable.");
+    }
+
+    private static void SetIndexedValue(object? target, object? index, object? value)
+    {
+        if (target is null)
+            throw new Exception("Cannot assign through an index on null.");
+
+        PropertyInfo[] indexers = GetSingleParameterIndexers(target.GetType());
+        bool compatibleReadOnlyIndexer = false;
+        bool compatibleIndex = false;
+
+        foreach (PropertyInfo indexer in indexers)
+        {
+            ParameterInfo indexParameter = indexer.GetIndexParameters()[0];
+            if (!TryConvertArgument(index, indexParameter.ParameterType, out object? convertedIndex))
+                continue;
+
+            compatibleIndex = true;
+            if (!indexer.CanWrite)
+            {
+                compatibleReadOnlyIndexer = true;
+                continue;
+            }
+
+            if (!TryConvertArgument(value, indexer.PropertyType, out object? convertedValue))
+                continue;
+
+            try
+            {
+                indexer.SetValue(target, convertedValue, [convertedIndex]);
+                return;
+            }
+            catch (TargetInvocationException ex)
+            {
+                throw ex.InnerException ?? ex;
+            }
+        }
+
+        if (target is IList list)
+        {
+            if (!TryConvertArgument(index, typeof(int), out object? convertedIndex))
+                throw new Exception($"Index for type \"{target.GetType().Name}\" must be compatible with Int32.");
+
+            object? convertedValue = value;
+            Type? elementType = target.GetType().GetElementType();
+            if (elementType is not null && !TryConvertArgument(value, elementType, out convertedValue))
+                throw new Exception($"Value is not compatible with element type \"{elementType.Name}\".");
+
+            list[(int)convertedIndex!] = convertedValue;
+            return;
+        }
+
+        if (target is IDictionary dictionary)
+        {
+            dictionary[index!] = value;
+            return;
+        }
+
+        if (compatibleReadOnlyIndexer)
+            throw new Exception($"Indexer on type \"{target.GetType().Name}\" is read-only.");
+
+        if (compatibleIndex)
+            throw new Exception($"Value is not compatible with a writable indexer on type \"{target.GetType().Name}\".");
+
+        if (indexers.Length > 0)
+            throw new Exception($"No writable indexer on type \"{target.GetType().Name}\" accepts the supplied index.");
+
+        throw new Exception($"Object of type \"{target.GetType().Name}\" does not support indexed assignment.");
+    }
+
+    private static PropertyInfo[] GetSingleParameterIndexers(Type type)
+    {
+        const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
+        return type
+            .GetProperties(flags)
+            .Where(property => property.GetIndexParameters().Length == 1)
+            .ToArray();
     }
 
     internal object EvaluateMemberAccessNode(FishboneEnvironment env,  MemberAccessNode node)

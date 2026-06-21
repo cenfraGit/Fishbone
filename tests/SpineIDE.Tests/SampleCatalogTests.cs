@@ -42,6 +42,7 @@ public class SampleCatalogTests
         Assert.DoesNotContain("addToList", code);
         Assert.DoesNotContain("getIndex", code);
         Assert.DoesNotContain("getMember", code);
+        Assert.DoesNotContain("setIndex", code);
         Assert.Contains(string.Join(Environment.NewLine, "3", "12", "21", "54", "89"), output.ToString());
     }
 

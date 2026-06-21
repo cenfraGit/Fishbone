@@ -120,6 +120,12 @@ public record AssignmentNode(IReadOnlyList<string> Names, AstNode Value) : AstNo
     }
 }
 
+public record IndexedAssignmentNode(
+    AstNode Target,
+    AstNode Index,
+    AstNode Value
+) : AstNode;
+
 public record FunctionDefinitionNode(
     string Name,
     ImmutableArray<string> Parameters,

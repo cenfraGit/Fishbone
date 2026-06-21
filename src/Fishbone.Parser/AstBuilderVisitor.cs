@@ -129,6 +129,16 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         return new AssignmentNode(names, value);
     }
 
+    public override AstNode VisitIndexedAssignmentStat(FishboneParser.IndexedAssignmentStatContext context)
+    {
+        AstNode assignmentTarget = Visit(context.expr(0));
+        if (assignmentTarget is not IndexingNode indexingNode)
+            throw new InvalidOperationException("Indexed assignment requires an indexed target.");
+
+        AstNode value = Visit(context.expr(1));
+        return new IndexedAssignmentNode(indexingNode.Target, indexingNode.Index, value);
+    }
+
     public override AstNode VisitUnaryExpr(FishboneParser.UnaryExprContext context)
     {
         string op = context.GetChild(0).GetText();

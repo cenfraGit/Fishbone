@@ -58,6 +58,42 @@ first, second = getValues();
     }
 
     [Fact]
+    public void Parse_IndexedAssignments_ReturnsExpectedAst()
+    {
+        var ast = ParserTestHelpers.ParseProgram("""
+values[0] = 10;
+matrix[0][1] = 20;
+sample.Items[2] = 30;
+getValues()[3] = 40;
+""");
+
+        var expectedAst = new ProgramNode(new List<AstNode>
+        {
+            new IndexedAssignmentNode(new IdentifierNode("values"), new LiteralNode(0), new LiteralNode(10)),
+            new IndexedAssignmentNode(
+                new IndexingNode(new IdentifierNode("matrix"), new LiteralNode(0)),
+                new LiteralNode(1),
+                new LiteralNode(20)),
+            new IndexedAssignmentNode(
+                new MemberAccessNode(new IdentifierNode("sample"), "Items"),
+                new LiteralNode(2),
+                new LiteralNode(30)),
+            new IndexedAssignmentNode(
+                new CallNode(new IdentifierNode("getValues"), []),
+                new LiteralNode(3),
+                new LiteralNode(40))
+        });
+
+        Assert.Equal(expectedAst, ast);
+    }
+
+    [Fact]
+    public void Parse_NonIndexedExpressionAssignment_Throws()
+    {
+        Assert.ThrowsAny<Exception>(() => ParserTestHelpers.ParseProgram("(a + b) = 10;"));
+    }
+
+    [Fact]
     public void Parse_ReturnBreakAndContinue_ReturnsControlStatementNodes()
     {
         var ast = ParserTestHelpers.ParseProgram("""
