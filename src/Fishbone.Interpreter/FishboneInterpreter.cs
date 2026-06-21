@@ -1,4 +1,5 @@
 using Fishbone.Core;
+using Fishbone.Debugging;
 using System.Collections;
 using System.Reflection;
 
@@ -7,10 +8,13 @@ namespace Fishbone.Interpreter;
 public class FishboneInterpreter
 {
     private readonly CancellationToken _cancellationToken;
+    private readonly IFishboneDebugger _debugger;
+    private static readonly object DebuggerReportedKey = new();
 
-    public FishboneInterpreter(CancellationToken cancellationToken = default)
+    public FishboneInterpreter(CancellationToken cancellationToken = default, IFishboneDebugger? debugger = null)
     {
         _cancellationToken = cancellationToken;
+        _debugger = debugger ?? NullFishboneDebugger.Instance;
     }
 
     public object Evaluate(FishboneEnvironment env, AstNode node)
@@ -19,9 +23,12 @@ public class FishboneInterpreter
             throw new ArgumentNullException(nameof(node));
 
         _cancellationToken.ThrowIfCancellationRequested();
+        _debugger.OnBeforeExecute(node, env);
 
-        return node switch
+        try
         {
+            return node switch
+            {
             ProgramNode programNode => EvaluateProgram(env, programNode),
             LiteralNode literal => literal.Value,
             IdentifierNode identifier => env.GetValue(identifier.Name),
@@ -43,9 +50,25 @@ public class FishboneInterpreter
             ReturnNode returnNode => EvaluateReturn(env, returnNode),
             BreakNode breakNode => EvaluateBreak(env, breakNode),
             ContinueNode continueNode => EvaluateContinue(env, continueNode),
-            _ => throw new NotImplementedException($"Execution for {node.GetType().Name} not yet implemented.")
-        };
+                _ => throw new NotImplementedException($"Execution for {node.GetType().Name} not yet implemented.")
+            };
+        }
+        catch (Exception exception) when (ShouldReport(exception))
+        {
+            exception.Data[DebuggerReportedKey] = true;
+            _debugger.OnRuntimeException(exception, node, env);
+            throw;
+        }
     }
+
+    internal void OnFunctionEnter(string functionName, FishboneEnvironment environment) =>
+        _debugger.OnFunctionEnter(functionName, environment);
+
+    internal void OnFunctionExit(string functionName) => _debugger.OnFunctionExit(functionName);
+
+    private static bool ShouldReport(Exception exception) =>
+        exception is not OperationCanceledException and not ReturnException and not BreakException and not ContinueException
+        && !exception.Data.Contains(DebuggerReportedKey);
 
     internal object EvaluateProgram(FishboneEnvironment env, ProgramNode node)
     {

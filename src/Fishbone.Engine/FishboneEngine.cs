@@ -1,4 +1,5 @@
-﻿using Fishbone.Core;
+using Fishbone.Core;
+using Fishbone.Debugging;
 using Fishbone.Interpreter;
 using Fishbone.Parser;
 
@@ -8,18 +9,26 @@ public static class FishboneEngine
 {
     public static FishboneEnvironment Run(string sourceCode,
                                           FishboneConfiguration configuration,
-                                          CancellationToken cancellationToken = default)
+                                          CancellationToken cancellationToken = default,
+                                          IFishboneDebugger? debugger = null)
     {
         var ast = ASTParser.Parse(sourceCode);
         var envRoot = new FishboneEnvironment();
 
-        // seed root env with config built-ins
         foreach (var kvp in configuration.BuiltIns)
             envRoot.AddBuiltIn(kvp.Key, kvp.Value);
 
-        // eval program
-        var interpreter = new FishboneInterpreter(cancellationToken);
-        interpreter.Evaluate(envRoot, ast);
+        var activeDebugger = debugger ?? NullFishboneDebugger.Instance;
+        var interpreter = new FishboneInterpreter(cancellationToken, activeDebugger);
+        activeDebugger.OnExecutionStarted(ast, envRoot);
+        try
+        {
+            interpreter.Evaluate(envRoot, ast);
+        }
+        finally
+        {
+            activeDebugger.OnExecutionCompleted(envRoot);
+        }
 
         return envRoot;
     }

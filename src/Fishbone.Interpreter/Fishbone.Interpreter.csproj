@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Fishbone.Core\Fishbone.Core.csproj" />
+    <ProjectReference Include="..\Fishbone.Debugging\Fishbone.Debugging.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

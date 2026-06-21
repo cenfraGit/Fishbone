@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Fishbone.Parser\Fishbone.Parser.csproj" />
+    <ProjectReference Include="..\..\src\Fishbone.Debugging\Fishbone.Debugging.csproj" />
     <ProjectReference Include="..\..\src\Fishbone.Interpreter\Fishbone.Interpreter.csproj" />
   </ItemGroup>
 

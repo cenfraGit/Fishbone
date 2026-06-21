@@ -31,19 +31,26 @@ public class FishboneFunction : ICallable
         for (int i = 0; i < _definition.Parameters.Length; i++)
             envFunction.Declare(_definition.Parameters[i], arguments[i]);
 
-        // exec function body
+        interpreter.OnFunctionEnter(_definition.Name, envFunction);
         try
         {
-            interpreter.EvaluateBlock(envFunction, _definition.Body);
-        }
-        catch (ReturnException ret)
-        {
-            return ret.Values is List<object> list && list.Count == 1
-                ? list[0]
-                : ret.Values;
-        }
+            try
+            {
+                interpreter.EvaluateBlock(envFunction, _definition.Body);
+            }
+            catch (ReturnException ret)
+            {
+                return ret.Values is List<object> list && list.Count == 1
+                    ? list[0]
+                    : ret.Values;
+            }
 
-        return null!;
+            return null!;
+        }
+        finally
+        {
+            interpreter.OnFunctionExit(_definition.Name);
+        }
     }
 }
 
