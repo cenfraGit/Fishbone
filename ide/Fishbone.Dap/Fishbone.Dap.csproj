@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>fishbone-dap</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="OmniSharp.Extensions.DebugAdapter" Version="0.19.9" />
+    <PackageReference Include="OmniSharp.Extensions.DebugAdapter.Server" Version="0.19.9" />
+    <PackageReference Include="System.CommandLine" Version="2.0.9" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Fishbone.DebugAdapter\Fishbone.DebugAdapter.csproj" />
+    <ProjectReference Include="..\..\src\Fishbone.Engine\Fishbone.Engine.csproj" />
+  </ItemGroup>
+</Project>
