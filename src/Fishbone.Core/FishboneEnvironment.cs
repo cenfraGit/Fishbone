@@ -7,6 +7,8 @@ public class FishboneEnvironment
     private readonly Dictionary<string, object> _builtins = [];
 
     public Dictionary<string, object> Values { get => _values; }
+    public FishboneEnvironment? Parent => _parent;
+    public IReadOnlyDictionary<string, object> LocalValues => _values;
 
     public TextReader StdIn { get; set; } = Console.In;
     public TextWriter StdOut { get; set; } = Console.Out;
