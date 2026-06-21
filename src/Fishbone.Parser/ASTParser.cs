@@ -12,6 +12,8 @@ public class ASTParser
         var lexer = new FishboneLexer(charStream);
         var parser = new FishboneParser(new CommonTokenStream(lexer));
         var parseTree = parser.program();
+        if (parser.NumberOfSyntaxErrors > 0)
+            throw new Exception("Invalid script syntax.");
         var visitor = new AstBuilderVisitor();
         var rootAst = visitor.Visit(parseTree);
         return rootAst;
