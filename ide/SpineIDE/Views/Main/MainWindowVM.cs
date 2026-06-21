@@ -3,7 +3,6 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
@@ -164,34 +163,49 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         //}
     }
 
-    private Task<FishboneEnvironment> ExecuteScriptAsync(
+    private async Task<FishboneEnvironment> ExecuteScriptAsync(
         MessageExecute m,
         int executionVersion,
         CancellationToken cancellationToken)
     {
         string scriptCode = m.Script.Code;
         var configuration = new FishboneConfiguration();
+        var outputBuffer = new ScriptOutputBuffer();
 
-        configuration.RegisterBuiltIn("print", new Action<object?>(value =>
-        {
-            Dispatcher.UIThread.Post(() =>
-            {
-                if (executionVersion == Volatile.Read(ref _executionVersion) && !cancellationToken.IsCancellationRequested)
-                    _outputPanel.Append(value);
-            });
-        }));
-        configuration.RegisterBuiltIn("println", new Action<object?>(value =>
-        {
-            Dispatcher.UIThread.Post(() =>
-            {
-                if (executionVersion == Volatile.Read(ref _executionVersion) && !cancellationToken.IsCancellationRequested)
-                    _outputPanel.AppendLine(value);
-            });
-        }));
+        configuration.RegisterBuiltIn("print", new Action<object?>(outputBuffer.Append));
+        configuration.RegisterBuiltIn("println", new Action<object?>(outputBuffer.AppendLine));
 
-        return Task.Run(
+        Task<FishboneEnvironment> executionTask = Task.Run(
             () => FishboneEngine.Run(scriptCode, configuration, cancellationToken),
             cancellationToken);
+
+        try
+        {
+            while (!executionTask.IsCompleted)
+            {
+                await Task.WhenAny(executionTask, Task.Delay(50));
+                FlushOutput(outputBuffer, executionVersion, cancellationToken);
+            }
+
+            return await executionTask;
+        }
+        finally
+        {
+            FlushOutput(outputBuffer, executionVersion, cancellationToken);
+        }
+    }
+
+    private void FlushOutput(
+        ScriptOutputBuffer outputBuffer,
+        int executionVersion,
+        CancellationToken cancellationToken)
+    {
+        string output = outputBuffer.DrainPending();
+        if (output.Length == 0)
+            return;
+
+        if (executionVersion == Volatile.Read(ref _executionVersion) && !cancellationToken.IsCancellationRequested)
+            _outputPanel.AppendBatch(output);
     }
 
     // --------------------------------------------------------------------------------

@@ -1,10 +1,12 @@
 using Dock.Model.Mvvm.Controls;
 using System;
+using System.Text;
 
 namespace SpineIDE.Panels;
 
 public class OutputPanelVM : Tool
 {
+    private readonly StringBuilder _outputBuilder = new();
     private string _outputText = string.Empty;
 
     public string OutputText
@@ -15,16 +17,26 @@ public class OutputPanelVM : Tool
 
     public void Clear()
     {
+        _outputBuilder.Clear();
         OutputText = string.Empty;
     }
 
     public void Append(object? value)
     {
-        OutputText += value?.ToString() ?? string.Empty;
+        AppendBatch(value?.ToString() ?? string.Empty);
     }
 
     public void AppendLine(object? value)
     {
-        OutputText += (value?.ToString() ?? string.Empty) + Environment.NewLine;
+        AppendBatch((value?.ToString() ?? string.Empty) + Environment.NewLine);
+    }
+
+    public void AppendBatch(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return;
+
+        _outputBuilder.Append(text);
+        OutputText = _outputBuilder.ToString();
     }
 }
