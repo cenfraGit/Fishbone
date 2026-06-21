@@ -3,26 +3,34 @@
              xmlns:panels="clr-namespace:SpineIDE.Panels"
              x:Class="SpineIDE.Views.Variables.VariableExplorerView"
              x:DataType="panels:VariableExplorerVM">
-    <DataGrid Name="VariablesGrid"
-              ItemsSource="{Binding Variables}"
-              SelectedItem="{Binding SelectedVariable}"
-              AutoGenerateColumns="False"
-              IsReadOnly="True"
-              GridLinesVisibility="All"
-              BorderThickness="1"
-              BorderBrush="Gray">
-        <DataGrid.Columns>
-            <DataGridTextColumn Header="Name"
-                                Binding="{Binding Name}"
-                                Width="1*" />
-
-            <DataGridTextColumn Header="Type"
-                                Binding="{Binding Type}"
-                                Width="1*" />
-
-            <DataGridTextColumn Header="Value"
-                                Binding="{Binding ValueDisplay}"
-                                Width="2*" />
-        </DataGrid.Columns>
-    </DataGrid>
+    <Grid RowDefinitions="Auto,*">
+        <Grid ColumnDefinitions="2*,*,3*" Background="#252526" Height="28">
+            <TextBlock Grid.Column="0" Text="Name" Margin="8,5" FontWeight="SemiBold" />
+            <TextBlock Grid.Column="1" Text="Type" Margin="8,5" FontWeight="SemiBold" />
+            <TextBlock Grid.Column="2" Text="Value" Margin="8,5" FontWeight="SemiBold" />
+        </Grid>
+        <TreeView Grid.Row="1" ItemsSource="{Binding Variables}" Background="#1E1E1E">
+            <TreeView.Styles>
+                <Style Selector="TreeViewItem">
+                    <Setter Property="IsExpanded" Value="{ReflectionBinding IsExpanded, Mode=TwoWay}" />
+                </Style>
+            </TreeView.Styles>
+            <TreeView.ItemTemplate>
+                <TreeDataTemplate DataType="panels:VariableItem" ItemsSource="{Binding Children}">
+                    <Grid ColumnDefinitions="Auto,2*,*,3*" MinHeight="25">
+                        <Button Grid.Column="0"
+                                Command="{Binding ToggleExpandedCommand}"
+                                IsVisible="{Binding HasChildren}"
+                                Background="Transparent" BorderThickness="0" Padding="3"
+                                ToolTip.Tip="Expand variable">
+                            <TextBlock Text=">" FontSize="16" />
+                        </Button>
+                        <TextBlock Grid.Column="1" Text="{Binding Name}" Margin="5,3" />
+                        <TextBlock Grid.Column="2" Text="{Binding Type}" Margin="5,3" Foreground="#9CDCFE" />
+                        <TextBlock Grid.Column="3" Text="{Binding ValueDisplay}" Margin="5,3" Foreground="#CE9178" TextTrimming="CharacterEllipsis" />
+                    </Grid>
+                </TreeDataTemplate>
+            </TreeView.ItemTemplate>
+        </TreeView>
+    </Grid>
 </UserControl>

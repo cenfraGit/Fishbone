@@ -12,6 +12,7 @@ namespace SpineIDE.Views.Editor;
 internal sealed class BreakpointMargin(TextEditor editor, Func<ScriptEditorVM?> viewModelProvider) : AbstractMargin
 {
     private static readonly IBrush BreakpointBrush = new SolidColorBrush(Color.Parse("#E05555"));
+    private static readonly IBrush UnverifiedBreakpointBrush = new SolidColorBrush(Color.Parse("#777777"));
     private static readonly IBrush GutterBrush = new SolidColorBrush(Color.Parse("#161616"));
 
     protected override Size MeasureOverride(Size availableSize) => new(18, 0);
@@ -31,7 +32,8 @@ internal sealed class BreakpointMargin(TextEditor editor, Func<ScriptEditorVM?> 
                 continue;
 
             double y = visualLine.VisualTop - textView.ScrollOffset.Y + visualLine.Height / 2;
-            context.DrawEllipse(BreakpointBrush, null, new Point(9, y), 5, 5);
+            IBrush brush = viewModel.IsBreakpointVerified(line) ? BreakpointBrush : UnverifiedBreakpointBrush;
+            context.DrawEllipse(brush, null, new Point(9, y), 5, 5);
         }
     }
 

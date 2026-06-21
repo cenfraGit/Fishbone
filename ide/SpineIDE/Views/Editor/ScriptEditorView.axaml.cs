@@ -19,6 +19,7 @@ public partial class ScriptEditorView : UserControl
     private bool _isMessengerRegistered;
     private BreakpointMargin? _breakpointMargin;
     private PausedLineRenderer? _pausedLineRenderer;
+    private ScriptEditorVM? _subscribedViewModel;
 
     public ScriptEditorView()
     {
@@ -58,6 +59,8 @@ public partial class ScriptEditorView : UserControl
             return;
 
         _breakpointMargin = new BreakpointMargin(editor, () => DataContext as ScriptEditorVM);
+        _subscribedViewModel = viewModel;
+        _subscribedViewModel.BreakpointVisualsChanged += OnBreakpointVisualsChanged;
         editor.TextArea.LeftMargins.Insert(0, _breakpointMargin);
         _pausedLineRenderer = new PausedLineRenderer();
         editor.TextArea.TextView.BackgroundRenderers.Add(_pausedLineRenderer);
@@ -72,7 +75,11 @@ public partial class ScriptEditorView : UserControl
 
         if (ReferenceEquals(_activeEditor, this))
             _activeEditor = null;
+        if (_subscribedViewModel is not null)
+            _subscribedViewModel.BreakpointVisualsChanged -= OnBreakpointVisualsChanged;
     }
+
+    private void OnBreakpointVisualsChanged(object? sender, EventArgs e) => _breakpointMargin?.InvalidateVisual();
 
     private void RegisterMessengerRecipients()
     {
