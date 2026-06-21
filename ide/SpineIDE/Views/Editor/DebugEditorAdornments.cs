@@ -48,6 +48,8 @@ internal sealed class BreakpointMargin(TextEditor editor, Func<ScriptEditorVM?> 
         var visualLine = textView.GetVisualLineFromVisualTop(visualY);
         if (visualLine is null || viewModelProvider() is not { } viewModel)
             return;
+        if (!viewModel.CanToggleBreakpoints)
+            return;
 
         viewModel.ToggleBreakpoint(visualLine.FirstDocumentLine.LineNumber);
         InvalidateVisual();

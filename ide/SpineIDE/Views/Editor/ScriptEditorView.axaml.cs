@@ -135,6 +135,8 @@ public partial class ScriptEditorView : UserControl
 
     private void InsertSnippet(string template)
     {
+        if (Editor.IsReadOnly)
+            return;
         var document = Editor.Document;
         int insertOffset = Editor.SelectionLength > 0 ? Editor.SelectionStart : Editor.CaretOffset;
         var line = document.GetLineByOffset(insertOffset);
@@ -156,6 +158,8 @@ public partial class ScriptEditorView : UserControl
 
     private void OnEditorKeyDown(object? sender, KeyEventArgs e)
     {
+        if (Editor.IsReadOnly)
+            return;
         if (e.Key != Key.Enter)
             return;
 
@@ -186,6 +190,8 @@ public partial class ScriptEditorView : UserControl
 
     private void OnEditorTextInput(object? sender, TextInputEventArgs e)
     {
+        if (Editor.IsReadOnly)
+            return;
         if (e.Text != "}")
             return;
 
@@ -218,6 +224,8 @@ public partial class ScriptEditorView : UserControl
 
     private void ToggleLineComment(bool addComment)
     {
+        if (Editor.IsReadOnly)
+            return;
         var document = Editor.Document;
         // var selection = Editor.SelectedText;
 

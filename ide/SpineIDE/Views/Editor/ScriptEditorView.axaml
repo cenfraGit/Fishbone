@@ -12,6 +12,6 @@
                            Foreground="#D4D4D4"
                            ShowLineNumbers="True"
                            FontFamily="{StaticResource CascadiaCode}"
-                           IsReadOnly="{Binding IsDebugging}"
+                           IsReadOnly="{Binding IsReadOnly}"
                            Document="{Binding ScriptDocument, Mode=TwoWay}"/>
 </UserControl>

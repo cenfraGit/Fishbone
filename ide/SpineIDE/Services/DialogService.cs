@@ -8,6 +8,7 @@ using Avalonia.Threading;
 using SpineIDE.Panels;
 using SpineIDE.Views.Input;
 using SpineIDE.Views.Variables;
+using SpineIDE.Views.Attach;
 
 namespace SpineIDE.Services;
 
@@ -18,6 +19,7 @@ public interface IDialogService
     Task<IStorageFile?> SaveFileAsync(string suggestedName = "script.fb");
     Task ShowVariableDetailsAsync(string name, object? value);
     Task<string> ShowScriptInputAsync(CancellationToken cancellationToken);
+    Task<RemoteAttachEndpoint?> ShowRemoteAttachAsync();
 }
 
 public class DialogService : IDialogService
@@ -80,6 +82,13 @@ public class DialogService : IDialogService
         cancellationToken.ThrowIfCancellationRequested();
 
         return result ?? throw new OperationCanceledException("Script input was cancelled.");
+    }
+
+    public async Task<RemoteAttachEndpoint?> ShowRemoteAttachAsync()
+    {
+        if (_mainWindow == null)
+            throw new InvalidOperationException("DialogService: window was null");
+        return await new RemoteAttachWindow().ShowDialog<RemoteAttachEndpoint?>(_mainWindow);
     }
 
     private static FilePickerFileType SvsFileType => new("Fishbone Files")

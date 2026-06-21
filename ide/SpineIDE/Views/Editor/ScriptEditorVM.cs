@@ -22,8 +22,14 @@ public partial class ScriptEditorVM : Document, IRecipient<MessageRunActiveScrip
 
     [ObservableProperty] TextDocument _scriptDocument;
     private readonly List<TextAnchor> _breakpoints = [];
-    [ObservableProperty] private bool _isDebugging;
-    public string SourceId { get; } = Guid.NewGuid().ToString("N");
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsReadOnly))]
+    [NotifyPropertyChangedFor(nameof(CanToggleBreakpoints))]
+    private bool _isDebugging;
+    public string SourceId { get; }
+    public bool IsRemote { get; }
+    public bool IsReadOnly => IsDebugging || IsRemote;
+    public bool CanToggleBreakpoints => !IsRemote || IsDebugging;
     public event EventHandler? BreakpointsChanged;
     public event EventHandler? BreakpointVisualsChanged;
     private readonly Dictionary<int, FishboneBreakpointResult> _breakpointResults = [];
@@ -42,12 +48,19 @@ public partial class ScriptEditorVM : Document, IRecipient<MessageRunActiveScrip
     // constructor
     // --------------------------------------------------------------------------------
 
-    public ScriptEditorVM(string name, string? path, string contents)
+    public ScriptEditorVM(
+        string name,
+        string? path,
+        string contents,
+        string? sourceId = null,
+        bool isRemote = false)
     {
-        this.Title = name;
+        this.Title = isRemote ? $"[Remote] {name}" : name;
         this._scriptNameTemp = name;
         this.ScriptPath = path;
         this.ScriptDocument = new(contents);
+        SourceId = sourceId ?? Guid.NewGuid().ToString("N");
+        IsRemote = isRemote;
 
         WeakReferenceMessenger.Default.Register(this);
         WeakReferenceMessenger.Default.Register<MessageDebugEditingChanged>(this, (recipient, message) =>
@@ -64,7 +77,7 @@ public partial class ScriptEditorVM : Document, IRecipient<MessageRunActiveScrip
     public async void Receive(MessageRunActiveScript m)
     {
         // whenever we receive a "run script" message, we'll broadcast back a message with the script data
-        if (this.IsActive)
+        if (this.IsActive && !IsRemote)
         {
             var scriptData = new Script(this.ScriptName, this.ScriptPath, ScriptDocument.Text, SourceId);
             WeakReferenceMessenger.Default.Send(new MessageExecute(scriptData, m.Mode, BreakpointLines));
@@ -91,6 +104,8 @@ public partial class ScriptEditorVM : Document, IRecipient<MessageRunActiveScrip
 
     public void ToggleBreakpoint(int line)
     {
+        if (!CanToggleBreakpoints)
+            return;
         if (line < 1 || line > ScriptDocument.LineCount)
             return;
 
