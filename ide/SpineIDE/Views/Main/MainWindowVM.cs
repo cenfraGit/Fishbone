@@ -43,13 +43,17 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
     // construtor
     // --------------------------------------------------------------------------------
 
-    public MainWindowVM(IDialogService dialogService, IErrorService errorService, OutputPanelVM outputPanel)
+    public MainWindowVM(
+        IDialogService dialogService,
+        IErrorService errorService,
+        OutputPanelVM outputPanel,
+        ErrorPanelVM errorPanel)
     {
         this._dialogService = dialogService;
         this.ErrorService = errorService;
         this._outputPanel = outputPanel;
 
-        Factory = new DockFactory(outputPanel);
+        Factory = new DockFactory(outputPanel, errorPanel);
         Layout = Factory?.CreateLayout();
         if (Layout != null)
             Factory?.InitLayout(Layout);
@@ -91,9 +95,15 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
                 if (m.Script.Directory is not null && Directory.Exists(m.Script.Directory))
                     Directory.SetCurrentDirectory(m.Script.Directory);
 
-                var environment = await ExecuteScriptAsync(m, executionVersion, localToken);
+                var result = await ExecuteScriptAsync(m, executionVersion, localToken);
+                if (result.Error is not null)
+                {
+                    await ReportScriptErrorAsync(result.Error);
+                    return;
+                }
+
                 if (executionVersion == Volatile.Read(ref _executionVersion) && !localToken.IsCancellationRequested)
-                    WeakReferenceMessenger.Default.Send(new MessageExecutionFinished(m.Script.Name, environment));
+                    WeakReferenceMessenger.Default.Send(new MessageExecutionFinished(m.Script.Name, result.Environment!));
             }
             catch (OperationCanceledException)
             {
@@ -103,10 +113,7 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
             catch (Exception ex)
             {
                 if (executionVersion == Volatile.Read(ref _executionVersion))
-                {
-                    _outputPanel.AppendLine($"[FishboneEngine] Exception: {ex.Message}");
-                    this.ErrorService.AddError(new ScriptExecutionError(ex.Message));
-                }
+                    await ReportScriptErrorAsync(ex);
             }
             finally
             {
@@ -119,6 +126,14 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         {
             _executionGate.Release();
         }
+    }
+
+    private async Task ReportScriptErrorAsync(Exception exception)
+    {
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            ErrorService.AddError(new ScriptExecutionError(exception.Message));
+        });
     }
 
     public async void Receive(MessageVariableDetailsRequested m)
@@ -164,7 +179,7 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         //}
     }
 
-    private async Task<FishboneEnvironment> ExecuteScriptAsync(
+    private async Task<ScriptExecutionResult> ExecuteScriptAsync(
         MessageExecute m,
         int executionVersion,
         CancellationToken cancellationToken)
@@ -178,8 +193,24 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         configuration.RegisterBuiltIn("input", new Func<string>(() =>
             ReadScriptInput(outputBuffer, executionVersion, cancellationToken)));
 
-        Task<FishboneEnvironment> executionTask = Task.Run(
-            () => FishboneEngine.Run(scriptCode, configuration, cancellationToken),
+        Task<ScriptExecutionResult> executionTask = Task.Run(
+            () =>
+            {
+                try
+                {
+                    return new ScriptExecutionResult(
+                        FishboneEngine.Run(scriptCode, configuration, cancellationToken),
+                        null);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    return new ScriptExecutionResult(null, ex);
+                }
+            },
             cancellationToken);
 
         try
@@ -387,6 +418,8 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         }
     }
 }
+
+internal record ScriptExecutionResult(FishboneEnvironment? Environment, Exception? Error);
 
 public class MenuItemViewModel
 {

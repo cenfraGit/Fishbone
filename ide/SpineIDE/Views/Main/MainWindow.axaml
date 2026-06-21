@@ -18,8 +18,8 @@
             <variables:VariableExplorerView />
         </DataTemplate>
 
-        <DataTemplate DataType="{x:Type panels:OutputPanelVM}">
-            <TextBox Text="{Binding OutputText}"
+        <DataTemplate DataType="{x:Type panels:TextPanelVM}">
+            <TextBox Text="{Binding PanelText, Mode=OneWay}"
                      IsReadOnly="True"
                      AcceptsReturn="True"
                      TextWrapping="NoWrap"

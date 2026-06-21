@@ -62,7 +62,12 @@ public class SampleCatalogTests
     [Fact]
     public void OpenSampleCommand_OpensEditableUnsavedDocument()
     {
-        var viewModel = new MainWindowVM(new StubDialogService(), new ErrorService(), new OutputPanelVM());
+        var errorService = new ErrorService();
+        var viewModel = new MainWindowVM(
+            new StubDialogService(),
+            errorService,
+            new OutputPanelVM(),
+            new ErrorPanelVM(errorService));
 
         viewModel.OpenSampleCommand.Execute("area_circle.fb");
 

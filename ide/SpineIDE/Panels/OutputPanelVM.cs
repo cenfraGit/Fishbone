@@ -1,24 +1,16 @@
-using Dock.Model.Mvvm.Controls;
 using System;
 using System.Text;
 
 namespace SpineIDE.Panels;
 
-public class OutputPanelVM : Tool
+public class OutputPanelVM : TextPanelVM
 {
     private readonly StringBuilder _outputBuilder = new();
-    private string _outputText = string.Empty;
-
-    public string OutputText
-    {
-        get => _outputText;
-        set => SetProperty(ref _outputText, value);
-    }
 
     public void Clear()
     {
         _outputBuilder.Clear();
-        OutputText = string.Empty;
+        PanelText = string.Empty;
     }
 
     public void Append(object? value)
@@ -37,6 +29,6 @@ public class OutputPanelVM : Tool
             return;
 
         _outputBuilder.Append(text);
-        OutputText = _outputBuilder.ToString();
+        PanelText = _outputBuilder.ToString();
     }
 }

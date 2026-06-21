@@ -1,0 +1,67 @@
+using Dock.Model.Controls;
+using Dock.Model.Core;
+using SpineIDE.Models.Layout;
+using SpineIDE.Panels;
+using SpineIDE.Services;
+
+namespace SpineIDE.Tests;
+
+public class ErrorPanelVMTests
+{
+    [Fact]
+    public void Errors_ReflectSharedServiceAdditionsAndClearing()
+    {
+        var errorService = new ErrorService();
+        var panel = new ErrorPanelVM(errorService);
+        var changedProperties = new List<string?>();
+        panel.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
+
+        errorService.AddError(new ScriptExecutionError("Failure"));
+
+        Assert.Same(errorService.Errors, panel.Errors);
+        Assert.Single(panel.Errors);
+        Assert.Equal("Failure", panel.Errors[0].ExMessage);
+        Assert.Equal("Failure", panel.PanelText);
+        Assert.Contains(nameof(TextPanelVM.PanelText), changedProperties);
+
+        changedProperties.Clear();
+        errorService.ClearErrors();
+
+        Assert.Empty(panel.Errors);
+        Assert.Equal(string.Empty, panel.PanelText);
+        Assert.Contains(nameof(TextPanelVM.PanelText), changedProperties);
+    }
+
+    [Fact]
+    public void CreateLayout_PlacesOutputAndErrorsInCollapsedBottomToolDock()
+    {
+        var output = new OutputPanelVM();
+        var errors = new ErrorPanelVM(new ErrorService());
+        var layout = new DockFactory(output, errors).CreateLayout();
+
+        var bottomDock = FindDockContaining(layout, errors);
+
+        Assert.NotNull(bottomDock);
+        Assert.Same(output, bottomDock.ActiveDockable);
+        Assert.Equal(new IDockable[] { output, errors }, bottomDock.VisibleDockables);
+        Assert.False(bottomDock.IsExpanded);
+    }
+
+    private static IToolDock? FindDockContaining(IDockable dockable, IDockable target)
+    {
+        if (dockable is IToolDock toolDock && toolDock.VisibleDockables?.Contains(target) == true)
+            return toolDock;
+
+        if (dockable is not IDock dock || dock.VisibleDockables is null)
+            return null;
+
+        foreach (var child in dock.VisibleDockables)
+        {
+            var result = FindDockContaining(child, target);
+            if (result is not null)
+                return result;
+        }
+
+        return null;
+    }
+}

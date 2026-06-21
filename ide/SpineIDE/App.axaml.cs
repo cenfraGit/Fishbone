@@ -28,7 +28,8 @@ public partial class App : Application
         collection.AddSingleton<IMessenger>(WeakReferenceMessenger.Default);
         collection.AddSingleton<IDialogService, DialogService>();
         collection.AddSingleton<OutputPanelVM>();
-        collection.AddTransient<IErrorService, ErrorService>();
+        collection.AddSingleton<IErrorService, ErrorService>();
+        collection.AddSingleton<ErrorPanelVM>();
 
         collection.AddTransient<MainWindowVM>();
 

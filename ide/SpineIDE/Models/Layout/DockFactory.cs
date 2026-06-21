@@ -12,10 +12,12 @@ namespace SpineIDE.Models.Layout;
 public class DockFactory : Factory
     {
         private readonly OutputPanelVM _outputPanel;
+        private readonly ErrorPanelVM _errorPanel;
 
-        public DockFactory(OutputPanelVM outputPanel)
+        public DockFactory(OutputPanelVM outputPanel, ErrorPanelVM errorPanel)
         {
             _outputPanel = outputPanel;
+            _errorPanel = errorPanel;
         }
 
         public override IRootDock CreateLayout()
@@ -24,12 +26,19 @@ public class DockFactory : Factory
             var scriptEditor = new ScriptEditorVM("New", null, "");
 
             var variablesToolDock = new ToolDock { ActiveDockable = variableExplorer, VisibleDockables = CreateList<IDockable>(variableExplorer) };
-            var outputToolDock = new ToolDock { ActiveDockable = _outputPanel, VisibleDockables = CreateList<IDockable>(_outputPanel) };
+            var outputToolDock = new ToolDock
+            {
+                ActiveDockable = _outputPanel,
+                VisibleDockables = CreateList<IDockable>(_outputPanel, _errorPanel),
+                IsExpanded = false
+            };
             var documentDock = new DocumentDock { Id = "Scripts", ActiveDockable = scriptEditor, VisibleDockables = CreateList<IDockable>(scriptEditor) };
 
             //variablesToolDock.Proportion = 0.5;
             _outputPanel.Id = "Output";
             _outputPanel.Title = "Output";
+            _errorPanel.Id = "Errors";
+            _errorPanel.Title = "Errors";
 
             var leftVerticalPanel = new ProportionalDock
             {
@@ -84,6 +93,7 @@ public class DockFactory : Factory
             {
                 ["Variables"] = () => layout,
                 ["Output"]    = () => layout,
+                ["Errors"]    = () => layout,
                 ["Editor"]    = () => layout
             };
 

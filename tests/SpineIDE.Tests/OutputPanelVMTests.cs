@@ -11,12 +11,12 @@ public class OutputPanelVMTests
 
         output.AppendBatch("first");
         output.AppendBatch(" second");
-        Assert.Equal("first second", output.OutputText);
+        Assert.Equal("first second", output.PanelText);
 
         output.Clear();
-        Assert.Equal(string.Empty, output.OutputText);
+        Assert.Equal(string.Empty, output.PanelText);
 
         output.AppendBatch("new");
-        Assert.Equal("new", output.OutputText);
+        Assert.Equal("new", output.PanelText);
     }
 }
