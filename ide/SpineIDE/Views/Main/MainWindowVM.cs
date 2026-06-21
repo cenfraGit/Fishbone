@@ -154,6 +154,11 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
 
     private async Task ReportScriptErrorAsync(Exception exception)
     {
+        if (Avalonia.Application.Current is null || Dispatcher.UIThread.CheckAccess())
+        {
+            ErrorService.AddError(new ScriptExecutionError(exception.Message));
+            return;
+        }
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
             ErrorService.AddError(new ScriptExecutionError(exception.Message));
@@ -260,7 +265,7 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
     {
         string scriptPath = message.Script.Path!;
         var completion = new TaskCompletionSource<ScriptExecutionResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-        IFishboneDebugClientSession session = _debugSessionFactory.Create(scriptPath);
+        IFishboneDebugClientSession session = _debugSessionFactory.CreateLaunched(scriptPath);
         _debugSession = session;
         _debugEditor = FindEditor(message.Script.SourceId);
         if (_debugEditor is not null)
@@ -288,9 +293,9 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         using CancellationTokenRegistration registration = cancellationToken.Register(() => completion.TrySetCanceled(cancellationToken));
         try
         {
-            await session.StartAsync(message.BreakpointLines, cancellationToken);
+            await session.ConnectAsync(stopOnEntry: false, cancellationToken);
             IReadOnlyList<FishboneBreakpointResult> breakpointResults =
-                await session.SetBreakpointsAsync(message.BreakpointLines, cancellationToken);
+                await session.ConfigureAsync(message.BreakpointLines, cancellationToken);
             _debugEditor?.ApplyBreakpointResults(breakpointResults);
             return await completion.Task;
         }
@@ -310,6 +315,84 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         }
     }
 
+    private async Task ExecuteRemoteAttachAsync(string host, int port, CancellationToken cancellationToken)
+    {
+        var completion = new TaskCompletionSource<Exception?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        IFishboneDebugClientSession session = _debugSessionFactory.CreateAttached(host, port);
+        _debugSession = session;
+        session.EventReceived += OnDebugEventReceived;
+
+        void HandleCompletion(object? sender, FishboneDebugEvent debugEvent)
+        {
+            if (debugEvent is FishboneDebugTerminated)
+                completion.TrySetResult(null);
+            else if (debugEvent is FishboneDebugFailed failed)
+                completion.TrySetResult(failed.Exception);
+        }
+
+        session.EventReceived += HandleCompletion;
+        using CancellationTokenRegistration registration = cancellationToken.Register(() => completion.TrySetCanceled(cancellationToken));
+        string? sourceId = null;
+        try
+        {
+            FishboneDebugSource source = await session.ConnectAsync(stopOnEntry: true, cancellationToken);
+            _debugEditor = OpenRemoteSource(source, host, port);
+            sourceId = _debugEditor.SourceId;
+            _debugEditor.BreakpointsChanged += OnDebugBreakpointsChanged;
+            WeakReferenceMessenger.Default.Send(new MessageDebugEditingChanged(sourceId, true));
+
+            IReadOnlyList<FishboneBreakpointResult> results =
+                await session.ConfigureAsync(_debugEditor.BreakpointLines, cancellationToken);
+            _debugEditor.ApplyBreakpointResults(results);
+
+            Exception? error = await completion.Task;
+            if (error is not null)
+                throw error;
+        }
+        finally
+        {
+            session.EventReceived -= HandleCompletion;
+            session.EventReceived -= OnDebugEventReceived;
+            if (_debugEditor is not null)
+                _debugEditor.BreakpointsChanged -= OnDebugBreakpointsChanged;
+            await session.DisposeAsync();
+            if (ReferenceEquals(_debugSession, session))
+                _debugSession = null;
+            if (sourceId is not null)
+            {
+                WeakReferenceMessenger.Default.Send(new MessageDebugEditingChanged(sourceId, false));
+                WeakReferenceMessenger.Default.Send(new MessageDebugLocationChanged(sourceId, null));
+            }
+            _debugEditor = null;
+            DebugState = FishboneDebugSessionState.Completed;
+        }
+    }
+
+    private ScriptEditorVM OpenRemoteSource(FishboneDebugSource source, string host, int port)
+    {
+        var scriptsDock = GetScriptsDock(Layout) ?? throw new InvalidOperationException("The scripts dock is unavailable.");
+        string sourceId = source.Identity ?? $"fishbone-remote://{host}:{port}/{source.Reference}";
+        ScriptEditorVM? existing = scriptsDock.VisibleDockables?.OfType<ScriptEditorVM>()
+            .FirstOrDefault(editor => editor.IsRemote && editor.SourceId == sourceId);
+        if (existing is not null)
+        {
+            existing.ScriptDocument = new AvaloniaEdit.Document.TextDocument(source.Content);
+            scriptsDock.ActiveDockable = existing;
+            return existing;
+        }
+
+        var editor = new ScriptEditorVM(source.Name, null, source.Content, sourceId, isRemote: true);
+        scriptsDock.VisibleDockables ??= [];
+        ScriptEditorVM? initialBlank = scriptsDock.VisibleDockables.OfType<ScriptEditorVM>().FirstOrDefault(candidate =>
+            !candidate.IsRemote && candidate.ScriptPath is null && candidate.ScriptDocument.Text.Length == 0 &&
+            candidate.BreakpointLines.Count == 0);
+        if (initialBlank is not null)
+            scriptsDock.VisibleDockables.Remove(initialBlank);
+        scriptsDock.VisibleDockables.Add(editor);
+        scriptsDock.ActiveDockable = editor;
+        return editor;
+    }
+
     private void OnDebugEventReceived(object? sender, FishboneDebugEvent debugEvent)
     {
         Dispatcher.UIThread.Post(() =>
@@ -324,8 +407,8 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
                     break;
                 case FishboneDebugPaused paused when sender is IFishboneDebugClientSession session:
                     FishboneDebugFrame? frame = paused.Snapshot.Frames.FirstOrDefault();
-                    if (frame?.SourcePath is not null)
-                        ActivateEditorByPath(frame.SourcePath);
+                    if (_debugEditor is not null)
+                        ActivateEditor(_debugEditor.SourceId);
                     WeakReferenceMessenger.Default.Send(new MessageDebugPaused(paused.Snapshot, session));
                     WeakReferenceMessenger.Default.Send(new MessageDebugLocationChanged(
                         _debugEditor?.SourceId ?? string.Empty, frame?.Line));
@@ -375,16 +458,6 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
     private ScriptEditorVM? FindEditor(string sourceId) => GetScriptsDock(Layout)?.VisibleDockables?
         .OfType<ScriptEditorVM>().FirstOrDefault(candidate => candidate.SourceId == sourceId);
 
-    private void ActivateEditorByPath(string sourcePath)
-    {
-        var scriptsDock = GetScriptsDock(Layout);
-        var editor = scriptsDock?.VisibleDockables?.OfType<ScriptEditorVM>()
-            .FirstOrDefault(candidate => candidate.ScriptPath is not null &&
-                string.Equals(Path.GetFullPath(candidate.ScriptPath), Path.GetFullPath(sourcePath), StringComparison.OrdinalIgnoreCase));
-        if (scriptsDock is not null && editor is not null)
-            scriptsDock.ActiveDockable = editor;
-    }
-
     partial void OnDebugStateChanged(FishboneDebugSessionState value)
     {
         DebugCommand.NotifyCanExecuteChanged();
@@ -395,6 +468,7 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         StepOverCommand.NotifyCanExecuteChanged();
         StepOutCommand.NotifyCanExecuteChanged();
         StopCommand.NotifyCanExecuteChanged();
+        AttachRemoteCommand.NotifyCanExecuteChanged();
     }
 
     private void FlushOutput(
@@ -471,6 +545,46 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
     [RelayCommand(CanExecute = nameof(CanStartExecution))]
     private void Debug() => WeakReferenceMessenger.Default.Send(new MessageRunActiveScript(ScriptLaunchMode.Debug));
 
+    [RelayCommand(CanExecute = nameof(CanStartExecution))]
+    private async Task AttachRemote()
+    {
+        RemoteAttachEndpoint? endpoint = await _dialogService.ShowRemoteAttachAsync();
+        if (endpoint is not null)
+            await AttachRemoteAsync(endpoint.Host, endpoint.Port);
+    }
+
+    public async Task AttachRemoteAsync(string host, int port)
+    {
+        Interlocked.Increment(ref _executionVersion);
+        _scriptCTS?.Cancel();
+        await _executionGate.WaitAsync();
+        try
+        {
+            using var currentCTS = new CancellationTokenSource();
+            _scriptCTS = currentCTS;
+            ErrorService.ClearErrors();
+            _outputPanel.Clear();
+            try
+            {
+                await ExecuteRemoteAttachAsync(host, port, currentCTS.Token);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception exception)
+            {
+                await ReportScriptErrorAsync(exception);
+            }
+            finally
+            {
+                if (ReferenceEquals(_scriptCTS, currentCTS))
+                    _scriptCTS = null;
+            }
+        }
+        finally
+        {
+            _executionGate.Release();
+        }
+    }
+
     [RelayCommand(CanExecute = nameof(CanResume))]
     private async Task Continue() { if (_debugSession is not null) await _debugSession.ContinueAsync(); }
 
@@ -491,7 +605,8 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
     {
         if (_debugSession is not null)
             await _debugSession.StopAsync();
-        _scriptCTS?.Cancel();
+        if (_debugSession?.Ownership != FishboneDebugSessionOwnership.Attached)
+            _scriptCTS?.Cancel();
     }
 
     [RelayCommand]

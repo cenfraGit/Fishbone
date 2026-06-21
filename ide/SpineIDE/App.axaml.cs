@@ -10,12 +10,14 @@ using SpineIDE.Services;
 using System;
 using SpineIDE.Panels;
 using Fishbone.DebugClient;
+using Avalonia.Threading;
 
 namespace SpineIDE;
 
 public partial class App : Application
 {
     public static IServiceProvider? ServiceProvider { get; private set; }
+    internal static SpineIdeStartupOptions StartupOptions { get; set; } = new();
 
     public override void Initialize()
     {
@@ -33,6 +35,7 @@ public partial class App : Application
         collection.AddSingleton<ErrorPanelVM>();
         collection.AddSingleton<IFishboneDapHostLocator, FishboneDapHostLocator>();
         collection.AddSingleton<IFishboneDebugClientSessionFactory, FishboneDebugClientSessionFactory>();
+        collection.AddSingleton(StartupOptions);
 
         collection.AddTransient<MainWindowVM>();
 
@@ -43,8 +46,11 @@ public partial class App : Application
             var mainWindow = new MainWindow();
             var dialogService = ServiceProvider.GetRequiredService<IDialogService>();
             dialogService.Initialize(mainWindow);
-            mainWindow.DataContext = ServiceProvider.GetRequiredService<MainWindowVM>();
+            var mainWindowViewModel = ServiceProvider.GetRequiredService<MainWindowVM>();
+            mainWindow.DataContext = mainWindowViewModel;
             desktop.MainWindow = mainWindow;
+            if (StartupOptions.AttachPort is int attachPort)
+                Dispatcher.UIThread.Post(() => _ = mainWindowViewModel.AttachRemoteAsync("127.0.0.1", attachPort));
         }
 
         base.OnFrameworkInitializationCompleted();

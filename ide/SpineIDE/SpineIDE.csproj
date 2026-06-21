@@ -49,6 +49,7 @@
     <PackageReference Include="Dock.Model.Mvvm" Version="12.0.0.2" />
     <PackageReference Include="MessageBox.Avalonia" Version="12.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.8" />
+    <PackageReference Include="System.CommandLine" Version="2.0.9" />
     <PackageReference Include="TextMateSharp.Grammars" Version="2.0.3" />
   </ItemGroup>
 

@@ -58,6 +58,7 @@
             <MenuItem Header="_Script">
                 <MenuItem Header="_Debug" Command="{Binding DebugCommand}" InputGesture="F5" />
                 <MenuItem Header="_Run without debugging" Command="{Binding ButtonRunCommand}" InputGesture="Ctrl+F5" />
+                <MenuItem Header="Attach to _Remote..." Command="{Binding AttachRemoteCommand}" />
                 <Separator />
                 <MenuItem Header="_Continue" Command="{Binding ContinueCommand}" />
                 <MenuItem Header="_Pause" Command="{Binding PauseCommand}" />
