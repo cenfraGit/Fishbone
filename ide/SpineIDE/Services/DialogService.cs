@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using SpineIDE.Panels;
+using SpineIDE.Views.Input;
 using SpineIDE.Views.Variables;
 
 namespace SpineIDE.Services;
@@ -14,6 +17,7 @@ public interface IDialogService
     Task<IReadOnlyList<IStorageFile>?> OpenFileAsync();
     Task<IStorageFile?> SaveFileAsync(string suggestedName = "script.fb");
     Task ShowVariableDetailsAsync(string name, object? value);
+    Task<string> ShowScriptInputAsync(CancellationToken cancellationToken);
 }
 
 public class DialogService : IDialogService
@@ -59,6 +63,23 @@ public class DialogService : IDialogService
 
         var window = new VariableDetailsWindow(name, value);
         await window.ShowDialog(_mainWindow);
+    }
+
+    public async Task<string> ShowScriptInputAsync(CancellationToken cancellationToken)
+    {
+        if (_mainWindow == null)
+            throw new InvalidOperationException("DialogService: window was null");
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var window = new ScriptInputWindow();
+        using CancellationTokenRegistration registration = cancellationToken.Register(() =>
+            Dispatcher.UIThread.Post(() => window.Close((string?)null)));
+
+        string? result = await window.ShowDialog<string?>(_mainWindow);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return result ?? throw new OperationCanceledException("Script input was cancelled.");
     }
 
     private static FilePickerFileType SvsFileType => new("Fishbone Files")

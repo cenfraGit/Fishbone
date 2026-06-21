@@ -1,0 +1,25 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="SpineIDE.Views.Input.ScriptInputWindow"
+        Title="Script Input"
+        Width="420"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner">
+    <Grid RowDefinitions="Auto,Auto,Auto" Margin="14">
+        <TextBlock Text="Value" Margin="0,0,0,6" />
+
+        <TextBox Name="InputTextBox"
+                 Grid.Row="1"
+                 MinWidth="360" />
+
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Spacing="8"
+                    Margin="0,14,0,0">
+            <Button Content="Cancel" Click="OnCancelClicked" />
+            <Button Content="OK" Click="OnSubmitClicked" />
+        </StackPanel>
+    </Grid>
+</Window>

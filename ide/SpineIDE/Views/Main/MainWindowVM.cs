@@ -174,6 +174,8 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
 
         configuration.RegisterBuiltIn("print", new Action<object?>(outputBuffer.Append));
         configuration.RegisterBuiltIn("println", new Action<object?>(outputBuffer.AppendLine));
+        configuration.RegisterBuiltIn("input", new Func<string>(() =>
+            ReadScriptInput(outputBuffer, executionVersion, cancellationToken)));
 
         Task<FishboneEnvironment> executionTask = Task.Run(
             () => FishboneEngine.Run(scriptCode, configuration, cancellationToken),
@@ -206,6 +208,49 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
 
         if (executionVersion == Volatile.Read(ref _executionVersion) && !cancellationToken.IsCancellationRequested)
             _outputPanel.AppendBatch(output);
+    }
+
+    private string ReadScriptInput(
+        ScriptOutputBuffer outputBuffer,
+        int executionVersion,
+        CancellationToken cancellationToken)
+    {
+        using var request = new ScriptInputRequest(cancellationToken);
+
+        Dispatcher.UIThread.Post(async () =>
+        {
+            try
+            {
+                if (executionVersion != Volatile.Read(ref _executionVersion) || cancellationToken.IsCancellationRequested)
+                {
+                    request.Cancel();
+                    return;
+                }
+
+                FlushOutput(outputBuffer, executionVersion, cancellationToken);
+                string value = await _dialogService.ShowScriptInputAsync(cancellationToken);
+
+                if (executionVersion != Volatile.Read(ref _executionVersion) || cancellationToken.IsCancellationRequested)
+                {
+                    request.Cancel();
+                    return;
+                }
+
+                outputBuffer.AppendLine(value);
+                FlushOutput(outputBuffer, executionVersion, cancellationToken);
+                request.Submit(value);
+            }
+            catch (OperationCanceledException)
+            {
+                request.Cancel();
+            }
+            catch (Exception ex)
+            {
+                request.Fail(ex);
+            }
+        });
+
+        return request.Wait();
     }
 
     // --------------------------------------------------------------------------------
