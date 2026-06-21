@@ -24,6 +24,7 @@ public sealed record DebugExceptionSnapshot(string Type, string Message);
 
 public sealed record DebugCallFrameSnapshot(
     string FunctionName,
+    DebugSourceLocation Location,
     ImmutableArray<DebugVariableSnapshot> Variables);
 
 public sealed record DebugPauseSnapshot(

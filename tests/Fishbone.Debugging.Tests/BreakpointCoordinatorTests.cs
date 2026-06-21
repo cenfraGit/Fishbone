@@ -180,6 +180,43 @@ public class BreakpointCoordinatorTests
         Assert.Equal(DebugSessionState.Running, coordinator.State);
     }
 
+    [Fact]
+    public void RuntimeExceptionPauseCanBeDisabled()
+    {
+        using var coordinator = CreateStartedCoordinator(out var environment);
+        coordinator.PauseOnRuntimeExceptions = false;
+        int pauses = 0;
+        coordinator.Paused += (_, _) => pauses++;
+
+        coordinator.OnRuntimeException(new InvalidOperationException("failed"), Node(7), environment);
+
+        Assert.Equal(0, pauses);
+        Assert.Equal(DebugSessionState.Running, coordinator.State);
+    }
+
+    [Fact]
+    public void CallFramesRetainTheirMostRecentSourceLocations()
+    {
+        using var coordinator = CreateStartedCoordinator(out var root);
+        var function = new FishboneEnvironment(root);
+        coordinator.OnBeforeExecute(Node(3), root);
+        coordinator.OnFunctionEnter("work", function);
+        coordinator.AddBreakpoint(8);
+        DebugPauseSnapshot? snapshot = null;
+        coordinator.Paused += (_, args) =>
+        {
+            snapshot = args.Snapshot;
+            coordinator.Continue();
+        };
+
+        coordinator.OnBeforeExecute(Node(8), function);
+
+        Assert.Equal("work", snapshot!.CallStack[0].FunctionName);
+        Assert.Equal(8, snapshot.CallStack[0].Location.Line);
+        Assert.Equal("<script>", snapshot.CallStack[1].FunctionName);
+        Assert.Equal(3, snapshot.CallStack[1].Location.Line);
+    }
+
     private static BreakpointCoordinator CreateStartedCoordinator(out FishboneEnvironment environment)
     {
         environment = new FishboneEnvironment();

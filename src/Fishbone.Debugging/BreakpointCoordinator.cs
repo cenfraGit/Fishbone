@@ -6,11 +6,15 @@ namespace Fishbone.Debugging;
 public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
 {
     private enum StepMode { None, Into, Over, Out }
+    private sealed record Frame(string Name, FishboneEnvironment Environment)
+    {
+        public DebugSourceLocation? Location { get; set; }
+    }
 
     private readonly object _sync = new();
     private readonly ManualResetEventSlim _threadGate = new(true);
     private readonly HashSet<int> _breakpoints = [];
-    private readonly List<(string Name, FishboneEnvironment Environment)> _frames = [];
+    private readonly List<Frame> _frames = [];
     private readonly CancellationToken _cancellationToken;
     private readonly CancellationTokenRegistration _cancellationRegistration;
     private DebugSessionState _state = DebugSessionState.Running;
@@ -21,6 +25,7 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
     private (int Line, int Depth)? _lastExecutableLocation;
     private (int Line, int Depth)? _resumeLocation;
     private int _targetDepth;
+    private bool _pauseOnRuntimeExceptions = true;
 
     public BreakpointCoordinator(string sourceId, CancellationToken cancellationToken = default)
     {
@@ -34,6 +39,12 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
     public DebugSessionState State
     {
         get { lock (_sync) return _state; }
+    }
+
+    public bool PauseOnRuntimeExceptions
+    {
+        get { lock (_sync) return _pauseOnRuntimeExceptions; }
+        set { lock (_sync) _pauseOnRuntimeExceptions = value; }
     }
 
     public event EventHandler<DebugStateChangedEventArgs>? StateChanged;
@@ -98,7 +109,7 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
         lock (_sync)
         {
             _frames.Clear();
-            _frames.Add(("<script>", environment));
+            _frames.Add(new Frame("<script>", environment));
             _lastExecutableLocation = null;
             _exceptionPause = false;
         }
@@ -119,6 +130,7 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
                 return;
 
             var location = (node.Line, _frames.Count - 1);
+            _frames[^1].Location = new DebugSourceLocation(SourceId, node.Line, node.Column);
             var isNewLocation = _lastExecutableLocation != location;
             _lastExecutableLocation = location;
             if (!isNewLocation)
@@ -155,6 +167,11 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
         lock (_sync)
         {
             ThrowIfStoppedLocked();
+            if (!_pauseOnRuntimeExceptions)
+                return;
+
+            if (_frames.Count > 0 && node.Line > 0)
+                _frames[^1].Location = new DebugSourceLocation(SourceId, node.Line, node.Column);
             _stepMode = StepMode.None;
             _exceptionPause = true;
             _resumeLocation = node.Line > 0 ? (node.Line, _frames.Count - 1) : null;
@@ -172,7 +189,7 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
     {
         lock (_sync)
         {
-            _frames.Add((functionName, environment));
+            _frames.Add(new Frame(functionName, environment));
             _lastExecutableLocation = null;
         }
     }
@@ -259,6 +276,7 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
             .Reverse()
             .Select(frame => new DebugCallFrameSnapshot(
                 frame.Name,
+                frame.Location ?? new DebugSourceLocation(SourceId, node.Line, node.Column),
                 frame.Environment.LocalValues
                     .OrderBy(pair => pair.Key, StringComparer.Ordinal)
                     .Select(pair => new DebugVariableSnapshot(pair.Key, pair.Value))
