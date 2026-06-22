@@ -9,11 +9,20 @@ using AvaloniaEdit.Rendering;
 
 namespace SpineIDE.Views.Editor;
 
-internal sealed class BreakpointMargin(TextEditor editor, Func<ScriptEditorVM?> viewModelProvider) : AbstractMargin
+internal sealed class BreakpointMargin : AbstractMargin
 {
+    private readonly TextEditor editor;
+    private readonly Func<ScriptEditorVM?> viewModelProvider;
     private static readonly IBrush BreakpointBrush = new SolidColorBrush(Color.Parse("#E05555"));
     private static readonly IBrush UnverifiedBreakpointBrush = new SolidColorBrush(Color.Parse("#777777"));
     private static readonly IBrush GutterBrush = new SolidColorBrush(Color.Parse("#161616"));
+
+    public BreakpointMargin(TextEditor editor, Func<ScriptEditorVM?> viewModelProvider)
+    {
+        this.editor = editor;
+        this.viewModelProvider = viewModelProvider;
+        Cursor = new Cursor(StandardCursorType.Hand);
+    }
 
     protected override Size MeasureOverride(Size availableSize) => new(18, 0);
 
