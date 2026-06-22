@@ -133,7 +133,7 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
     {
         AstNode assignmentTarget = Visit(context.expr(0));
         if (assignmentTarget is not IndexingNode indexingNode)
-            throw new InvalidOperationException("Indexed assignment requires an indexed target.");
+            throw new InvalidOperationException($"Indexed assignment requires an indexed target, but found {assignmentTarget.GetType().Name}.");
 
         AstNode value = Visit(context.expr(1));
         return new IndexedAssignmentNode(indexingNode.Target, indexingNode.Index, value) { Line = context.Start.Line, Column = context.Start.Column + 1 };

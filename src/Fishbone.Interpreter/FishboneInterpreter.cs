@@ -236,7 +236,7 @@ public class FishboneInterpreter
         {
             IDictionary dictionary => dictionary.Keys,
             IEnumerable enumerable when enumerable is not string => enumerable,
-            _ => throw new Exception("Object is not iterable.")
+            _ => throw new Exception($"Object of type \"{iterable.GetType().Name}\" is not iterable.")
         };
 
         var loopEnv = new FishboneEnvironment(env);
@@ -310,7 +310,7 @@ public class FishboneInterpreter
             return InvokeBoundMethod(env, boundMethod, argumentNodes);
 
         if (callee is null)
-            throw new Exception("Null is not callable.");
+            throw new Exception("Cannot call null. Only functions and methods are callable.");
 
         throw new Exception($"Object of type \"{callee.GetType().Name}\" is not callable.");
     }

@@ -106,7 +106,7 @@ public class FishboneConfiguration
         {
             if (collection is IList list)
                 return list[index];
-            throw new Exception($"Object is not an indexable collection.");
+            throw new Exception($"Object of type \"{collection.GetType().Name}\" is not an indexable collection.");
         });
 
         BuiltIns["setIndex"] = new Action<IList, int, object>((targetList, index, value) =>
@@ -119,7 +119,7 @@ public class FishboneConfiguration
         {
             if (dictionary is IDictionary dict)
                 return dict[key];
-            throw new Exception($"Object is not a dictionary.");
+            throw new Exception($"Object of type \"{dictionary.GetType().Name}\" is not a dictionary.");
         });
     }
 
