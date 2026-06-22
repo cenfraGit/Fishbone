@@ -55,9 +55,15 @@ public class FishboneInterpreter
         }
         catch (Exception exception) when (ShouldReport(exception))
         {
-            exception.Data[DebuggerReportedKey] = true;
             _debugger.OnRuntimeException(exception, node, env);
-            throw;
+            if (exception is FishboneRuntimeException)
+            {
+                exception.Data[DebuggerReportedKey] = true;
+                throw;
+            }
+            var wrapped = new FishboneRuntimeException(exception.Message, node.Line, node.Column, exception);
+            wrapped.Data[DebuggerReportedKey] = true;
+            throw wrapped;
         }
     }
 

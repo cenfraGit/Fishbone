@@ -33,6 +33,32 @@ public class ErrorPanelVMTests
     }
 
     [Fact]
+    public void Errors_WithLocation_RenderLineAndColumn()
+    {
+        var errorService = new ErrorService();
+        var panel = new ErrorPanelVM(errorService);
+
+        errorService.AddError(new ScriptExecutionError("Undefined variable \"x\".", 3, 5));
+        errorService.AddError(new ScriptExecutionError("Object is not callable.", 10, null));
+        errorService.AddError(new ScriptExecutionError("No location error.", null, null));
+
+        Assert.Equal(3, panel.Errors[0].Line);
+        Assert.Equal(5, panel.Errors[0].Column);
+        Assert.True(panel.Errors[0].HasLocation);
+        Assert.Equal("Line 3, column 5", panel.Errors[0].LocationDisplay);
+
+        Assert.True(panel.Errors[1].HasLocation);
+        Assert.Equal("Line 10", panel.Errors[1].LocationDisplay);
+
+        Assert.False(panel.Errors[2].HasLocation);
+        Assert.Equal(string.Empty, panel.Errors[2].LocationDisplay);
+
+        Assert.Contains("Line 3, column 5: Undefined variable \"x\".", panel.PanelText);
+        Assert.Contains("Line 10: Object is not callable.", panel.PanelText);
+        Assert.Contains("No location error.", panel.PanelText);
+    }
+
+    [Fact]
     public void CreateLayout_PlacesOutputAndErrorsInCollapsedBottomToolDock()
     {
         var output = new OutputPanelVM();

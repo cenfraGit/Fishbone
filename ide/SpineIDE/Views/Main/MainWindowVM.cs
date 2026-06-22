@@ -14,6 +14,7 @@ using Dock.Model.Core;
 using Fishbone.Core;
 using Fishbone.DebugClient;
 using Fishbone.Engine;
+using Fishbone.Interpreter;
 using SpineIDE.Models.Layout;
 using SpineIDE.Models.Messages;
 using SpineIDE.Models;
@@ -154,14 +155,22 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
 
     private async Task ReportScriptErrorAsync(Exception exception)
     {
+        int? line = null;
+        int? column = null;
+        if (exception is FishboneRuntimeException runtimeException)
+        {
+            line = runtimeException.Line > 0 ? runtimeException.Line : null;
+            column = runtimeException.Column > 0 ? runtimeException.Column : null;
+        }
+
         if (Avalonia.Application.Current is null || Dispatcher.UIThread.CheckAccess())
         {
-            ErrorService.AddError(new ScriptExecutionError(exception.Message));
+            ErrorService.AddError(new ScriptExecutionError(exception.Message, line, column));
             return;
         }
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
-            ErrorService.AddError(new ScriptExecutionError(exception.Message));
+            ErrorService.AddError(new ScriptExecutionError(exception.Message, line, column));
         });
     }
 

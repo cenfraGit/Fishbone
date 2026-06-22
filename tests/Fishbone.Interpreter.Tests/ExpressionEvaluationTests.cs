@@ -112,7 +112,7 @@ let skippedOr = true or missingOr;
 
         Assert.Equal(false, env.GetValue("skippedAnd"));
         Assert.Equal(true, env.GetValue("skippedOr"));
-        Assert.Throws<Exception>(() => InterpreterTestHelpers.Run("let result = true xor missingXor;"));
+        Assert.ThrowsAny<Exception>(() => InterpreterTestHelpers.Run("let result = true xor missingXor;"));
     }
 
     [Fact]

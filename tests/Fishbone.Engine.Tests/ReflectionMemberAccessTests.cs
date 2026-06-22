@@ -68,13 +68,13 @@ sample.Increment(value);
         var config = new FishboneConfiguration()
             .RegisterBuiltIn("sample", new ReflectionSample());
 
-        Assert.Throws<Exception>(() => FishboneEngine.Run("let value = sample.Missing;", config));
-        Assert.Throws<Exception>(() => FishboneEngine.Run("let value = null; let name = value.Name;", config));
-        Assert.Throws<Exception>(() => FishboneEngine.Run("let value = sample.Resize(1);", config));
-        Assert.Throws<Exception>(() => FishboneEngine.Run("let value = sample.Name();", config));
-        Assert.Throws<Exception>(() => FishboneEngine.Run("""let value = sample.Resize("wide", "high");""", config));
-        Assert.Throws<Exception>(() => FishboneEngine.Run("""let ok = sample.TryGetNumber("answer", missing);""", config));
-        Assert.Throws<Exception>(() => FishboneEngine.Run("""let value = 0; let ok = sample.TryGetNumber("answer", [value][0]);""", config));
+        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("let value = sample.Missing;", config));
+        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("let value = null; let name = value.Name;", config));
+        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("let value = sample.Resize(1);", config));
+        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("let value = sample.Name();", config));
+        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("""let value = sample.Resize("wide", "high");""", config));
+        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("""let ok = sample.TryGetNumber("answer", missing);""", config));
+        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("""let value = 0; let ok = sample.TryGetNumber("answer", [value][0]);""", config));
     }
 
     private sealed class ReflectionSample

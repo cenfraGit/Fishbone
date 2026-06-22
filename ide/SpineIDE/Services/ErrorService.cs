@@ -4,19 +4,19 @@ namespace SpineIDE.Services;
 
 public class ScriptExecutionError
 {
-    public string? Line { get; set; }
-    public string? Column { get; set; }
+    public int? Line { get; set; }
+    public int? Column { get; set; }
     public string ExMessage { get; set; }
-    public bool HasLocation => !string.IsNullOrWhiteSpace(Line) || !string.IsNullOrWhiteSpace(Column);
+    public bool HasLocation => Line is not null || Column is not null;
     public string LocationDisplay => (Line, Column) switch
     {
-        ({ Length: > 0 }, { Length: > 0 }) => $"Line {Line}, column {Column}",
-        ({ Length: > 0 }, _) => $"Line {Line}",
-        (_, { Length: > 0 }) => $"Column {Column}",
+        (int line, int col) => $"Line {line}, column {col}",
+        (int line, _) => $"Line {line}",
+        (_, int col) => $"Column {col}",
         _ => string.Empty
     };
 
-    public ScriptExecutionError(string message, string? line = null, string? column = null)
+    public ScriptExecutionError(string message, int? line = null, int? column = null)
     {
         this.ExMessage = message;
         this.Line = line;

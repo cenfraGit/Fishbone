@@ -85,7 +85,7 @@ let failResult = searchTarget(15);
     [Fact]
     public void Evaluate_FunctionCallWithWrongArity_Throws()
     {
-        Assert.Throws<Exception>(() => InterpreterTestHelpers.Run("""
+        Assert.ThrowsAny<Exception>(() => InterpreterTestHelpers.Run("""
 func add(left, right)
 {
     return left + right;
@@ -98,7 +98,7 @@ let value = add(1);
     [Fact]
     public void Evaluate_NonCallableSymbolCall_Throws()
     {
-        Assert.Throws<Exception>(() => InterpreterTestHelpers.Run("""
+        Assert.ThrowsAny<Exception>(() => InterpreterTestHelpers.Run("""
 let value = 1;
 let result = value();
 """));

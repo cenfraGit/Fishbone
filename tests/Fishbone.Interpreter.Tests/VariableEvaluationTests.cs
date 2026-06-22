@@ -79,8 +79,8 @@ let outer = 1;
     [Fact]
     public void Evaluate_InvalidVariableOperations_Throw()
     {
-        Assert.Throws<Exception>(() => InterpreterTestHelpers.Run("missing = 1;"));
-        Assert.Throws<Exception>(() => InterpreterTestHelpers.Run("let duplicate = 1; let duplicate = 2;"));
-        Assert.Throws<Exception>(() => InterpreterTestHelpers.Run("let value = missing;"));
+        Assert.ThrowsAny<Exception>(() => InterpreterTestHelpers.Run("missing = 1;"));
+        Assert.ThrowsAny<Exception>(() => InterpreterTestHelpers.Run("let duplicate = 1; let duplicate = 2;"));
+        Assert.ThrowsAny<Exception>(() => InterpreterTestHelpers.Run("let value = missing;"));
     }
 }

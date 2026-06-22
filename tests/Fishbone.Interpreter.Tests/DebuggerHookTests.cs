@@ -31,7 +31,7 @@ public class DebuggerHookTests
         var failed = new RecordingDebugger();
         var interpreter = new FishboneInterpreter(debugger: failed);
         var ast = ASTParser.Parse("func fail() { return missing; } fail();");
-        Assert.Throws<Exception>(() => interpreter.Evaluate(new FishboneEnvironment(), ast));
+        Assert.ThrowsAny<Exception>(() => interpreter.Evaluate(new FishboneEnvironment(), ast));
         Assert.Contains("exit:fail", failed.Events);
     }
 
@@ -42,7 +42,7 @@ public class DebuggerHookTests
         var interpreter = new FishboneInterpreter(debugger: debugger);
         var ast = ASTParser.Parse("let result = missing + 1;");
 
-        Assert.Throws<Exception>(() => interpreter.Evaluate(new FishboneEnvironment(), ast));
+        Assert.ThrowsAny<Exception>(() => interpreter.Evaluate(new FishboneEnvironment(), ast));
 
         var report = Assert.Single(debugger.Exceptions);
         Assert.IsType<IdentifierNode>(report.Node);

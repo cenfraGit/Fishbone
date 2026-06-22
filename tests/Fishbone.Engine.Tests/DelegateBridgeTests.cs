@@ -35,7 +35,7 @@ let scriptResult = doubleValue(21);
         var config = new FishboneConfiguration()
             .RegisterFunction("add", new Func<int, int, int>((left, right) => left + right));
 
-        Assert.Throws<Exception>(() => FishboneEngine.Run("""
+        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("""
 let scriptResult = add(1);
 """, config));
     }
@@ -46,11 +46,12 @@ let scriptResult = add(1);
         var config = new FishboneConfiguration()
             .RegisterFunction("explode", new Func<int>(() => throw new InvalidOperationException("boom")));
 
-        var exception = Assert.Throws<InvalidOperationException>(() => FishboneEngine.Run("""
+        var exception = Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("""
 let scriptResult = explode();
 """, config));
 
         Assert.Equal("boom", exception.Message);
+        Assert.IsType<InvalidOperationException>(exception.InnerException);
     }
 
     [Fact]

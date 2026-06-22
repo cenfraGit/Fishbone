@@ -1,5 +1,7 @@
 ﻿using System.Reflection;
+using Fishbone.Core;
 using Fishbone.Engine;
+using Fishbone.Interpreter;
 using System.CommandLine;
 
 namespace SpineCLI;
@@ -72,7 +74,24 @@ internal class Program
         if (Directory.Exists(pluginsPath))
             LoadPlugins(pluginsPath, config);
 
-        var env = FishboneEngine.Run(contents, config);
+        FishboneEnvironment env;
+        try
+        {
+            env = FishboneEngine.Run(contents, config);
+        }
+        catch (FishboneRuntimeException ex)
+        {
+            if (ex.Line > 0)
+                Console.Error.WriteLine($"Error at line {ex.Line}, column {ex.Column}: {ex.Message}");
+            else
+                Console.Error.WriteLine($"Error: {ex.Message}");
+            return;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error: {ex.Message}");
+            return;
+        }
 
         if (showValues)
         {
