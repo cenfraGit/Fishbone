@@ -28,8 +28,8 @@
   "syntax table")
 
 (defvar fishbone-highlights
-  (let* ((keywords '("if" "else if" "else" "while" "foreach" "in" "func" "return" "break" "continue" "import" "let"))
-         (builtins '("true" "false"))
+  (let* ((keywords '("if" "else" "while" "foreach" "in" "func" "return" "break" "continue" "import" "let"))
+         (builtins '("true" "false" "null"))
          (operators '("and" "or" "xor" "not"))
 
          (keywords-regex (regexp-opt keywords 'words))
@@ -41,7 +41,7 @@
       (,operators-regex . font-lock-keyword-face)
       ("\\<let\\>\\s-+\\([a-zA-Z_][a-zA-Z0-9_]*\\)" 1 font-lock-variable-name-face)
       ("\\<func\\>\\s-+\\([a-zA-Z_][a-zA-Z0-9_]*\\)" 1 font-lock-function-name-face)
-      ("\\<[0-9]+\\(?:\\.[0-9]+\\)?\\>" . font-lock-constant-face)))
+      ("\\<[0-9]+\\(?:_+[0-9]+\\)*\\(?:\\.[0-9]+\\)?\\>" . font-lock-constant-face)))
   "highlighting rules")
 
 (defun fishbone-indent-line ()
