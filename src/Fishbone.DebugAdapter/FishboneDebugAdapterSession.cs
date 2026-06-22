@@ -309,7 +309,7 @@ public sealed class FishboneDebugAdapterSession :
             return;
 
         action();
-        if (_coordinator.State != DebugSessionState.Running)
+        if (!_coordinator.LastResumeWasSuccessful)
             return;
 
         _handles.Clear();

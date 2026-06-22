@@ -26,6 +26,7 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
     private (int Line, int Depth)? _resumeLocation;
     private int _targetDepth;
     private bool _pauseOnRuntimeExceptions = true;
+    private bool _lastResumeWasSuccessful;
 
     public BreakpointCoordinator(string sourceId, CancellationToken cancellationToken = default)
     {
@@ -39,6 +40,11 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
     public DebugSessionState State
     {
         get { lock (_sync) return _state; }
+    }
+
+    public bool LastResumeWasSuccessful
+    {
+        get { lock (_sync) return _lastResumeWasSuccessful; }
     }
 
     public bool PauseOnRuntimeExceptions
@@ -190,7 +196,6 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
         lock (_sync)
         {
             _frames.Add(new Frame(functionName, environment));
-            _lastExecutableLocation = null;
         }
     }
 
@@ -200,7 +205,6 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
         {
             if (_frames.Count > 1)
                 _frames.RemoveAt(_frames.Count - 1);
-            _lastExecutableLocation = null;
         }
     }
 
@@ -220,6 +224,8 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
         DebugStateChangedEventArgs? stateChange;
         lock (_sync)
         {
+            _lastResumeWasSuccessful = false;
+
             if (_state != DebugSessionState.Paused)
                 return;
 
@@ -229,6 +235,7 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
             _stepMode = stepMode;
             _exceptionPause = false;
             _targetDepth = _frames.Count - 1;
+            _lastResumeWasSuccessful = true;
             stateChange = SetStateLocked(DebugSessionState.Running);
             _threadGate.Set();
         }

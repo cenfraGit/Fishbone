@@ -339,6 +339,8 @@ public class FishboneInterpreter
         object?[] args,
         List<(string Name, int Index)> writeBacks)
     {
+        var delegateEnv = new FishboneEnvironment(env);
+        OnFunctionEnter(method.Name, delegateEnv);
         try
         {
             var result = method.Invoke(target, args);
@@ -350,6 +352,10 @@ public class FishboneInterpreter
         catch (TargetInvocationException ex)
         {
             throw ex.InnerException ?? ex;
+        }
+        finally
+        {
+            OnFunctionExit(method.Name);
         }
     }
 
