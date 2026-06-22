@@ -1,5 +1,4 @@
-﻿using System.Reflection;
-using Fishbone.Core;
+﻿using Fishbone.Core;
 using Fishbone.Engine;
 using Fishbone.Interpreter;
 using Fishbone.Parser;
@@ -9,7 +8,6 @@ namespace SpineCLI;
 
 internal class Program
 {
-    private static readonly HashSet<string> _pluginDirs = [];
     private static readonly List<string> _loadedPlugins = [];
 
     private static int Main(string[] args)
@@ -70,10 +68,8 @@ internal class Program
 
         var config = new FishboneConfiguration();
 
-        // will look for plguins in plugins/*/ dirs. where IFishbonePlugins could live
-        var pluginsPath = Path.Combine(AppContext.BaseDirectory, "plugins");
-        if (Directory.Exists(pluginsPath))
-            LoadPlugins(pluginsPath, config);
+        _loadedPlugins.AddRange(FishbonePluginLoader.LoadPlugins(
+            FishbonePluginLoader.DefaultPluginsDirectory, config));
 
         FishboneEnvironment env;
         try
@@ -128,53 +124,5 @@ internal class Program
                 foreach (var plugin in _loadedPlugins)
                     Console.WriteLine(plugin);
         }
-    }
-
-    static void LoadPlugins(string pluginsPath, FishboneConfiguration config)
-    {
-        foreach (var dir in Directory.EnumerateDirectories(pluginsPath))
-            _pluginDirs.Add(dir);
-
-        AppDomain.CurrentDomain.AssemblyResolve += ResolvePluginAssembly;
-
-        foreach (var dir in Directory.EnumerateDirectories(pluginsPath))
-        {
-            foreach (var dll in Directory.EnumerateFiles(dir, "*.dll"))
-            {
-                try
-                {
-                    var assembly = Assembly.LoadFrom(dll);
-                    foreach (var type in assembly.GetExportedTypes())
-                    {
-                        if (!type.IsClass || type.IsAbstract || !typeof(IFishbonePlugin).IsAssignableFrom(type))
-                            continue;
-
-                        if (Activator.CreateInstance(type) is IFishbonePlugin plugin)
-                        {
-                            plugin.Register(config);
-                            _loadedPlugins.Add($"{plugin.GetType().Name} ({dll})");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine($"Failed to load plugin from {dll}: {ex.Message}");
-                }
-            }
-        }
-    }
-
-    static Assembly? ResolvePluginAssembly(object? sender, ResolveEventArgs args)
-    {
-        var assemblyName = new AssemblyName(args.Name).Name + ".dll";
-
-        foreach (var dir in _pluginDirs)
-        {
-            var path = Path.Combine(dir, assemblyName);
-            if (File.Exists(path))
-                return Assembly.LoadFrom(path);
-        }
-
-        return null;
     }
 }

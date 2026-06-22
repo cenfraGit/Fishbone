@@ -238,6 +238,8 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         var configuration = new FishboneConfiguration();
         var outputBuffer = new ScriptOutputBuffer();
 
+        FishbonePluginLoader.LoadPlugins(FishbonePluginLoader.DefaultPluginsDirectory, configuration);
+
         configuration.RegisterBuiltIn("print", new Action<object?>(outputBuffer.Append));
         configuration.RegisterBuiltIn("println", new Action<object?>(outputBuffer.AppendLine));
         configuration.RegisterBuiltIn("input", new Func<string>(() =>
