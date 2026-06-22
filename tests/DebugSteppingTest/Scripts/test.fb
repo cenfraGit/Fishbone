@@ -1,0 +1,8 @@
+println("Debug session starting...");
+
+SetInternalValue(100);
+
+let internalValue = InternalDict["InternalValue"];
+println("Internal value is now: " + internalValue);
+
+println("Debug session complete.");
