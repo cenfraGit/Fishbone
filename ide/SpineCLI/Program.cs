@@ -2,6 +2,7 @@
 using Fishbone.Core;
 using Fishbone.Engine;
 using Fishbone.Interpreter;
+using Fishbone.Parser;
 using System.CommandLine;
 
 namespace SpineCLI;
@@ -78,6 +79,17 @@ internal class Program
         try
         {
             env = FishboneEngine.Run(contents, config);
+        }
+        catch (FishboneParseException ex)
+        {
+            foreach (var error in ex.Errors)
+            {
+                if (error.Line > 0)
+                    Console.Error.WriteLine($"Error at line {error.Line}, column {error.Column}: {error.Message}");
+                else
+                    Console.Error.WriteLine($"Error: {error.Message}");
+            }
+            return;
         }
         catch (FishboneRuntimeException ex)
         {

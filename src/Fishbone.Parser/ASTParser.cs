@@ -11,11 +11,19 @@ public class ASTParser
         ICharStream charStream = CharStreams.fromString(code);
         var lexer = new FishboneLexer(charStream);
         var parser = new FishboneParser(new CommonTokenStream(lexer));
+
+        var errorListener = new CollectingErrorListener();
+        lexer.RemoveErrorListeners();
+        parser.RemoveErrorListeners();
+        lexer.AddErrorListener(errorListener);
+        parser.AddErrorListener(errorListener);
+
         var parseTree = parser.program();
-        if (parser.NumberOfSyntaxErrors > 0)
-            throw new Exception("Invalid script syntax.");
+
+        if (errorListener.Errors.Count > 0)
+            throw new FishboneParseException(errorListener.Errors);
+
         var visitor = new AstBuilderVisitor();
-        var rootAst = visitor.Visit(parseTree);
-        return rootAst;
+        return visitor.Visit(parseTree);
     }
 }

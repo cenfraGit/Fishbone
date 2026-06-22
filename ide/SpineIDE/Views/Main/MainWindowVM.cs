@@ -15,6 +15,7 @@ using Fishbone.Core;
 using Fishbone.DebugClient;
 using Fishbone.Engine;
 using Fishbone.Interpreter;
+using Fishbone.Parser;
 using SpineIDE.Models.Layout;
 using SpineIDE.Models.Messages;
 using SpineIDE.Models;
@@ -155,6 +156,13 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
 
     private async Task ReportScriptErrorAsync(Exception exception)
     {
+        if (exception is FishboneParseException parseException)
+        {
+            foreach (var error in parseException.Errors)
+                await AddErrorAsync(error.Message, error.Line > 0 ? error.Line : null, error.Column > 0 ? error.Column : null);
+            return;
+        }
+
         int? line = null;
         int? column = null;
         if (exception is FishboneRuntimeException runtimeException)
@@ -162,16 +170,20 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
             line = runtimeException.Line > 0 ? runtimeException.Line : null;
             column = runtimeException.Column > 0 ? runtimeException.Column : null;
         }
+        await AddErrorAsync(exception.Message, line, column);
 
-        if (Avalonia.Application.Current is null || Dispatcher.UIThread.CheckAccess())
+        async Task AddErrorAsync(string message, int? line, int? column)
         {
-            ErrorService.AddError(new ScriptExecutionError(exception.Message, line, column));
-            return;
+            if (Avalonia.Application.Current is null || Dispatcher.UIThread.CheckAccess())
+            {
+                ErrorService.AddError(new ScriptExecutionError(message, line, column));
+                return;
+            }
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                ErrorService.AddError(new ScriptExecutionError(message, line, column));
+            });
         }
-        await Dispatcher.UIThread.InvokeAsync(() =>
-        {
-            ErrorService.AddError(new ScriptExecutionError(exception.Message, line, column));
-        });
     }
 
     public async void Receive(MessageVariableDetailsRequested m)
