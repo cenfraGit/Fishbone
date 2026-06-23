@@ -12,7 +12,8 @@ public static class SampleCatalog
     public static IReadOnlyList<SampleDefinition> Samples { get; } =
     [
         new("area_circle.fb", "Area of a Circle"),
-        new("bubble_sort.fb", "Bubble Sort")
+        new("bubble_sort.fb", "Bubble Sort"),
+        new("riemann_sum.fb", "Riemann Sum")
     ];
 
     public static string Load(string fileName)
