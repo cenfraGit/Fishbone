@@ -124,54 +124,47 @@
                 <Button DockPanel.Dock="Left" ToolTip.Tip="Open"
                         Command="{Binding OpenFileCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource folder_open_regular}"
-                                  Foreground="Gray" Width="16" Height="16" />
+                        <PathIcon Data="{StaticResource folder_open_regular}" Foreground="Gray" Width="16" Height="16" />
                     </StackPanel>
                 </Button>
 
                 <Button DockPanel.Dock="Left" ToolTip.Tip="Save" Margin="0,0,13,0"
                         Command="{Binding SaveFileCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource save_regular}"
-                                  Foreground="Orange" Width="16" Height="16" />
+                        <PathIcon Data="{StaticResource save_regular}" Foreground="Orange" Width="16" Height="16" />
                     </StackPanel>
                 </Button>
 
                 <Button DockPanel.Dock="Left" ToolTip.Tip="Copy" Command="{Binding CopyCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource copy_regular}"
-                                  Width="16" Height="16" />
+                        <PathIcon Data="{StaticResource copy_regular}" Width="16" Height="16" />
                     </StackPanel>
                 </Button>
 
                 <Button DockPanel.Dock="Left" ToolTip.Tip="Cut" Command="{Binding CutCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource cut_regular}"
-                                  Width="16" Height="16" />
+                        <PathIcon Data="{StaticResource cut_regular}" Width="16" Height="16" />
                     </StackPanel>
                 </Button>
 
                 <Button DockPanel.Dock="Left" ToolTip.Tip="Paste" Command="{Binding PasteCommand}"
                         Margin="0,0,13,0">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource clipboard_paste_regular}"
-                                  Width="16" Height="16" />
+                        <PathIcon Data="{StaticResource clipboard_paste_regular}" Width="16" Height="16" />
                     </StackPanel>
                 </Button>
 
                 <Button DockPanel.Dock="Left" ToolTip.Tip="Undo"
                         Command="{Binding UndoCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource arrow_undo_regular}"
-                                  Foreground="DarkSlateGray" Width="16" Height="16" />
+                        <PathIcon Data="{StaticResource arrow_undo_regular}" Foreground="DarkSlateGray" Width="16" Height="16" />
                     </StackPanel>
                 </Button>
 
                 <Button DockPanel.Dock="Left" ToolTip.Tip="Redo"
                         Command="{Binding RedoCommand}" Margin="0,0,13,0">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource arrow_undo_regular}"
-                                  Foreground="DarkSlateGray" Width="16" Height="16">
+                        <PathIcon Data="{StaticResource arrow_undo_regular}" Foreground="DarkSlateGray" Width="16" Height="16">
                             <!-- redo symbol outputs same as undo. gh issue unanswered, -->
                             <!-- so just flip? -->
                             <PathIcon.RenderTransform>
@@ -184,47 +177,70 @@
                 <Button DockPanel.Dock="Left" ToolTip.Tip="Remove line comment"
                         Command="{Binding RemoveLineCommentCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource text_bullet_list_add_regular}"
-                                  Foreground="DarkRed" Width="16" Height="16" />
+                        <PathIcon Data="{StaticResource text_bullet_list_add_regular}" Foreground="DarkRed" Width="16" Height="16" />
                     </StackPanel>
                 </Button>
 
                 <Button DockPanel.Dock="Left" ToolTip.Tip="Add line comment"
                         Command="{Binding AddLineCommentCommand}" Margin="0,0,13,0">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource text_bullet_list_add_regular}"
-                                  Foreground="Green" Width="16" Height="16" />
+                        <PathIcon Data="{StaticResource text_bullet_list_add_regular}" Foreground="Green" Width="16" Height="16" />
                     </StackPanel>
                 </Button>
 
-                <Button DockPanel.Dock="Right" Command="{Binding StopCommand}" ToolTip.Tip="Stop">
-                    <TextBlock Text="Stop" />
-                </Button>
+				<Button DockPanel.Dock="Right" Command="{Binding StopCommand}" ToolTip.Tip="Stop">
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<PathIcon Data="{StaticResource stop_regular}" Width="16" Height="16" Foreground="Red" />
+						<TextBlock Text="Stop" />
+					</StackPanel>
+				</Button>
 
                 <Button DockPanel.Dock="Right" Command="{Binding StepOutCommand}" ToolTip.Tip="Step Out">
-                    <TextBlock Text="Out" />
-                </Button>
-
-                <Button DockPanel.Dock="Right" Command="{Binding StepOverCommand}" ToolTip.Tip="Step Over">
-                    <TextBlock Text="Over" />
+					<StackPanel Orientation="Horizontal" Spacing="8">
+					    <PathIcon Data="{StaticResource arrow_curve_up_right_regular}" Width="16" Height="16" Foreground="Gray" />
+                        <TextBlock Text="Out" />
+					</StackPanel>
                 </Button>
 
                 <Button DockPanel.Dock="Right" Command="{Binding StepIntoCommand}" ToolTip.Tip="Step Into">
-                    <TextBlock Text="Into" />
+					<StackPanel Orientation="Horizontal" Spacing="8">
+					    <PathIcon Data="{StaticResource arrow_curve_up_right_regular}" Width="16" Height="16" Foreground="Gray">
+						    <PathIcon.RenderTransform>
+							    <ScaleTransform ScaleY="-1" />
+						    </PathIcon.RenderTransform>
+					    </PathIcon>
+                        <TextBlock Text="Into" />
+					</StackPanel>
                 </Button>
 
-                <Button DockPanel.Dock="Right" Command="{Binding PauseCommand}" ToolTip.Tip="Pause">
-                    <TextBlock Text="Pause" />
-                </Button>
+				<Button DockPanel.Dock="Right" Command="{Binding StepOverCommand}" ToolTip.Tip="Step Over">
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<PathIcon Data="{StaticResource arrow_curve_up_left_regular}" Width="16" Height="16" Foreground="Gray">
+							<PathIcon.RenderTransform>
+								<RotateTransform Angle="90" />
+							</PathIcon.RenderTransform>
+						</PathIcon>
+						<TextBlock Text="Over" />
+					</StackPanel>
+				</Button>
+
+				<Button DockPanel.Dock="Right" Command="{Binding PauseCommand}" ToolTip.Tip="Pause">
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<PathIcon Data="{StaticResource pause_regular}" Width="16" Height="16" Foreground="Gray" />
+						<TextBlock Text="Pause" />
+					</StackPanel>
+				</Button>
 
                 <Button DockPanel.Dock="Right" Command="{Binding ContinueCommand}" ToolTip.Tip="Continue">
-                    <PathIcon Data="{StaticResource play_regular}" Width="16" Height="16" Foreground="Green" />
+					<StackPanel Orientation="Horizontal" Spacing="8">
+                        <PathIcon Data="{StaticResource play_regular}" Width="16" Height="16" Foreground="Green" />
+					    <TextBlock Text="Continue" VerticalAlignment="Center" />
+					</StackPanel>
                 </Button>
 
                 <Button DockPanel.Dock="Right" Command="{Binding ButtonRunCommand}" ToolTip.Tip="Run without debugging">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource play_regular}"
-                                  Width="16" Height="16" Foreground="Green" />
+                        <PathIcon Data="{StaticResource play_regular}" Width="16" Height="16" Foreground="Green" />
                         <TextBlock Text="Run" VerticalAlignment="Center" />
                     </StackPanel>
                 </Button>
