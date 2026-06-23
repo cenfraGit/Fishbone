@@ -5,4 +5,10 @@ SetInternalValue(100);
 let internalValue = InternalDict["InternalValue"];
 println("Internal value is now: " + internalValue);
 
+let a = DoSomething();
+
+
+let b = null;
+TrySomething(b);
+
 println("Debug session complete.");

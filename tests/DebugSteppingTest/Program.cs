@@ -14,6 +14,20 @@ config.RegisterBuiltIn("InternalDict", internalDict);
 config.RegisterBuiltIn("SetInternalValue", new Action<object>(value =>
     internalDict["InternalValue"] = value));
 
+int DoSomething()
+{
+    return 10;
+}
+
+config.RegisterBuiltIn("DoSomething", DoSomething);
+
+void TrySomething(out int a)
+{
+    a = 10;
+}
+
+config.RegisterBuiltIn("TrySomething", TrySomething);
+
 string scriptPath = Path.Combine(AppContext.BaseDirectory, "Scripts", "test.fb");
 if (!File.Exists(scriptPath))
     scriptPath = Path.Combine(Directory.GetCurrentDirectory(), "Scripts", "test.fb");
