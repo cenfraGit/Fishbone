@@ -48,8 +48,8 @@ let scriptValue = globalValue + 7;
     {
         var env = FishboneEngine.Run("""
 let values = {"name": "Fishbone", 7: "seven"};
-let name = getKey(values, "name");
-let number = getKey(values, 7);
+let name = values["name"];
+let number = values[7];
 """, new FishboneConfiguration());
 
         Assert.Equal("Fishbone", env.GetValue("name"));

@@ -19,28 +19,4 @@ public class ErrorMessageQualityTests
         Assert.Contains("Cannot call null", exception.Message);
         Assert.Contains("functions", exception.Message);
     }
-
-    [Fact]
-    public void Run_GetIndexOnNonList_IncludesTypeNameInMessage()
-    {
-        var config = new FishboneConfiguration()
-            .RegisterBuiltIn("sample", 42);
-
-        Exception exception = Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("let v = getIndex(sample, 0);", config));
-
-        Assert.Contains("Int32", exception.Message);
-        Assert.Contains("indexable collection", exception.Message);
-    }
-
-    [Fact]
-    public void Run_GetKeyOnNonDictionary_IncludesTypeNameInMessage()
-    {
-        var config = new FishboneConfiguration()
-            .RegisterBuiltIn("sample", 42);
-
-        Exception exception = Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("let v = getKey(sample, \"x\");", config));
-
-        Assert.Contains("Int32", exception.Message);
-        Assert.Contains("dictionary", exception.Message);
-    }
 }
