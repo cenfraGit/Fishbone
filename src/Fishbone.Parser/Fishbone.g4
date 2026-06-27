@@ -4,9 +4,7 @@ grammar Fishbone;
 // parser rules
 // --------------------------------------------------------------------------------
 
-program : importStat* statement* EOF ;
-
-importStat : IMPORT STRING SEMI ;
+program : statement* EOF ;
 
 statement
     : declarationStat SEMI
@@ -106,8 +104,6 @@ FOREACH : 'foreach' ;
 IN      : 'in';
 FUNC    : 'func' ;
 RETURN  : 'return' ;
-
-IMPORT  : 'import' ;
 
 LINE_COMMENT : '//' ~[\r\n]* -> skip ;
 BLOCK_COMMENT : '/*' .*? '*/' -> skip ;
