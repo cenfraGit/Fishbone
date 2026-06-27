@@ -210,9 +210,9 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         return new LiteralNode(int.Parse(text)) { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }
 
-    public override AstNode VisitFloatExpr(FishboneParser.FloatExprContext context)
+    public override AstNode VisitDoubleExpr(FishboneParser.DoubleExprContext context)
     {
-        return new LiteralNode(double.Parse(context.FLOAT().GetText())) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new LiteralNode(double.Parse(context.DOUBLE().GetText())) { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }
 
     public override AstNode VisitStringExpr(FishboneParser.StringExprContext context)

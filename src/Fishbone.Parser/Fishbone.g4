@@ -55,7 +55,7 @@ expr
     | NULL                                    #NullExpr
     | ID                                      #IdExpr
     | INT                                     #IntExpr
-    | FLOAT                                   #FloatExpr
+    | DOUBLE                                  #DoubleExpr
     | STRING                                  #StringExpr
     | (TRUE|FALSE)                            #BoolExpr
     ;
@@ -69,7 +69,7 @@ SEMI   : ';' ;
 COLON  : ':' ;
 
 INT    : [0-9]+ ('_'+ [0-9]+)* ;
-FLOAT  : [0-9]* '.' [0-9]+ ;
+DOUBLE : [0-9]* '.' [0-9]+ ;
 STRING : '"' ~["]* '"' ; // anything that isnt a quote
 
 PLUS  : '+' ;
