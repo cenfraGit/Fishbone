@@ -242,4 +242,143 @@ foreach (value in [1])
 
         Assert.Throws<Exception>(() => env.GetValue("value"));
     }
+
+    [Fact]
+    public void Evaluate_ForLoop_IteratesRange()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let total = 0;
+for (i in 0, 10)
+{
+    total = total + i;
+}
+""");
+
+        Assert.Equal(45.0, env.GetValue("total"));
+    }
+
+    [Fact]
+    public void Evaluate_ForLoop_WithStep()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let total = 0;
+for (i in 0, 10, 2)
+{
+    total = total + i;
+}
+""");
+
+        Assert.Equal(20.0, env.GetValue("total"));
+    }
+
+    [Fact]
+    public void Evaluate_ForLoop_ReverseStep()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let total = 0;
+for (i in 10, 0, -1)
+{
+    total = total + i;
+}
+""");
+
+        Assert.Equal(55.0, env.GetValue("total"));
+    }
+
+    [Fact]
+    public void Evaluate_ForLoop_AutoDescending()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let total = 0;
+for (i in 5, 0)
+{
+    total = total + i;
+}
+""");
+
+        Assert.Equal(15.0, env.GetValue("total"));
+    }
+
+    [Fact]
+    public void Evaluate_ForLoop_EmptyRange()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let count = 0;
+for (i in 5, 5)
+{
+    count = count + 1;
+}
+""");
+
+        Assert.Equal(0, env.GetValue("count"));
+    }
+
+    [Fact]
+    public void Evaluate_ForLoop_ZeroStep_Throws()
+    {
+        Assert.Throws<FishboneRuntimeException>(() => InterpreterTestHelpers.Run("""
+for (i in 0, 10, 0)
+{
+}
+"""));
+    }
+
+    [Fact]
+    public void Evaluate_ForLoop_Break()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let total = 0;
+for (i in 0, 10)
+{
+    if (i == 4) { break; }
+    total = total + i;
+}
+""");
+
+        Assert.Equal(6.0, env.GetValue("total"));
+    }
+
+    [Fact]
+    public void Evaluate_ForLoop_Continue()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let total = 0;
+for (i in 0, 5)
+{
+    if (i == 2) { continue; }
+    total = total + i;
+}
+""");
+
+        Assert.Equal(8.0, env.GetValue("total"));
+    }
+
+    [Fact]
+    public void Evaluate_ForLoop_IteratorDoesNotLeak()
+    {
+        var env = InterpreterTestHelpers.Run("""
+for (i in 0, 1)
+{
+}
+""");
+
+        Assert.Throws<Exception>(() => env.GetValue("i"));
+    }
+
+    [Fact]
+    public void Evaluate_ForLoop_NestedLoops()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let total = 0;
+for (outer in 0, 3)
+{
+    for (inner in 0, 4)
+    {
+        total = total + 1;
+    }
+}
+""");
+
+        Assert.Equal(12, env.GetValue("total"));
+    }
 }

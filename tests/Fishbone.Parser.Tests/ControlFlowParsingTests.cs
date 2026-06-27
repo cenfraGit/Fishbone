@@ -144,4 +144,50 @@ foreach (value in values)
 
         Assert.Equal(expectedAst, ast);
     }
+
+    [Fact]
+    public void Parse_ForTwoArgs_ReturnsForNode()
+    {
+        var ast = ParserTestHelpers.ParseProgram("""
+for (i in 0, 10)
+{
+}
+""");
+
+        var expectedAst = new ProgramNode(new List<AstNode>
+        {
+            new ForNode(
+                "i",
+                new LiteralNode(0),
+                new LiteralNode(10),
+                null,
+                new BlockNode(new List<AstNode>())
+            )
+        });
+
+        Assert.Equal(expectedAst, ast);
+    }
+
+    [Fact]
+    public void Parse_ForThreeArgs_ReturnsForNodeWithStep()
+    {
+        var ast = ParserTestHelpers.ParseProgram("""
+for (i in 0, 10, 2)
+{
+}
+""");
+
+        var expectedAst = new ProgramNode(new List<AstNode>
+        {
+            new ForNode(
+                "i",
+                new LiteralNode(0),
+                new LiteralNode(10),
+                new LiteralNode(2),
+                new BlockNode(new List<AstNode>())
+            )
+        });
+
+        Assert.Equal(expectedAst, ast);
+    }
 }
