@@ -54,6 +54,7 @@ An identifier's name must also not collide with the reserved keywords, which inc
 - `else`
 - `while`
 - `foreach`
+- `for`
 - `break`
 - `continue`
 - `in`
@@ -260,6 +261,17 @@ foreach (item in collection) { }
 ```
 
 Iterates over a list, dictionary (iterates keys), or any .NET `IEnumerable`.
+
+### For
+
+```csharp
+for (i in 0, 10) { }       // i = 0, 1, ..., 9
+for (i in 0, 10, 2) { }    // i = 0, 2, 4, 6, 8
+for (i in 10, 0) { }       // i = 10, 9, ..., 1
+for (i in 10, 0, -2) { }   // i = 10, 8, 6, 4, 2
+```
+
+Iterates over a numeric range. The syntax is `for (identifier in start, end)` or `for (identifier in start, end, step)`. The step defaults to `1` or `-1` depending on direction. The range is exclusive of `end`. The loop variable is scoped to the loop body.
 
 ### Break / Continue
 
