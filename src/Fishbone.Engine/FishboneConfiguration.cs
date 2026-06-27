@@ -1,6 +1,4 @@
-﻿using System.Collections;
-
-namespace Fishbone.Engine;
+﻿namespace Fishbone.Engine;
 
 public class FishboneConfiguration
 {
@@ -87,40 +85,6 @@ public class FishboneConfiguration
         });
 
         BuiltIns["string"] = new Func<object?, string>(value => value?.ToString() ?? string.Empty);
-
-        BuiltIns["getMember"] = new Func<object, string, object?>((obj, memberName) =>
-        {
-            if (obj is null) return null;
-            var type = obj.GetType();
-
-            var prop = type.GetProperty(memberName, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-            if (prop is not null) return prop.GetValue(obj);
-
-            var field = type.GetField(memberName, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-            if (field is not null) return field.GetValue(obj);
-
-            throw new Exception($"Type \"{type.Name}\" does not have a public property or field named \"{memberName}\".");
-        });
-
-        BuiltIns["getIndex"] = new Func<object, int, object?>((collection, index) =>
-        {
-            if (collection is IList list)
-                return list[index];
-            throw new Exception($"Object of type \"{collection.GetType().Name}\" is not an indexable collection.");
-        });
-
-        BuiltIns["setIndex"] = new Action<IList, int, object>((targetList, index, value) =>
-        {
-            if (targetList == null) throw new ArgumentNullException(nameof(targetList));
-            targetList[index] = value;
-        });
-
-        BuiltIns["getKey"] = new Func<object, object, object?>((dictionary, key) =>
-        {
-            if (dictionary is IDictionary dict)
-                return dict[key];
-            throw new Exception($"Object of type \"{dictionary.GetType().Name}\" is not a dictionary.");
-        });
     }
 
     public FishboneConfiguration RegisterBuiltIn(string name, object value)
