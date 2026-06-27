@@ -1,3 +1,4 @@
+using Antlr4.Runtime.Misc;
 using Fishbone.Core;
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
@@ -196,6 +197,17 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         var iterable = Visit(context.expr());
         var body = Visit(context.blockStat());
         return new ForeachNode(iteratorName, iterable, body) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+    }
+
+    public override AstNode VisitForStat(FishboneParser.ForStatContext context)
+    {
+        var iteratorName = context.ID().GetText();
+        var start = Visit(context.expr(0));
+        var end = Visit(context.expr(1));
+        var step = (context.expr().Length > 2) ? Visit(context.expr(2)) : null;
+        var body = Visit(context.blockStat());
+        return new ForNode(iteratorName, start, end, step, body) 
+        { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }
 
     public override AstNode VisitIdExpr(FishboneParser.IdExprContext context)

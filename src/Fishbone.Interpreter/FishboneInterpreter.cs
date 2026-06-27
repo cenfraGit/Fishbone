@@ -40,6 +40,7 @@ public class FishboneInterpreter
             IfNode ifNode => EvaluateIf(env, ifNode),
             WhileNode whileNode => EvaluateWhile(env, whileNode),
             ForeachNode foreachNode => EvaluateForeach(env, foreachNode),
+            ForNode forNode => EvaluateFor(env, forNode),
             BlockNode block => EvaluateBlock(env, block),
             FunctionDefinitionNode functionDefinition => EvaluateFunctionDefinition(env, functionDefinition),
             CallNode callNode => EvaluateCallNode(env, callNode),
@@ -259,6 +260,62 @@ public class FishboneInterpreter
             {
                 break;
             }
+        }
+
+        return lastValue;
+    }
+
+    internal object EvaluateFor(FishboneEnvironment env, ForNode node)
+    {
+        var start = Convert.ToDouble(Evaluate(env, node.Start));
+        var end = Convert.ToDouble(Evaluate(env, node.End));
+
+        // 1.0 or -1.0 depending on direction
+        var step = (node.Step is null) ? Math.Sign(end - start) : Convert.ToDouble(Evaluate(env, node.Step));
+
+        if (start == end) return null!;
+
+        if (step == 0.0)
+            throw new Exception("For: step can't be zero.");
+
+        // true if start is less than end
+        // false if start is more than end
+        bool forIncremental = (start < end);
+
+        // create new env and declare iterator name
+        var loopEnv = new FishboneEnvironment(env);
+        object lastValue = null!;
+
+        double i = start; // iterator value
+        loopEnv.Declare(node.IteratorName, start);
+        while (true)
+        {
+            // checking phase: use forIncremental (direction) and evaluate status
+
+            // incremental: whenever i is greater than end, stop
+            if (forIncremental) { if (i >= end) break; }
+            // decremental: whenever i is less than end, stop
+            else { if (i <= end) break; }
+
+            try
+            {
+                lastValue = Evaluate(loopEnv, node.Body);
+            }
+            catch (ContinueException)
+            {
+                // update with current vlaue
+                i = i + step;
+                loopEnv.Assign(node.IteratorName, i);
+                continue;
+            }
+            catch (BreakException)
+            {
+                break;
+            }
+
+            // update with current vlaue
+            i = i + step;
+            loopEnv.Assign(node.IteratorName, i);
         }
 
         return lastValue;

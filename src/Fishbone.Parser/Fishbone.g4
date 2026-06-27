@@ -16,6 +16,7 @@ statement
     | ifStat
     | whileStat
     | foreachStat
+    | forStat
     | blockStat
     | returnStat SEMI
     | breakStat SEMI
@@ -24,20 +25,22 @@ statement
 
 blockStat : '{' statement* '}' ;
 
-declarationStat : 'let' ID (COMMA ID)* ASSIGN expr ;
-assignmentStat : ID (COMMA ID)* ASSIGN expr ;
+declarationStat       : LET ID (COMMA ID)* ASSIGN expr ;
+assignmentStat        : ID (COMMA ID)* ASSIGN expr ;
 indexedAssignmentStat : expr ASSIGN expr ;
 
 ifStat : IF '(' expr ')' blockStat (ELSEIF '(' expr ')' blockStat)* (ELSE blockStat)? ;
 
-whileStat : WHILE '(' expr ')' blockStat ;
+whileStat   : WHILE '(' expr ')' blockStat ;
 foreachStat : FOREACH '(' ID IN expr ')' blockStat ;
+forStat     : FOR '(' ID IN expr (COMMA expr (COMMA expr)?)? ')' blockStat ;
 
 functionDefinitionStat : FUNC ID '(' (ID (COMMA ID)*)? ')' blockStat ;
-returnStat : RETURN (expr (COMMA expr)*)? ;
-breakStat : 'break' ;
-continueStat : 'continue' ;
-dictPair : expr COLON expr ;
+
+returnStat   : RETURN (expr (COMMA expr)*)? ;
+breakStat    : BREAK ;
+continueStat : CONTINUE ;
+dictPair     : expr COLON expr ;
 
 expr
     : '(' expr ')'                            #ParenthesesExpr
@@ -101,9 +104,13 @@ ELSE    : 'else' ;
 
 WHILE   : 'while' ;
 FOREACH : 'foreach' ;
+FOR     : 'for' ;
 IN      : 'in';
 FUNC    : 'func' ;
+BREAK   : 'break' ;
+CONTINUE: 'continue' ;
 RETURN  : 'return' ;
+LET     : 'let' ;
 
 LINE_COMMENT : '//' ~[\r\n]* -> skip ;
 BLOCK_COMMENT : '/*' .*? '*/' -> skip ;
