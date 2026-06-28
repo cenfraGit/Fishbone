@@ -184,7 +184,7 @@ Fishbone supports the following expression forms:
 | Identifier | `x`, `myVar` | Reference to a variable or function |
 | Parenthesized | `( expr )` | Explicit grouping |
 | Unary | `- expr`, `not expr` | Numeric negation, boolean negation |
-| Multiplicative | `expr * expr`, `expr / expr` | |
+| Multiplicative | `expr * expr`, `expr / expr` | `int / int` returns `double` |
 | Additive | `expr + expr`, `expr - expr` | `+` also concatenates strings |
 | Comparison | `expr < expr`, `expr > expr`, `expr <= expr`, `expr >= expr` | Returns `bool` |
 | Equality | `expr == expr`, `expr != expr` | Returns `bool` |
