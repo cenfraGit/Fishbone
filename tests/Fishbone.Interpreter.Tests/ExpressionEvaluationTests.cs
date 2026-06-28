@@ -12,7 +12,7 @@ let lessThan = arithmetic < 20;
 let notEqual = arithmetic != 0;
 """);
 
-        Assert.Equal(19, env.GetValue("arithmetic"));
+        Assert.Equal(19.0, env.GetValue("arithmetic"));
         Assert.Equal(true, env.GetValue("comparison"));
         Assert.Equal(true, env.GetValue("lessThan"));
         Assert.Equal(true, env.GetValue("notEqual"));
@@ -203,5 +203,47 @@ let nestedDictValue = {"outer": {"inner": 42}}["outer"]["inner"];
         Assert.Equal("seven", env.GetValue("number"));
         Assert.Equal(3, env.GetValue("nestedListValue"));
         Assert.Equal(42, env.GetValue("nestedDictValue"));
+    }
+
+    [Fact]
+    public void Evaluate_IntegerDivision_ReturnsDouble()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let result = 5 / 2;
+""");
+
+        Assert.Equal(2.5, env.GetValue("result"));
+    }
+
+    [Fact]
+    public void Evaluate_IntegerDivisionByZero_ReturnsInfinity()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let result = 5 / 0;
+""");
+
+        Assert.Equal(double.PositiveInfinity, env.GetValue("result"));
+    }
+
+    [Fact]
+    public void Evaluate_MixedTypeDivision_KeepsDoubleResult()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let a = 5.0 / 2;
+let b = 5 / 2.0;
+""");
+
+        Assert.Equal(2.5, env.GetValue("a"));
+        Assert.Equal(2.5, env.GetValue("b"));
+    }
+
+    [Fact]
+    public void Evaluate_NegativeIntegerDivision_ReturnsDouble()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let result = -5 / 2;
+""");
+
+        Assert.Equal(-2.5, env.GetValue("result"));
     }
 }
