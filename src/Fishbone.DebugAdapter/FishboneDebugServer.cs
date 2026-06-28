@@ -39,6 +39,7 @@ public sealed class FishboneDebugServerSession : IAsyncDisposable
     private readonly TcpListener _listener;
     private readonly CancellationTokenSource _lifetime;
     private readonly object _sync = new();
+    private readonly TaskCompletionSource _clientConnected = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private FishboneDebugAdapterSession? _adapterSession;
     private bool _stopRequested;
     private bool _clientAccepted;
@@ -59,6 +60,12 @@ public sealed class FishboneDebugServerSession : IAsyncDisposable
 
     public IPEndPoint Endpoint { get; }
     public Task<FishboneDebugServerResult> Completion { get; }
+
+    /// <summary>
+    /// Completes when a debug client attaches. If the session ends before any client connects
+    /// (cancelled or stopped), this task is cancelled
+    /// </summary>
+    public Task ClientConnected => _clientConnected.Task;
 
     public async Task StopAsync()
     {
@@ -126,6 +133,7 @@ public sealed class FishboneDebugServerSession : IAsyncDisposable
 
             using TcpClient client = await _listener.AcceptTcpClientAsync(cancellationToken).ConfigureAwait(false);
             _clientAccepted = true;
+            _clientConnected.TrySetResult();
             _listener.Stop();
             using NetworkStream stream = client.GetStream();
             using DebugAdapterServer server = DebugAdapterServer.Create(options =>
@@ -171,6 +179,8 @@ public sealed class FishboneDebugServerSession : IAsyncDisposable
         }
         finally
         {
+            // if we exited without a client ever attaching, release anyone awaiting ClientConnected
+            _clientConnected.TrySetCanceled();
             lock (_sync) _adapterSession = null;
             _listener.Stop();
         }
