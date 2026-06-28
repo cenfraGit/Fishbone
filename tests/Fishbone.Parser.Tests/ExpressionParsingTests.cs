@@ -5,6 +5,24 @@ namespace Fishbone.Parser.Tests;
 public class ExpressionParsingTests
 {
     [Fact]
+    public void Parse_CallArguments_CaptureOutRefAndValueModifiers()
+    {
+        var ast = ParserTestHelpers.ParseProgram("foo(out x, ref y, z);");
+
+        var expectedAst = new ProgramNode(new List<AstNode>
+        {
+            new CallNode(new IdentifierNode("foo"),
+            [
+                new ArgumentNode(ArgumentModifier.Out, new IdentifierNode("x")),
+                new ArgumentNode(ArgumentModifier.Ref, new IdentifierNode("y")),
+                new ArgumentNode(ArgumentModifier.None, new IdentifierNode("z"))
+            ])
+        });
+
+        Assert.Equal(expectedAst, ast);
+    }
+
+    [Fact]
     public void Parse_LiteralExpressions_ReturnsTypedLiteralNodes()
     {
         var ast = ParserTestHelpers.ParseProgram("""

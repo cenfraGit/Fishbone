@@ -62,13 +62,13 @@ let scriptResult = explode();
             .RegisterFunction("increment", new IncrementDelegate(Increment));
 
         var env = FishboneEngine.Run("""
-let parsed = 0;
-let ok = tryParse("42", parsed);
+let ok = tryParse("42", out parsed);
 let value = 10;
-increment(value);
+increment(ref value);
 """, config);
 
         Assert.Equal(true, env.GetValue("ok"));
+        // `out parsed` introduces the variable; no prior declaration was needed.
         Assert.Equal(42, env.GetValue("parsed"));
         Assert.Equal(11, env.GetValue("value"));
     }

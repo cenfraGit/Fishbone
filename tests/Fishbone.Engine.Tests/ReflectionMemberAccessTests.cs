@@ -51,10 +51,9 @@ let scaled = sample.Scale(2);
             .RegisterBuiltIn("sample", new ReflectionSample());
 
         var env = FishboneEngine.Run("""
-let result = 0;
-let ok = sample.TryGetNumber("answer", result);
+let ok = sample.TryGetNumber("answer", out result);
 let value = 10;
-sample.Increment(value);
+sample.Increment(ref value);
 """, config);
 
         Assert.Equal(true, env.GetValue("ok"));
@@ -73,8 +72,10 @@ sample.Increment(value);
         Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("let value = sample.Resize(1);", config));
         Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("let value = sample.Name();", config));
         Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("""let value = sample.Resize("wide", "high");""", config));
+        // Out parameter called without the 'out' keyword
         Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("""let ok = sample.TryGetNumber("answer", missing);""", config));
-        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("""let value = 0; let ok = sample.TryGetNumber("answer", [value][0]);""", config));
+        // 'out' given, but the target is not a plain variable
+        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("""let value = 0; let ok = sample.TryGetNumber("answer", out [value][0]);""", config));
     }
 
     private sealed class ReflectionSample
