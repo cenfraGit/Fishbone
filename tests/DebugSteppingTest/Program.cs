@@ -9,9 +9,9 @@ var internalDict = new Dictionary<string, object>
 
 var config = new FishboneConfiguration(injectDefaults: true);
 
-config.RegisterBuiltIn("InternalDict", internalDict);
+config.AddBuiltIn("InternalDict", internalDict);
 
-config.RegisterBuiltIn("SetInternalValue", new Action<object>(value =>
+config.AddBuiltIn("SetInternalValue", new Action<object>(value =>
     internalDict["InternalValue"] = value));
 
 int DoSomething()
@@ -19,14 +19,14 @@ int DoSomething()
     return 10;
 }
 
-config.RegisterBuiltIn("DoSomething", DoSomething);
+config.AddBuiltIn("DoSomething", DoSomething);
 
 void TrySomething(out int a)
 {
     a = 10;
 }
 
-config.RegisterBuiltIn("TrySomething", TrySomething);
+config.AddBuiltIn("TrySomething", TrySomething);
 
 string scriptPath = Path.Combine(AppContext.BaseDirectory, "Scripts", "test.fb");
 if (!File.Exists(scriptPath))

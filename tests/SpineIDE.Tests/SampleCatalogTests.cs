@@ -52,7 +52,7 @@ public class SampleCatalogTests
         string code = SampleCatalog.Load("area_circle.fb");
         var output = new StringBuilder();
         var configuration = CreateOutputConfiguration(output);
-        configuration.RegisterBuiltIn("input", new Func<string>(() => "2"));
+        configuration.AddBuiltIn("input", new Func<string>(() => "2"));
 
         FishboneEngine.Run(code, configuration);
 
@@ -81,8 +81,8 @@ public class SampleCatalogTests
     private static FishboneConfiguration CreateOutputConfiguration(StringBuilder output)
     {
         var configuration = new FishboneConfiguration();
-        configuration.RegisterBuiltIn("print", new Action<object?>(value => output.Append(value)));
-        configuration.RegisterBuiltIn("println", new Action<object?>(value => output.AppendLine(value?.ToString())));
+        configuration.AddBuiltIn("print", new Action<object?>(value => output.Append(value)));
+        configuration.AddBuiltIn("println", new Action<object?>(value => output.AppendLine(value?.ToString())));
         return configuration;
     }
 

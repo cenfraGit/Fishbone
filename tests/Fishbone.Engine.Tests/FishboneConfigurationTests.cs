@@ -7,7 +7,7 @@ public class FishboneConfigurationTests
     {
         var config = new FishboneConfiguration();
 
-        var returned = config.RegisterBuiltIn("answer", 42);
+        var returned = config.AddBuiltIn("answer", 42);
 
         Assert.Same(config, returned);
         Assert.Equal(42, config.BuiltIns["answer"]);
@@ -19,7 +19,7 @@ public class FishboneConfigurationTests
         var config = new FishboneConfiguration();
         Func<int, int> doubleValue = value => value * 2;
 
-        var returned = config.RegisterFunction("doubleValue", doubleValue);
+        var returned = config.AddFunction("doubleValue", doubleValue);
 
         Assert.Same(config, returned);
         Assert.Same(doubleValue, config.BuiltIns["doubleValue"]);
@@ -29,8 +29,8 @@ public class FishboneConfigurationTests
     public void BuiltIns_UsesOrdinalKeyComparison()
     {
         var config = new FishboneConfiguration(injectDefaults: false)
-            .RegisterBuiltIn("Name", 1)
-            .RegisterBuiltIn("name", 2);
+            .AddBuiltIn("Name", 1)
+            .AddBuiltIn("name", 2);
 
         Assert.Equal(1, config.BuiltIns["Name"]);
         Assert.Equal(2, config.BuiltIns["name"]);

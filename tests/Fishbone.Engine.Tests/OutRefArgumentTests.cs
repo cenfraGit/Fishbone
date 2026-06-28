@@ -3,7 +3,7 @@ namespace Fishbone.Engine.Tests;
 public class OutRefArgumentTests
 {
     private static FishboneConfiguration Config() =>
-        new FishboneConfiguration().RegisterBuiltIn("sample", new ByRefSample());
+        new FishboneConfiguration().AddBuiltIn("sample", new ByRefSample());
 
     [Fact]
     public void Run_OutArgument_IntroducesNewVariable()

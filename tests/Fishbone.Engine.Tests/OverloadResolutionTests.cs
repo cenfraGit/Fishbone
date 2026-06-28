@@ -6,7 +6,7 @@ public class OverloadResolutionTests
     public void Run_OverloadedMethod_PrefersExactNumericTypeOverConvertible()
     {
         var config = new FishboneConfiguration()
-            .RegisterBuiltIn("sample", new OverloadSample());
+            .AddBuiltIn("sample", new OverloadSample());
 
         var env = FishboneEngine.Run("""
 let fromInt = sample.Number(5);
@@ -22,7 +22,7 @@ let fromDouble = sample.Number(5.0);
     public void Run_OverloadedMethod_PrefersExactThenAssignableThenConvertible()
     {
         var config = new FishboneConfiguration()
-            .RegisterBuiltIn("sample", new OverloadSample());
+            .AddBuiltIn("sample", new OverloadSample());
 
         var env = FishboneEngine.Run("""
 let exactString = sample.Describe("hello");
@@ -39,7 +39,7 @@ let assignableObject = sample.Describe(5);
     public void Run_OverloadedMethod_WithEquallyGoodCandidates_ThrowsAmbiguous()
     {
         var config = new FishboneConfiguration()
-            .RegisterBuiltIn("sample", new OverloadSample());
+            .AddBuiltIn("sample", new OverloadSample());
 
         var exception = Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("""
 let result = sample.Ambiguous(1, 2);
@@ -52,7 +52,7 @@ let result = sample.Ambiguous(1, 2);
     public void Run_OverloadedMethod_SelectsByArgumentCount()
     {
         var config = new FishboneConfiguration()
-            .RegisterBuiltIn("sample", new OverloadSample());
+            .AddBuiltIn("sample", new OverloadSample());
 
         var env = FishboneEngine.Run("""
 let none = sample.Greet();

@@ -1,4 +1,4 @@
-﻿using Fishbone.Interpreter;
+using Fishbone.Interpreter;
 
 namespace Fishbone.Engine;
 
@@ -9,36 +9,84 @@ public class FishboneConfiguration
     public bool EnableFunctionDeclaration { get; set; } = true;
     public bool EnableFunctionCall { get; set; } = true;
 
+    /// <summary>
+    /// Ambient names available to every script — functions, types, and constants. These are not
+    /// shown in the debugger's variables view.
+    /// </summary>
     public Dictionary<string, object> BuiltIns { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Pre-seeded script variables. Unlike built-ins, these appear in the debugger's variables
+    /// view and behave like ordinary top-level variables (readable and assignable).
+    /// </summary>
+    public Dictionary<string, object> Values { get; } = new(StringComparer.Ordinal);
 
     public FishboneConfiguration(bool injectDefaults = true)
     {
         if (injectDefaults)
-            RegisterDefaults();
+            AddDefaults();
     }
 
-    public void RegisterDefaults()
+    /// <summary>Binds an ambient built-in (function, value, or registered type) under a name.</summary>
+    public FishboneConfiguration AddBuiltIn(string name, object value)
     {
-        RegisterDefaultConstants();
-        RegisterDefaultIO();
-        RegisterDefaultMath();
-        RegisterDefaultReflection();
+        BuiltIns[name] = value;
+        return this;
     }
 
-    public void RegisterDefaultConstants()
+    /// <summary>
+    /// Pre-seeds a script variable. The value shows up in the debugger's variables view and the
+    /// script can read or reassign it. Use this for injected data, as opposed to ambient API.
+    /// </summary>
+    public FishboneConfiguration AddValue(string name, object value)
+    {
+        Values[name] = value;
+        return this;
+    }
+
+    /// <summary>Exposes a .NET delegate as a callable function.</summary>
+    public FishboneConfiguration AddFunction(string name, Delegate csharpMethod)
+    {
+        BuiltIns[name] = csharpMethod;
+        return this;
+    }
+
+    /// <summary>
+    /// Registers a .NET type so scripts can construct it by calling its name like a function,
+    /// for example <c>let p = Point(1, 2);</c>. The script-visible name defaults to the type's
+    /// short name; pass <paramref name="name"/> to override it.
+    /// </summary>
+    public FishboneConfiguration AddType<T>(string? name = null) =>
+        AddType(typeof(T), name);
+
+    public FishboneConfiguration AddType(Type type, string? name = null)
+    {
+        BuiltIns[name ?? type.Name] = new RegisteredType(type);
+        return this;
+    }
+
+    private void AddDefaults()
+    {
+        AddDefaultConstants();
+        AddDefaultIO();
+        AddDefaultMath();
+        AddDefaultReflection();
+    }
+
+    private void AddDefaultConstants()
     {
         BuiltIns["PI"] = Math.PI;
         BuiltIns["E"] = Math.E;
     }
 
-    public void RegisterDefaultIO()
+    private void AddDefaultIO()
     {
         BuiltIns["print"] = new Action<object?>(value => Console.Write(value?.ToString()));
         BuiltIns["println"] = new Action<object?>(value => Console.WriteLine(value?.ToString()));
         BuiltIns["input"] = new Func<string>(() => Console.ReadLine() ?? string.Empty);
     }
 
-    public void RegisterDefaultMath()
+    private void AddDefaultMath()
     {
         BuiltIns["abs"] = new Func<double, double>(Math.Abs);
         BuiltIns["round"] = new Func<double, int, double>(Math.Round);
@@ -48,7 +96,7 @@ public class FishboneConfiguration
         BuiltIns["sqrt"] = new Func<double, double>(Math.Sqrt);
     }
 
-    public void RegisterDefaultReflection()
+    private void AddDefaultReflection()
     {
         BuiltIns["int"] = new Func<object?, int>(value =>
         {
@@ -87,31 +135,5 @@ public class FishboneConfiguration
         });
 
         BuiltIns["string"] = new Func<object?, string>(value => value?.ToString() ?? string.Empty);
-    }
-
-    public FishboneConfiguration RegisterBuiltIn(string name, object value)
-    {
-        BuiltIns[name] = value;
-        return this;
-    }
-
-    public FishboneConfiguration RegisterFunction(string name, Delegate csharpMethod)
-    {
-        BuiltIns[name] = csharpMethod;
-        return this;
-    }
-
-    /// <summary>
-    /// Registers a .NET type so scripts can construct it by calling its name like a function,
-    /// for example <c>let p = Point(1, 2);</c>. The script-visible name defaults to the type's
-    /// short name; pass <paramref name="name"/> to override it.
-    /// </summary>
-    public FishboneConfiguration RegisterType<T>(string? name = null) =>
-        RegisterType(typeof(T), name);
-
-    public FishboneConfiguration RegisterType(Type type, string? name = null)
-    {
-        BuiltIns[name ?? type.Name] = new RegisteredType(type);
-        return this;
     }
 }

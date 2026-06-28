@@ -19,7 +19,7 @@ let y = x * 2;
     public void Run_SeedsRegisteredVariablesForScriptUse()
     {
         var config = new FishboneConfiguration()
-            .RegisterBuiltIn("baseValue", 10);
+            .AddBuiltIn("baseValue", 10);
 
         var env = FishboneEngine.Run("""
 let result = baseValue + 5;
@@ -33,7 +33,7 @@ let result = baseValue + 5;
     public void Run_ReturnedEnvironmentRetainsTopLevelDeclarationsAndGlobals()
     {
         var config = new FishboneConfiguration()
-            .RegisterBuiltIn("globalValue", 3);
+            .AddBuiltIn("globalValue", 3);
 
         var env = FishboneEngine.Run("""
 let scriptValue = globalValue + 7;

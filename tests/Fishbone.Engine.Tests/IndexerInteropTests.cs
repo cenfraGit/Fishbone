@@ -6,7 +6,7 @@ public class IndexerInteropTests
     public void Run_CustomIndexer_ReadsWritesAndConvertsArguments()
     {
         var sample = new CustomIndexer();
-        var configuration = new FishboneConfiguration().RegisterBuiltIn("sample", sample);
+        var configuration = new FishboneConfiguration().AddBuiltIn("sample", sample);
 
         var env = FishboneEngine.Run("""
 sample["2"] = "7";
@@ -21,7 +21,7 @@ let value = sample[2];
     public void Run_ArrayIndexer_ReadsWritesAndConvertsValues()
     {
         int[] values = [1, 2, 3];
-        var configuration = new FishboneConfiguration().RegisterBuiltIn("values", values);
+        var configuration = new FishboneConfiguration().AddBuiltIn("values", values);
 
         var env = FishboneEngine.Run("""
 values[1] = "9";
@@ -36,7 +36,7 @@ let result = values[1];
     public void Run_TypedDictionaryIndexer_AddsAndConvertsEntries()
     {
         var values = new Dictionary<string, int>();
-        var configuration = new FishboneConfiguration().RegisterBuiltIn("values", values);
+        var configuration = new FishboneConfiguration().AddBuiltIn("values", values);
 
         FishboneEngine.Run("values[123] = \"8\";", configuration);
 
@@ -49,8 +49,8 @@ let result = values[1];
         var list = new ExplicitList();
         var dictionary = new ExplicitDictionary();
         var configuration = new FishboneConfiguration()
-            .RegisterBuiltIn("list", list)
-            .RegisterBuiltIn("dictionary", dictionary);
+            .AddBuiltIn("list", list)
+            .AddBuiltIn("dictionary", dictionary);
 
         var env = FishboneEngine.Run("""
 list[1] = 9;
@@ -67,7 +67,7 @@ let dictionaryValue = dictionary["new"];
     public void Run_ReadOnlyIndexer_RejectsAssignment()
     {
         var configuration = new FishboneConfiguration()
-            .RegisterBuiltIn("sample", new ReadOnlyIndexer());
+            .AddBuiltIn("sample", new ReadOnlyIndexer());
 
         Exception exception = Assert.ThrowsAny<Exception>(() =>
             FishboneEngine.Run("sample[0] = 10;", configuration));
@@ -79,7 +79,7 @@ let dictionaryValue = dictionary["new"];
     public void Run_IncompatibleIndexerValue_ThrowsClearError()
     {
         var configuration = new FishboneConfiguration()
-            .RegisterBuiltIn("sample", new CustomIndexer());
+            .AddBuiltIn("sample", new CustomIndexer());
 
         Exception exception = Assert.ThrowsAny<Exception>(() =>
             FishboneEngine.Run("sample[0] = [1];", configuration));
@@ -95,17 +95,17 @@ let dictionaryValue = dictionary["new"];
         int indexCalls = 0;
         int valueCalls = 0;
         var configuration = new FishboneConfiguration()
-            .RegisterFunction("getTarget", new Func<List<object>>(() =>
+            .AddFunction("getTarget", new Func<List<object>>(() =>
             {
                 targetCalls++;
                 return values;
             }))
-            .RegisterFunction("getIndex", new Func<int>(() =>
+            .AddFunction("getIndex", new Func<int>(() =>
             {
                 indexCalls++;
                 return 0;
             }))
-            .RegisterFunction("getValue", new Func<int>(() =>
+            .AddFunction("getValue", new Func<int>(() =>
             {
                 valueCalls++;
                 return 42;

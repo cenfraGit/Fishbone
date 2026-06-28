@@ -240,9 +240,9 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
 
         FishbonePluginLoader.LoadPlugins(FishbonePluginLoader.DefaultPluginsDirectory, configuration);
 
-        configuration.RegisterBuiltIn("print", new Action<object?>(outputBuffer.Append));
-        configuration.RegisterBuiltIn("println", new Action<object?>(outputBuffer.AppendLine));
-        configuration.RegisterBuiltIn("input", new Func<string>(() =>
+        configuration.AddBuiltIn("print", new Action<object?>(outputBuffer.Append));
+        configuration.AddBuiltIn("println", new Action<object?>(outputBuffer.AppendLine));
+        configuration.AddBuiltIn("input", new Func<string>(() =>
             ReadScriptInput(outputBuffer, executionVersion, cancellationToken)));
 
         Task<ScriptExecutionResult> executionTask = Task.Run(

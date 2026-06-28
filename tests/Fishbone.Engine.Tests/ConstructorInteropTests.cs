@@ -6,7 +6,7 @@ public class ConstructorInteropTests
     public void Run_RegisteredType_ConstructsAndExposesInstanceMembers()
     {
         var config = new FishboneConfiguration()
-            .RegisterType<Point>();
+            .AddType<Point>();
 
         var env = FishboneEngine.Run("""
 let p = Point(3, 4);
@@ -26,7 +26,7 @@ let sum = p.Sum();
     public void Run_RegisteredType_SelectsConstructorOverloadByArgumentCount()
     {
         var config = new FishboneConfiguration()
-            .RegisterType<Point>();
+            .AddType<Point>();
 
         var env = FishboneEngine.Run("""
 let single = Point(5);
@@ -44,7 +44,7 @@ let y = single.Y;
     public void Run_RegisteredType_ConvertsConstructorArguments()
     {
         var config = new FishboneConfiguration()
-            .RegisterType<Point>();
+            .AddType<Point>();
 
         var env = FishboneEngine.Run("""
 let p = Point(3.0, 4.0);
@@ -58,7 +58,7 @@ let x = p.X;
     public void Run_RegisteredType_HonorsCustomName()
     {
         var config = new FishboneConfiguration()
-            .RegisterType<Point>("Vec");
+            .AddType<Point>("Vec");
 
         var env = FishboneEngine.Run("""
 let v = Vec(1, 2);
@@ -75,7 +75,7 @@ let sum = v.Sum();
     public void Run_RegisteredType_WithNoMatchingConstructor_Throws()
     {
         var config = new FishboneConfiguration()
-            .RegisterType<Point>();
+            .AddType<Point>();
 
         Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("let p = Point(1, 2, 3);", config));
     }
@@ -84,7 +84,7 @@ let sum = v.Sum();
     public void Run_RegisteredType_WithNoPublicConstructor_Throws()
     {
         var config = new FishboneConfiguration()
-            .RegisterType<Hidden>();
+            .AddType<Hidden>();
 
         var exception = Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("let h = Hidden();", config));
         Assert.Contains("constructor", exception.Message, StringComparison.OrdinalIgnoreCase);

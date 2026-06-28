@@ -89,9 +89,9 @@ public sealed class FishboneDebugServerSession : IAsyncDisposable
             FishboneDebugAdapterSession? session = null;
             if (_options.RedirectOutput)
             {
-                configuration.RegisterBuiltIn("print", new Action<object?>(value =>
+                configuration.AddBuiltIn("print", new Action<object?>(value =>
                     session?.WriteOutput(value?.ToString() ?? string.Empty)));
-                configuration.RegisterBuiltIn("println", new Action<object?>(value =>
+                configuration.AddBuiltIn("println", new Action<object?>(value =>
                     session?.WriteOutput((value?.ToString() ?? string.Empty) + Environment.NewLine)));
             }
 
@@ -202,6 +202,8 @@ public sealed class FishboneDebugServerSession : IAsyncDisposable
         };
         foreach (var builtIn in source.BuiltIns)
             clone.BuiltIns[builtIn.Key] = builtIn.Value;
+        foreach (var value in source.Values)
+            clone.Values[value.Key] = value.Value;
         return clone;
     }
 

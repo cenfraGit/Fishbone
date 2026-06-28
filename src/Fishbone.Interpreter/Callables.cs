@@ -69,7 +69,7 @@ public sealed class BoundMethod
 /// <summary>
 /// A .NET type that scripts may construct by calling its name like a function
 /// (for example <c>let p = Point(1, 2);</c>). Registered through
-/// <c>FishboneConfiguration.RegisterType</c>.
+/// <c>FishboneConfiguration.AddType</c>.
 /// </summary>
 public sealed class RegisteredType
 {

@@ -6,7 +6,7 @@ public class ReflectionMemberAccessTests
     public void Run_MemberAccess_ReadsPublicFieldsPropertiesAndChains()
     {
         var config = new FishboneConfiguration()
-            .RegisterBuiltIn("sample", new ReflectionSample());
+            .AddBuiltIn("sample", new ReflectionSample());
 
         var env = FishboneEngine.Run("""
 let fieldValue = sample.PublicField;
@@ -25,7 +25,7 @@ let itemName = sample.Items[0].Name;
     public void Run_MethodCalls_InvokePublicInstanceMethods()
     {
         var config = new FishboneConfiguration()
-            .RegisterBuiltIn("sample", new ReflectionSample());
+            .AddBuiltIn("sample", new ReflectionSample());
 
         var env = FishboneEngine.Run("""
 let description = sample.Describe();
@@ -48,7 +48,7 @@ let scaled = sample.Scale(2);
     public void Run_MethodCalls_AssignOutAndRefIdentifierArguments()
     {
         var config = new FishboneConfiguration()
-            .RegisterBuiltIn("sample", new ReflectionSample());
+            .AddBuiltIn("sample", new ReflectionSample());
 
         var env = FishboneEngine.Run("""
 let ok = sample.TryGetNumber("answer", out result);
@@ -65,7 +65,7 @@ sample.Increment(ref value);
     public void Run_MethodCalls_WithInvalidAccessOrArguments_ThrowClearErrors()
     {
         var config = new FishboneConfiguration()
-            .RegisterBuiltIn("sample", new ReflectionSample());
+            .AddBuiltIn("sample", new ReflectionSample());
 
         Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("let value = sample.Missing;", config));
         Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("let value = null; let name = value.Name;", config));
