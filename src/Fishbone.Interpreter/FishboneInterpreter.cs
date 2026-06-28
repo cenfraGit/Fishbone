@@ -181,11 +181,19 @@ public class FishboneInterpreter
 
         dynamic right = Evaluate(env, node.Right);
 
-        object Divide(dynamic left, dynamic right)
+        static object Divide(dynamic left, dynamic right)
         {
             if (left is int intLeft && right is int intRight)
                 return intLeft / (double)intRight;
             return left / right;
+        }
+
+        // equality never throws on mismatched types. numbers compare by value
+        static bool AreEqual(object? left, object? right)
+        {
+            if (left is int or double && right is int or double)
+                return Convert.ToDouble(left) == Convert.ToDouble(right);
+            return Equals(left, right);
         }
 
         return node.Operator switch
@@ -196,8 +204,8 @@ public class FishboneInterpreter
             "/" => Divide(left, right),
             "%" => left % right,
             // comparison
-            "==" => left == right,
-            "!=" => left != right,
+            "==" => AreEqual(left, right),
+            "!=" => !AreEqual(left, right),
             "<"  => left < right,
             ">"  => left > right,
             "<=" => left <= right,

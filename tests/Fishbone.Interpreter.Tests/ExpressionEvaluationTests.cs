@@ -19,6 +19,46 @@ let notEqual = arithmetic != 0;
     }
 
     [Fact]
+    public void Evaluate_Equality_ComparesNumbersByValueAcrossIntAndDouble()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let sameInt = 1 == 1;
+let intEqualsDouble = 1 == 1.0;
+let doubleEqualsInt = 2.0 == 2;
+let differentNumbers = 1 == 2;
+let inequality = 1 != 1.0;
+""");
+
+        Assert.Equal(true, env.GetValue("sameInt"));
+        Assert.Equal(true, env.GetValue("intEqualsDouble"));
+        Assert.Equal(true, env.GetValue("doubleEqualsInt"));
+        Assert.Equal(false, env.GetValue("differentNumbers"));
+        Assert.Equal(false, env.GetValue("inequality"));
+    }
+
+    [Fact]
+    public void Evaluate_Equality_IsTotalAcrossMismatchedTypes()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let numberVsString = 1 == "1";
+let stringVsNumber = "1" != 1;
+let boolVsNumber = true == 1;
+let nullVsNumber = null == 0;
+let stringsEqual = "abc" == "abc";
+let stringsDiffer = "abc" == "abd";
+let bothNull = null == null;
+""");
+
+        Assert.Equal(false, env.GetValue("numberVsString"));
+        Assert.Equal(true, env.GetValue("stringVsNumber"));
+        Assert.Equal(false, env.GetValue("boolVsNumber"));
+        Assert.Equal(false, env.GetValue("nullVsNumber"));
+        Assert.Equal(true, env.GetValue("stringsEqual"));
+        Assert.Equal(false, env.GetValue("stringsDiffer"));
+        Assert.Equal(true, env.GetValue("bothNull"));
+    }
+
+    [Fact]
     public void Evaluate_UnaryExpressions_ProducesExpectedValues()
     {
         var env = InterpreterTestHelpers.Run("""
