@@ -180,12 +180,20 @@ public class FishboneInterpreter
             return IsTruthy(left) != IsTruthy(Evaluate(env, node.Right));
 
         dynamic right = Evaluate(env, node.Right);
+
+        object Divide(dynamic left, dynamic right)
+        {
+            if (left is int intLeft && right is int intRight)
+                return intLeft / (double)intRight;
+            return left / right;
+        }
+
         return node.Operator switch
         {
             "+" => left + right,
             "-" => left - right,
             "*" => left * right,
-            "/" => left / right,
+            "/" => Divide(left, right),
             // comparison
             "==" => left == right,
             "!=" => left != right,
