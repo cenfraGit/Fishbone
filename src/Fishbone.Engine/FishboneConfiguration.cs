@@ -1,4 +1,6 @@
-﻿namespace Fishbone.Engine;
+﻿using Fishbone.Interpreter;
+
+namespace Fishbone.Engine;
 
 public class FishboneConfiguration
 {
@@ -96,6 +98,20 @@ public class FishboneConfiguration
     public FishboneConfiguration RegisterFunction(string name, Delegate csharpMethod)
     {
         BuiltIns[name] = csharpMethod;
+        return this;
+    }
+
+    /// <summary>
+    /// Registers a .NET type so scripts can construct it by calling its name like a function,
+    /// for example <c>let p = Point(1, 2);</c>. The script-visible name defaults to the type's
+    /// short name; pass <paramref name="name"/> to override it.
+    /// </summary>
+    public FishboneConfiguration RegisterType<T>(string? name = null) =>
+        RegisterType(typeof(T), name);
+
+    public FishboneConfiguration RegisterType(Type type, string? name = null)
+    {
+        BuiltIns[name ?? type.Name] = new RegisteredType(type);
         return this;
     }
 }

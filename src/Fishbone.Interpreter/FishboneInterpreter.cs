@@ -375,6 +375,9 @@ public class FishboneInterpreter
         if (callee is BoundMethod boundMethod)
             return InvokeBoundMethod(env, boundMethod, argumentNodes);
 
+        if (callee is RegisteredType registeredType)
+            return InvokeConstructorOverload(env, registeredType, argumentNodes);
+
         if (callee is null)
             throw new Exception("Cannot call null. Only functions and methods are callable.");
 
@@ -387,6 +390,15 @@ public class FishboneInterpreter
     internal object InvokeReflectedCallable(FishboneEnvironment env, object? target, MethodInfo method, IReadOnlyList<AstNode> argumentNodes) =>
         InvokeBestOverload(env, target, [method], argumentNodes, method.Name);
 
+    internal object InvokeConstructorOverload(FishboneEnvironment env, RegisteredType registeredType, IReadOnlyList<AstNode> argumentNodes)
+    {
+        var constructors = ReflectionCache.GetConstructors(registeredType.Type);
+        if (constructors.Length == 0)
+            throw new Exception($"Type \"{registeredType.Type.Name}\" has no public constructor to call.");
+
+        return InvokeBestOverload(env, target: null, constructors, argumentNodes, registeredType.Type.Name);
+    }
+
     /// <summary>
     /// Selects the best-matching overload from <paramref name="methods"/> and invokes it.
     /// Arguments are evaluated exactly once, then each candidate is scored by how well every
@@ -395,7 +407,7 @@ public class FishboneInterpreter
     private object InvokeBestOverload(
         FishboneEnvironment env,
         object? target,
-        IReadOnlyList<MethodInfo> methods,
+        IReadOnlyList<MethodBase> methods,
         IReadOnlyList<AstNode> argumentNodes,
         string methodName)
     {
@@ -408,7 +420,7 @@ public class FishboneInterpreter
         for (int i = 0; i < argumentNodes.Count; i++)
             rawArgs[i] = Evaluate(env, argumentNodes[i]);
 
-        MethodInfo? best = null;
+        MethodBase? best = null;
         object?[]? bestArgs = null;
         List<(string Name, int Index)>? bestWriteBacks = null;
         int bestScore = -1;
@@ -448,7 +460,12 @@ public class FishboneInterpreter
         if (ambiguous)
             throw new Exception($"Call to \"{methodName}\" with {argumentNodes.Count} argument(s) is ambiguous between multiple overloads.");
 
-        return InvokeMethod(env, target, best, bestArgs!, bestWriteBacks!);
+        return best switch
+        {
+            ConstructorInfo constructor => InvokeConstructor(env, constructor, bestArgs!, bestWriteBacks!),
+            MethodInfo method => InvokeMethod(env, target, method, bestArgs!, bestWriteBacks!),
+            _ => throw new Exception($"Cannot invoke member \"{methodName}\".")
+        };
     }
 
     private object InvokeMethod(
@@ -477,6 +494,32 @@ public class FishboneInterpreter
         finally
         {
             OnFunctionExit(method.Name);
+        }
+    }
+
+    private object InvokeConstructor(
+        FishboneEnvironment env,
+        ConstructorInfo constructor,
+        object?[] args,
+        List<(string Name, int Index)> writeBacks)
+    {
+        var typeName = constructor.DeclaringType?.Name ?? "constructor";
+        OnFunctionEnter(typeName, new FishboneEnvironment(env));
+        try
+        {
+            var instance = ReflectionCache.GetConstructorInvoker(constructor).Invoke(args.AsSpan());
+            foreach (var writeBack in writeBacks)
+                env.Assign(writeBack.Name, args[writeBack.Index]!);
+
+            return instance!;
+        }
+        catch (TargetInvocationException ex)
+        {
+            throw ex.InnerException ?? ex;
+        }
+        finally
+        {
+            OnFunctionExit(typeName);
         }
     }
 

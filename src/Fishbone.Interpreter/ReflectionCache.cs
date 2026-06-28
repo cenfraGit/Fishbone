@@ -14,16 +14,24 @@ internal static class ReflectionCache
 {
     private const BindingFlags InstanceMembers = BindingFlags.Public | BindingFlags.Instance;
 
-    private static readonly ConcurrentDictionary<MethodInfo, ParameterInfo[]> Parameters = new();
+    private static readonly ConcurrentDictionary<MethodBase, ParameterInfo[]> Parameters = new();
     private static readonly ConcurrentDictionary<MethodInfo, MethodInvoker> Invokers = new();
+    private static readonly ConcurrentDictionary<ConstructorInfo, ConstructorInvoker> ConstructorInvokers = new();
+    private static readonly ConcurrentDictionary<Type, ConstructorInfo[]> Constructors = new();
     private static readonly ConcurrentDictionary<Type, PropertyInfo[]> SingleParameterIndexers = new();
     private static readonly ConcurrentDictionary<(Type Type, string Name), MemberLookup> Members = new();
 
-    public static ParameterInfo[] GetParameters(MethodInfo method) =>
+    public static ParameterInfo[] GetParameters(MethodBase method) =>
         Parameters.GetOrAdd(method, static m => m.GetParameters());
 
     public static MethodInvoker GetInvoker(MethodInfo method) =>
         Invokers.GetOrAdd(method, static m => MethodInvoker.Create(m));
+
+    public static ConstructorInvoker GetConstructorInvoker(ConstructorInfo constructor) =>
+        ConstructorInvokers.GetOrAdd(constructor, static c => ConstructorInvoker.Create(c));
+
+    public static ConstructorInfo[] GetConstructors(Type type) =>
+        Constructors.GetOrAdd(type, static t => t.GetConstructors(InstanceMembers));
 
     public static PropertyInfo[] GetSingleParameterIndexers(Type type) =>
         SingleParameterIndexers.GetOrAdd(type, static t => t

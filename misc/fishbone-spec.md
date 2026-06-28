@@ -385,6 +385,16 @@ let count = list.Count;
 
 **Type conversions** — When calling .NET methods, Fishbone automatically converts values via `Convert.ChangeType`. Enum parameters accept both string names (`"Monday"`) and integer values, parsed via `Enum.Parse`.
 
+**Construction** — A host can register a .NET type with `FishboneConfiguration.RegisterType<T>()` (optionally under a custom name). A registered type is bound as a callable whose name acts like a constructor — there is no `new` keyword:
+
+```csharp
+// host: config.RegisterType<Point>();
+let p = Point(3, 4);   // invokes the Point(int, int) constructor
+let sum = p.X + p.Y;   // instances are ordinary .NET objects
+```
+
+Constructor overloads are resolved with the same best-match rules as method calls. Calling a registered type with no matching constructor, or registering a type that exposes no public constructor, is an error.
+
 ### Plugins
 
 External .NET assemblies implementing `IFishbonePlugin` can be loaded to register custom builtins. Plugins are loaded from the `.fishbone/plugins/` directory at the user's home directory.

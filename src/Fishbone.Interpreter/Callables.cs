@@ -65,3 +65,18 @@ public sealed class BoundMethod
     public object Target { get; }
     public IReadOnlyList<MethodInfo> Methods { get; }
 }
+
+/// <summary>
+/// A .NET type that scripts may construct by calling its name like a function
+/// (for example <c>let p = Point(1, 2);</c>). Registered through
+/// <c>FishboneConfiguration.RegisterType</c>.
+/// </summary>
+public sealed class RegisteredType
+{
+    public RegisteredType(Type type)
+    {
+        Type = type;
+    }
+
+    public Type Type { get; }
+}
