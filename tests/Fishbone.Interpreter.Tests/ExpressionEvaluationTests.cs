@@ -246,4 +246,48 @@ let result = -5 / 2;
 
         Assert.Equal(-2.5, env.GetValue("result"));
     }
+
+    [Fact]
+    public void Evaluate_IntegerModulo_PreservesIntegerResult()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let result = 17 % 5;
+""");
+
+        Assert.Equal(2, env.GetValue("result"));
+        Assert.IsType<int>(env.GetValue("result"));
+    }
+
+    [Fact]
+    public void Evaluate_NegativeModulo_SignFollowsDividend()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let negativeDividend = -5 % 3;
+let negativeDivisor = 5 % -3;
+""");
+
+        Assert.Equal(-2, env.GetValue("negativeDividend"));
+        Assert.Equal(2, env.GetValue("negativeDivisor"));
+    }
+
+    [Fact]
+    public void Evaluate_DoubleModulo_ReturnsDouble()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let result = 5.5 % 2;
+""");
+
+        Assert.Equal(1.5, env.GetValue("result"));
+    }
+
+    [Fact]
+    public void Evaluate_Modulo_HasSamePrecedenceAsMultiplication()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let result = 2 + 17 % 5 * 2;
+""");
+
+        // Modulo and multiplication bind tighter than addition: 2 + ((17 % 5) * 2) = 2 + 4 = 6
+        Assert.Equal(6, env.GetValue("result"));
+    }
 }

@@ -194,6 +194,7 @@ public class FishboneInterpreter
             "-" => left - right,
             "*" => left * right,
             "/" => Divide(left, right),
+            "%" => left % right,
             // comparison
             "==" => left == right,
             "!=" => left != right,

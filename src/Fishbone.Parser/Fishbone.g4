@@ -50,7 +50,7 @@ expr
     | expr '.' ID                             #MemberAccessExpr
     | expr '[' expr ']'                       #IndexingExpr
     | (MINUS|NOT) expr                        #UnaryExpr
-    | expr (MUL|DIV) expr                     #BinaryExpr
+    | expr (MUL|DIV|MOD) expr                 #BinaryExpr
     | expr (PLUS|MINUS) expr                  #BinaryExpr
     | expr (GE|LE|GT|LT) expr                 #BinaryExpr
     | expr (EQ|NEQ) expr                      #BinaryExpr
@@ -79,6 +79,7 @@ PLUS  : '+' ;
 MINUS : '-' ;
 MUL   : '*' ;
 DIV   : '/';
+MOD   : '%' ;
 
 EQ  : '==' ;
 NEQ : '!=' ;
