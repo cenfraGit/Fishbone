@@ -3,6 +3,7 @@ using Fishbone.Engine;
 
 namespace Fishbone.DebugAdapter.Tests;
 
+[Collection("DebugServer")]
 public class RunDebuggableAsyncTests
 {
     [Fact]

@@ -5,6 +5,7 @@ using Fishbone.Dap;
 
 namespace Fishbone.DebugAdapter.Tests;
 
+[Collection("DebugServer")]
 public class TcpDapIntegrationTests
 {
     [Fact]
