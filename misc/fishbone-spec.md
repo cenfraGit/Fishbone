@@ -131,7 +131,7 @@ Fishbone is dynamically typed. Every value is one of the following:
 
 | Type | Examples | Notes |
 |------|----------|-------|
-| `int` | `42`, `-1`, `1_000_000` | 32-bit signed integer |
+| `int` | `42`, `-1`, `1_000_000` | 32-bit signed integer (wraps on overflow) |
 | `double` | `3.14`, `.5`, `-2.0` | 64-bit double-precision float |
 | `string` | `"hello"`, `""` | Unicode text |
 | `bool` | `true`, `false` | |
