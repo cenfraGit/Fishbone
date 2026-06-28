@@ -5,11 +5,9 @@ func f(x)
 
 let a = 0; // lower limit
 let b = 3; // upper limit
-let n = 1000;
+let n = 100;
 
-// c#: int / int yields int
-// so we must cast to double
-let dx = (b - a) / double(n);
+let dx = (b - a) / n;
 
 let riemann_sum = 0;
 
