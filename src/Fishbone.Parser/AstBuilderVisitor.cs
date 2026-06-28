@@ -140,6 +140,35 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         return new IndexedAssignmentNode(indexingNode.Target, indexingNode.Index, value) { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }
 
+    public override AstNode VisitCompoundAssignmentStat(FishboneParser.CompoundAssignmentStatContext context)
+    {
+        AstNode target = Visit(context.expr(0));
+        AstNode rightValue = Visit(context.expr(1));
+
+        // the compound operator text is "+=" (for example), the underlying binary operator is "+"
+        string compoundOp = context.GetChild(1).GetText();
+        string binaryOp = compoundOp[..^1];
+
+        var line = context.Start.Line;
+        var column = context.Start.Column + 1;
+
+        // "target <op>= right" converts to "target = target <op> right".
+        // plan: combine assignment node with operator node
+        switch (target)
+        {
+            case IdentifierNode identifier:
+                var combinedValue = new BinaryOpNode(binaryOp, identifier, rightValue) { Line = line, Column = column };
+                return new AssignmentNode([identifier.Name], combinedValue) { Line = line, Column = column };
+
+            case IndexingNode indexing:
+                var combinedIndexedValue = new BinaryOpNode(binaryOp, indexing, rightValue) { Line = line, Column = column };
+                return new IndexedAssignmentNode(indexing.Target, indexing.Index, combinedIndexedValue) { Line = line, Column = column };
+
+            default:
+                throw new InvalidOperationException($"Compound assignment requires a variable or indexed target, but found {target.GetType().Name}.");
+        }
+    }
+
     public override AstNode VisitUnaryExpr(FishboneParser.UnaryExprContext context)
     {
         string op = context.GetChild(0).GetText();

@@ -10,6 +10,7 @@ statement
     : declarationStat SEMI
     | assignmentStat SEMI
     | indexedAssignmentStat SEMI
+    | compoundAssignmentStat SEMI
     | ID (COMMA ID)* ASSIGN expr SEMI
     | expr SEMI
     | functionDefinitionStat
@@ -28,6 +29,7 @@ blockStat : '{' statement* '}' ;
 declarationStat       : LET ID (COMMA ID)* ASSIGN expr ;
 assignmentStat        : ID (COMMA ID)* ASSIGN expr ;
 indexedAssignmentStat : expr ASSIGN expr ;
+compoundAssignmentStat : expr (PLUS_ASSIGN | MINUS_ASSIGN | MUL_ASSIGN | DIV_ASSIGN | MOD_ASSIGN) expr ;
 
 ifStat : IF '(' expr ')' blockStat (ELSEIF '(' expr ')' blockStat)* (ELSE blockStat)? ;
 
@@ -80,6 +82,12 @@ MINUS : '-' ;
 MUL   : '*' ;
 DIV   : '/';
 MOD   : '%' ;
+
+PLUS_ASSIGN  : '+=' ;
+MINUS_ASSIGN : '-=' ;
+MUL_ASSIGN   : '*=' ;
+DIV_ASSIGN   : '/=' ;
+MOD_ASSIGN   : '%=' ;
 
 EQ  : '==' ;
 NEQ : '!=' ;
