@@ -360,7 +360,7 @@ let count = list.Count;
 
 **Indexing** — The `[ ]` operator works with .NET indexers, `IList`, and `IDictionary`.
 
-**Type conversions** — When calling .NET methods, Fishbone automatically converts values via `Convert.ChangeType` and enum parsing.
+**Type conversions** — When calling .NET methods, Fishbone automatically converts values via `Convert.ChangeType`. Enum parameters accept both string names (`"Monday"`) and integer values, parsed via `Enum.Parse`.
 
 ### Plugins
 
