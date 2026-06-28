@@ -69,10 +69,11 @@ An identifier's name must also not collide with the reserved keywords, which inc
 
 | Token(s) | Description |
 |----------|-------------|
-| `+` `-` `*` `/` | Arithmetic operators |
+| `+` `-` `*` `/` `%` | Arithmetic operators |
 | `==` `!=` `<` `>` `<=` `>=` | Comparison operators |
 | `and` `or` `xor` `not` | Boolean operators |
 | `=` | Assignment |
+| `+=` `-=` `*=` `/=` `%=` | Compound assignment |
 | `.` | Member access |
 | `[` `]` | Indexing / list and dictionary construction |
 | `(` `)` | Grouping / call expressions |
@@ -184,7 +185,7 @@ Fishbone supports the following expression forms:
 | Identifier | `x`, `myVar` | Reference to a variable or function |
 | Parenthesized | `( expr )` | Explicit grouping |
 | Unary | `- expr`, `not expr` | Numeric negation, boolean negation |
-| Multiplicative | `expr * expr`, `expr / expr` | `int / int` returns `double` |
+| Multiplicative | `expr * expr`, `expr / expr`, `expr % expr` | `int / int` returns `double`; `%` is the remainder |
 | Additive | `expr + expr`, `expr - expr` | `+` also concatenates strings |
 | Comparison | `expr < expr`, `expr > expr`, `expr <= expr`, `expr >= expr` | Returns `bool` |
 | Equality | `expr == expr`, `expr != expr` | Returns `bool` |
@@ -198,11 +199,17 @@ Fishbone supports the following expression forms:
 Operator precedence, from highest to lowest:
 
 1. Unary (`-`, `not`)
-2. Multiplicative (`*`, `/`)
+2. Multiplicative (`*`, `/`, `%`)
 3. Additive (`+`, `-`)
 4. Comparison (`<`, `>`, `<=`, `>=`)
 5. Equality (`==`, `!=`)
 6. Boolean (`and`, `or`, `xor`)
+
+### Arithmetic semantics
+
+- `+`, `-`, `*` preserve `int` when both operands are `int`, and produce a `double` when either operand is a `double`.
+- `/` is true division: it always produces a `double`, regardless of operand types, so `5 / 2` is `2.5` and `4 / 2` is `2.0`. Integer division by zero therefore yields `double` infinity rather than an error. There is no dedicated floor-division operator; use `int(a / b)` when an integer quotient is required.
+- `%` is the remainder operator. It preserves `int` when both operands are `int` (only `/` promotes to `double`), and follows the C# truncated convention where the sign of the result follows the dividend: `-5 % 3` is `-2` and `5 % -3` is `2`. Integer remainder by zero raises an error; `double` remainder by zero yields `NaN`.
 
 ## Statements
 
@@ -232,6 +239,22 @@ dict["key"] = value;
 ```
 
 Assigns a value to a list index, dictionary key, or .NET indexer.
+
+### Compound assignment
+
+```csharp
+x += 1;
+total -= cost;
+scaled *= 2;
+average /= count;
+remainder %= modulus;
+list[i] += 1;
+dict["key"] *= 2;
+```
+
+The compound assignment operators `+=`, `-=`, `*=`, `/=`, `%=` are syntactic sugar. `target op= value` is exactly equivalent to `target = target op value`, and the result follows the same arithmetic semantics as the underlying operator (for example `x /= 2` always produces a `double`). The target must be a variable or an indexed target; any other target is a parse error.
+
+For an indexed target such as `list[i] += 1`, the index expression is evaluated twice — once to read the current value and once to write the result. Avoid index expressions with side effects in a compound assignment.
 
 ### Expression statement
 
