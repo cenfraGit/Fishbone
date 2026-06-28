@@ -381,21 +381,74 @@ public class FishboneInterpreter
         throw new Exception($"Object of type \"{callee.GetType().Name}\" is not callable.");
     }
 
-    internal object InvokeBoundMethod(FishboneEnvironment env, BoundMethod boundMethod, IReadOnlyList<AstNode> argumentNodes)
+    internal object InvokeBoundMethod(FishboneEnvironment env, BoundMethod boundMethod, IReadOnlyList<AstNode> argumentNodes) =>
+        InvokeBestOverload(env, boundMethod.Target, boundMethod.Methods, argumentNodes, boundMethod.Methods[0].Name);
+
+    internal object InvokeReflectedCallable(FishboneEnvironment env, object? target, MethodInfo method, IReadOnlyList<AstNode> argumentNodes) =>
+        InvokeBestOverload(env, target, [method], argumentNodes, method.Name);
+
+    /// <summary>
+    /// Selects the best-matching overload from <paramref name="methods"/> and invokes it.
+    /// Arguments are evaluated exactly once, then each candidate is scored by how well every
+    /// argument matches its parameter. The highest total score wins.
+    /// </summary>
+    private object InvokeBestOverload(
+        FishboneEnvironment env,
+        object? target,
+        IReadOnlyList<MethodInfo> methods,
+        IReadOnlyList<AstNode> argumentNodes,
+        string methodName)
     {
-        foreach (var method in boundMethod.Methods)
-            if (TryBuildInvocation(env, ReflectionCache.GetParameters(method), argumentNodes, out var args, out var writeBacks))
-                return InvokeMethod(env, boundMethod.Target, method, args, writeBacks);
+        // evaluate every argument once
 
-        throw new Exception($"No overload of \"{boundMethod.Methods[0].Name}\" accepts {argumentNodes.Count} argument(s).");
-    }
+        // identifier arguments (the only things allowed for out/ref parameters) simply read
+        // their current value here, so this is side-effect free for them
+        // and preserves the existing "the variable must already exist" rule for out/ref targets.
+        var rawArgs = new object?[argumentNodes.Count];
+        for (int i = 0; i < argumentNodes.Count; i++)
+            rawArgs[i] = Evaluate(env, argumentNodes[i]);
 
-    internal object InvokeReflectedCallable(FishboneEnvironment env, object? target, MethodInfo method, IReadOnlyList<AstNode> argumentNodes)
-    {
-        if (!TryBuildInvocation(env, ReflectionCache.GetParameters(method), argumentNodes, out var args, out var writeBacks))
-            throw new Exception($"Expected compatible args for \"{method.Name}\" but got {argumentNodes.Count}.");
+        MethodInfo? best = null;
+        object?[]? bestArgs = null;
+        List<(string Name, int Index)>? bestWriteBacks = null;
+        int bestScore = -1;
+        bool ambiguous = false;
+        string? deferredDiagnostic = null;
 
-        return InvokeMethod(env, target, method, args, writeBacks);
+        foreach (var method in methods)
+        {
+            var parameters = ReflectionCache.GetParameters(method);
+            if (!TryBindOverload(parameters, argumentNodes, rawArgs, out var args, out var writeBacks, out var score, out var diagnostic))
+            {
+                deferredDiagnostic ??= diagnostic;
+                continue;
+            }
+
+            if (best is null || score > bestScore)
+            {
+                best = method;
+                bestArgs = args;
+                bestWriteBacks = writeBacks;
+                bestScore = score;
+                ambiguous = false;
+            }
+            else if (score == bestScore)
+            {
+                ambiguous = true;
+            }
+        }
+
+        if (best is null)
+        {
+            if (deferredDiagnostic is not null)
+                throw new Exception(deferredDiagnostic);
+            throw new Exception($"No overload of \"{methodName}\" accepts {argumentNodes.Count} argument(s).");
+        }
+
+        if (ambiguous)
+            throw new Exception($"Call to \"{methodName}\" with {argumentNodes.Count} argument(s) is ambiguous between multiple overloads.");
+
+        return InvokeMethod(env, target, best, bestArgs!, bestWriteBacks!);
     }
 
     private object InvokeMethod(
@@ -427,15 +480,26 @@ public class FishboneInterpreter
         }
     }
 
-    private bool TryBuildInvocation(
-        FishboneEnvironment env,
+    /// <summary>
+    /// Attempts to bind already-evaluated arguments to a single overload's parameters, producing
+    /// the converted argument buffer, the out/ref write-back list, and a total match score.
+    /// Returns false when the overload cannot accept the arguments. Does not evaluate argument
+    /// expressions (that happens once in the caller) so it can be run against every candidate
+    /// overload without repeating side effects.
+    /// </summary>
+    private static bool TryBindOverload(
         ParameterInfo[] parameters,
         IReadOnlyList<AstNode> argumentNodes,
+        object?[] rawArgs,
         out object?[] args,
-        out List<(string Name, int Index)> writeBacks)
+        out List<(string Name, int Index)> writeBacks,
+        out int score,
+        out string? diagnostic)
     {
         args = new object?[parameters.Length];
         writeBacks = [];
+        score = 0;
+        diagnostic = null;
 
         if (parameters.Length != argumentNodes.Count)
             return false;
@@ -452,31 +516,34 @@ public class FishboneInterpreter
             if (parameter.IsOut)
             {
                 if (argumentNodes[i] is not IdentifierNode identifier)
-                    throw new Exception($"Out argument \"{parameter.Name}\" must be a variable.");
+                {
+                    diagnostic = $"Out argument \"{parameter.Name}\" must be a variable.";
+                    return false;
+                }
 
-                env.GetValue(identifier.Name);
                 args[i] = GetDefaultValue(targetType);
                 writeBacks.Add((identifier.Name, i));
+                // an out parameter consumes no input value, so it does not bias overload scoring
+                score += (int)ArgumentMatch.Exact;
                 continue;
             }
 
-            object? rawArg;
             if (isByRef)
             {
                 if (argumentNodes[i] is not IdentifierNode identifier)
-                    throw new Exception($"Ref argument \"{parameter.Name}\" must be a variable.");
+                {
+                    diagnostic = $"Ref argument \"{parameter.Name}\" must be a variable.";
+                    return false;
+                }
 
-                rawArg = env.GetValue(identifier.Name);
                 writeBacks.Add((identifier.Name, i));
             }
-            else
-            {
-                rawArg = Evaluate(env, argumentNodes[i]);
-            }
 
-            if (!TryConvertArgument(rawArg, targetType, out var convertedArg))
+            var match = ConvertArgument(rawArgs[i], targetType, out var convertedArg);
+            if (match == ArgumentMatch.None)
                 return false;
 
+            score += (int)match;
             args[i] = convertedArg;
         }
 
@@ -489,7 +556,22 @@ public class FishboneInterpreter
         return targetType.IsValueType ? Activator.CreateInstance(targetType) : null;
     }
 
-    private static bool TryConvertArgument(object? rawArg, Type targetType, out object? convertedArg)
+    /// <summary>
+    /// Quality of a single argument-to-parameter match, used to rank overloads. Ordered so a
+    /// larger value is a better match; <see cref="None"/> means the argument is not accepted.
+    /// </summary>
+    private enum ArgumentMatch
+    {
+        None = 0,
+        Convertible = 1, // requires explicit conversion (Convert.ChangeType, enum-from-int)
+        Assignable = 2,  // reference/interface assignable without conversion (e.g. int -> object)
+        Exact = 3        // runtime type already matches the parameter type
+    }
+
+    private static bool TryConvertArgument(object? rawArg, Type targetType, out object? convertedArg) =>
+        ConvertArgument(rawArg, targetType, out convertedArg) != ArgumentMatch.None;
+
+    private static ArgumentMatch ConvertArgument(object? rawArg, Type targetType, out object? convertedArg)
     {
         var nullableType = Nullable.GetUnderlyingType(targetType);
         var conversionType = nullableType ?? targetType;
@@ -497,13 +579,21 @@ public class FishboneInterpreter
         if (rawArg is null)
         {
             convertedArg = GetDefaultValue(conversionType);
-            return !conversionType.IsValueType || nullableType is not null || convertedArg is not null;
+            var nullAccepted = !conversionType.IsValueType || nullableType is not null || convertedArg is not null;
+            return nullAccepted ? ArgumentMatch.Assignable : ArgumentMatch.None;
+        }
+
+        var rawType = rawArg.GetType();
+        if (rawType == targetType || rawType == conversionType)
+        {
+            convertedArg = rawArg;
+            return ArgumentMatch.Exact;
         }
 
         if (targetType.IsInstanceOfType(rawArg))
         {
             convertedArg = rawArg;
-            return true;
+            return ArgumentMatch.Assignable;
         }
 
         try
@@ -513,23 +603,23 @@ public class FishboneInterpreter
                 convertedArg = rawArg is string enumName
                     ? Enum.Parse(conversionType, enumName)
                     : Enum.ToObject(conversionType, rawArg);
-                return true;
+                return ArgumentMatch.Convertible;
             }
 
             if (rawArg is IConvertible && typeof(IConvertible).IsAssignableFrom(conversionType))
             {
                 convertedArg = Convert.ChangeType(rawArg, conversionType);
-                return true;
+                return ArgumentMatch.Convertible;
             }
         }
         catch
         {
             convertedArg = null;
-            return false;
+            return ArgumentMatch.None;
         }
 
         convertedArg = null;
-        return false;
+        return ArgumentMatch.None;
     }
 
     internal object EvaluateListNode(FishboneEnvironment env, ListNode node)

@@ -379,7 +379,7 @@ let list = [1, 2, 3];
 let count = list.Count;
 ```
 
-**Method calls** — Methods are resolved at runtime. Overload resolution matches arguments by count and type.
+**Method calls** — Methods are resolved at runtime. When a method has overloads, Fishbone first filters to those whose parameter count matches the argument count, then selects the *best* match: each argument is scored by how closely it matches the parameter type — an exact runtime-type match ranks above a reference/interface assignment (such as `int` to `object`), which ranks above a value conversion (such as `int` to `double`, or an enum from a string). The overload with the highest total score wins. If two overloads tie for the best score, the call is rejected as ambiguous rather than silently choosing one.
 
 **Indexing** — The `[ ]` operator works with .NET indexers, `IList`, and `IDictionary`.
 
