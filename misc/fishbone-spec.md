@@ -64,6 +64,8 @@ An identifier's name must also not collide with the reserved keywords, which inc
 - `or`
 - `xor`
 - `not`
+- `out`
+- `ref`
 
 ### Operators and punctuation
 
@@ -394,6 +396,20 @@ let sum = p.X + p.Y;   // instances are ordinary .NET objects
 ```
 
 Constructor overloads are resolved with the same best-match rules as method calls. Calling a registered type with no matching constructor, or registering a type that exposes no public constructor, is an error.
+
+**By-reference arguments (`out` / `ref`)** — When a .NET method has `out` or `ref` parameters, the call site must mark the corresponding argument with the matching keyword, and the argument must be a plain variable:
+
+```csharp
+// bool TryParse(string text, out int value)
+let ok = TryParse("42", out parsed);   // 'parsed' is introduced by the call
+// void Increment(ref int value)
+let n = 10;
+Increment(ref n);                      // 'n' must already exist; it is updated in place
+```
+
+- `out` does not require the variable to exist beforehand: if it is undefined, the call declares it in the current scope; if it already exists, the call writes through to it.
+- `ref` requires the variable to already be defined; its current value is passed in and the updated value is written back.
+- Omitting the keyword on an `out`/`ref` parameter, using a keyword on a by-value parameter, passing a non-variable expression with a keyword, or using `out`/`ref` when calling a Fishbone function are all errors.
 
 ### Plugins
 

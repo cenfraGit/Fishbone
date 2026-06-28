@@ -355,7 +355,7 @@ public class FishboneInterpreter
         return EvaluateCall(env, callee, node.Arguments);
     }
 
-    internal object EvaluateCall(FishboneEnvironment env, object callee, IReadOnlyList<AstNode> argumentNodes)
+    internal object EvaluateCall(FishboneEnvironment env, object callee, IReadOnlyList<ArgumentNode> argumentNodes)
     {
         if (callee is ICallable fishboneFunction)
         {
@@ -364,7 +364,12 @@ public class FishboneInterpreter
 
             var evaluatedArgs = new List<object>();
             foreach (var argNode in argumentNodes)
-                evaluatedArgs.Add(Evaluate(env, argNode));
+            {
+                if (argNode.Modifier != ArgumentModifier.None)
+                    throw new Exception($"'{argNode.Modifier.ToString().ToLowerInvariant()}' arguments are only supported when calling .NET methods.");
+
+                evaluatedArgs.Add(Evaluate(env, argNode.Value));
+            }
 
             return fishboneFunction.Call(this, evaluatedArgs);
         }
@@ -384,13 +389,13 @@ public class FishboneInterpreter
         throw new Exception($"Object of type \"{callee.GetType().Name}\" is not callable.");
     }
 
-    internal object InvokeBoundMethod(FishboneEnvironment env, BoundMethod boundMethod, IReadOnlyList<AstNode> argumentNodes) =>
+    internal object InvokeBoundMethod(FishboneEnvironment env, BoundMethod boundMethod, IReadOnlyList<ArgumentNode> argumentNodes) =>
         InvokeBestOverload(env, boundMethod.Target, boundMethod.Methods, argumentNodes, boundMethod.Methods[0].Name);
 
-    internal object InvokeReflectedCallable(FishboneEnvironment env, object? target, MethodInfo method, IReadOnlyList<AstNode> argumentNodes) =>
+    internal object InvokeReflectedCallable(FishboneEnvironment env, object? target, MethodInfo method, IReadOnlyList<ArgumentNode> argumentNodes) =>
         InvokeBestOverload(env, target, [method], argumentNodes, method.Name);
 
-    internal object InvokeConstructorOverload(FishboneEnvironment env, RegisteredType registeredType, IReadOnlyList<AstNode> argumentNodes)
+    internal object InvokeConstructorOverload(FishboneEnvironment env, RegisteredType registeredType, IReadOnlyList<ArgumentNode> argumentNodes)
     {
         var constructors = ReflectionCache.GetConstructors(registeredType.Type);
         if (constructors.Length == 0)
@@ -408,21 +413,21 @@ public class FishboneInterpreter
         FishboneEnvironment env,
         object? target,
         IReadOnlyList<MethodBase> methods,
-        IReadOnlyList<AstNode> argumentNodes,
+        IReadOnlyList<ArgumentNode> argumentNodes,
         string methodName)
     {
-        // evaluate every argument once
-
-        // identifier arguments (the only things allowed for out/ref parameters) simply read
-        // their current value here, so this is side-effect free for them
-        // and preserves the existing "the variable must already exist" rule for out/ref targets.
+        // evaluate every argument once. 'out' arguments are skipped: the receiving variable need
+        // not exist yet (the call introduces it), so evaluating it would wrongly fail. 'ref' and
+        // by-value arguments are read here, which is why 'ref' requires an already-defined variable.
         var rawArgs = new object?[argumentNodes.Count];
         for (int i = 0; i < argumentNodes.Count; i++)
-            rawArgs[i] = Evaluate(env, argumentNodes[i]);
+            rawArgs[i] = argumentNodes[i].Modifier == ArgumentModifier.Out
+                ? null
+                : Evaluate(env, argumentNodes[i].Value);
 
         MethodBase? best = null;
         object?[]? bestArgs = null;
-        List<(string Name, int Index)>? bestWriteBacks = null;
+        List<(string Name, int Index, bool IsOut)>? bestWriteBacks = null;
         int bestScore = -1;
         bool ambiguous = false;
         string? deferredDiagnostic = null;
@@ -473,7 +478,7 @@ public class FishboneInterpreter
         object? target,
         MethodInfo method,
         object?[] args,
-        List<(string Name, int Index)> writeBacks)
+        List<(string Name, int Index, bool IsOut)> writeBacks)
     {
         var delegateEnv = new FishboneEnvironment(env);
         OnFunctionEnter(method.Name, delegateEnv);
@@ -482,8 +487,7 @@ public class FishboneInterpreter
             // span overload is required, it is the only MethodInvoker.Invoke overload that
             // writes by-ref (out/ref) results back into the supplied argument buffer.
             var result = ReflectionCache.GetInvoker(method).Invoke(target, args.AsSpan());
-            foreach (var writeBack in writeBacks)
-                env.Assign(writeBack.Name, args[writeBack.Index]!);
+            WriteBackByRefArguments(env, args, writeBacks);
 
             return result!;
         }
@@ -501,15 +505,14 @@ public class FishboneInterpreter
         FishboneEnvironment env,
         ConstructorInfo constructor,
         object?[] args,
-        List<(string Name, int Index)> writeBacks)
+        List<(string Name, int Index, bool IsOut)> writeBacks)
     {
         var typeName = constructor.DeclaringType?.Name ?? "constructor";
         OnFunctionEnter(typeName, new FishboneEnvironment(env));
         try
         {
             var instance = ReflectionCache.GetConstructorInvoker(constructor).Invoke(args.AsSpan());
-            foreach (var writeBack in writeBacks)
-                env.Assign(writeBack.Name, args[writeBack.Index]!);
+            WriteBackByRefArguments(env, args, writeBacks);
 
             return instance!;
         }
@@ -532,10 +535,10 @@ public class FishboneInterpreter
     /// </summary>
     private static bool TryBindOverload(
         ParameterInfo[] parameters,
-        IReadOnlyList<AstNode> argumentNodes,
+        IReadOnlyList<ArgumentNode> argumentNodes,
         object?[] rawArgs,
         out object?[] args,
-        out List<(string Name, int Index)> writeBacks,
+        out List<(string Name, int Index, bool IsOut)> writeBacks,
         out int score,
         out string? diagnostic)
     {
@@ -555,17 +558,24 @@ public class FishboneInterpreter
             var targetType = isByRef
                 ? parameterType.GetElementType()!
                 : parameterType;
+            var argument = argumentNodes[i];
 
             if (parameter.IsOut)
             {
-                if (argumentNodes[i] is not IdentifierNode identifier)
+                if (argument.Modifier != ArgumentModifier.Out)
+                {
+                    diagnostic = $"Parameter \"{parameter.Name}\" is an out parameter; pass the argument with 'out'.";
+                    return false;
+                }
+
+                if (argument.Value is not IdentifierNode outTarget)
                 {
                     diagnostic = $"Out argument \"{parameter.Name}\" must be a variable.";
                     return false;
                 }
 
                 args[i] = GetDefaultValue(targetType);
-                writeBacks.Add((identifier.Name, i));
+                writeBacks.Add((outTarget.Name, i, true));
                 // an out parameter consumes no input value, so it does not bias overload scoring
                 score += (int)ArgumentMatch.Exact;
                 continue;
@@ -573,13 +583,32 @@ public class FishboneInterpreter
 
             if (isByRef)
             {
-                if (argumentNodes[i] is not IdentifierNode identifier)
+                if (argument.Modifier != ArgumentModifier.Ref)
+                {
+                    diagnostic = $"Parameter \"{parameter.Name}\" is a ref parameter; pass the argument with 'ref'.";
+                    return false;
+                }
+
+                if (argument.Value is not IdentifierNode refTarget)
                 {
                     diagnostic = $"Ref argument \"{parameter.Name}\" must be a variable.";
                     return false;
                 }
 
-                writeBacks.Add((identifier.Name, i));
+                var refMatch = ConvertArgument(rawArgs[i], targetType, out var refConverted);
+                if (refMatch == ArgumentMatch.None)
+                    return false;
+
+                score += (int)refMatch;
+                args[i] = refConverted;
+                writeBacks.Add((refTarget.Name, i, false));
+                continue;
+            }
+
+            if (argument.Modifier != ArgumentModifier.None)
+            {
+                diagnostic = $"Parameter \"{parameter.Name}\" is passed by value; remove '{argument.Modifier.ToString().ToLowerInvariant()}'.";
+                return false;
             }
 
             var match = ConvertArgument(rawArgs[i], targetType, out var convertedArg);
@@ -591,6 +620,24 @@ public class FishboneInterpreter
         }
 
         return true;
+    }
+
+    private static void WriteBackByRefArguments(
+        FishboneEnvironment env,
+        object?[] args,
+        List<(string Name, int Index, bool IsOut)> writeBacks)
+    {
+        foreach (var writeBack in writeBacks)
+        {
+            var value = args[writeBack.Index]!;
+
+            // 'out' introduces the variable when it does not already exist; 'ref' (and an 'out'
+            // that targets an existing variable) writes through to the existing binding
+            if (writeBack.IsOut && !env.IsDefined(writeBack.Name))
+                env.Declare(writeBack.Name, value);
+            else
+                env.Assign(writeBack.Name, value);
+        }
     }
 
     private static object? GetDefaultValue(Type type)

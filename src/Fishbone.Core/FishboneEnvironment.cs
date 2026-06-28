@@ -48,6 +48,9 @@ public class FishboneEnvironment
         throw new Exception($"Undefined variable \"{name}\".");
     }
 
+    public bool IsDefined(string name) =>
+        _values.ContainsKey(name) || (_parent?.IsDefined(name) ?? false);
+
     public object GetValue(string name)
     {
         if (_values.TryGetValue(name, out var val))
