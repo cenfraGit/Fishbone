@@ -42,11 +42,17 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
 
     public override AstNode VisitCallExpr(FishboneParser.CallExprContext context)
     {
-        var callee = Visit(context.expr(0));
-        var funcArgs = new List<AstNode>();
+        var callee = Visit(context.expr());
+        var funcArgs = new List<ArgumentNode>();
 
-        for (int i = 1; i < context.expr().Length; i++)
-            funcArgs.Add(Visit(context.expr(i)));
+        foreach (var argument in context.argument())
+        {
+            var modifier = argument.OUT() is not null ? ArgumentModifier.Out
+                : argument.REF() is not null ? ArgumentModifier.Ref
+                : ArgumentModifier.None;
+
+            funcArgs.Add(new ArgumentNode(modifier, Visit(argument.expr())));
+        }
 
         return new CallNode(callee, funcArgs.ToImmutableArray()) { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }

@@ -29,7 +29,7 @@ blockStat : '{' statement* '}' ;
 declarationStat       : LET ID (COMMA ID)* ASSIGN expr ;
 assignmentStat        : ID (COMMA ID)* ASSIGN expr ;
 indexedAssignmentStat : expr ASSIGN expr ;
-compoundAssignmentStat : expr (PLUS_ASSIGN | MINUS_ASSIGN | MUL_ASSIGN | DIV_ASSIGN | MOD_ASSIGN) expr ;
+compoundAssignmentStat : expr (PLUS_ASSIGN|MINUS_ASSIGN|MUL_ASSIGN|DIV_ASSIGN|MOD_ASSIGN) expr ;
 
 ifStat : IF '(' expr ')' blockStat (ELSEIF '(' expr ')' blockStat)* (ELSE blockStat)? ;
 
@@ -39,6 +39,7 @@ forStat     : FOR '(' ID IN expr (COMMA expr (COMMA expr)?)? ')' blockStat ;
 
 functionDefinitionStat : FUNC ID '(' (ID (COMMA ID)*)? ')' blockStat ;
 
+argument     : (OUT|REF)? expr ;
 returnStat   : RETURN (expr (COMMA expr)*)? ;
 breakStat    : BREAK ;
 continueStat : CONTINUE ;
@@ -48,7 +49,7 @@ expr
     : '(' expr ')'                            #ParenthesesExpr
     | '[' (expr (COMMA expr)*)? ']'           #ListExpr
     | '{' (dictPair (COMMA dictPair)*)? '}'   #DictionaryExpr
-    | expr '(' (expr (COMMA expr)*)? ')'      #CallExpr
+    | expr '(' (argument (COMMA argument)*)? ')'  #CallExpr
     | expr '.' ID                             #MemberAccessExpr
     | expr '[' expr ']'                       #IndexingExpr
     | (MINUS|NOT) expr                        #UnaryExpr
@@ -120,6 +121,8 @@ BREAK   : 'break' ;
 CONTINUE: 'continue' ;
 RETURN  : 'return' ;
 LET     : 'let' ;
+OUT     : 'out' ;
+REF     : 'ref' ;
 
 LINE_COMMENT : '//' ~[\r\n]* -> skip ;
 BLOCK_COMMENT : '/*' .*? '*/' -> skip ;

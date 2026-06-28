@@ -171,9 +171,27 @@ public record FunctionDefinitionNode(
     }
 }
 
+// how a call-site argument is passed
+public enum ArgumentModifier
+{
+    None, // by value
+    Out,
+    Ref
+}
+
+/// <summary>
+/// A single call argument and its pass-by-reference modifier. Not an <see cref="AstNode"/> itself;
+/// it wraps the argument expression. An <see cref="AstNode"/> implicitly converts to an unmodified
+/// (by-value) argument so existing call construction stays terse.
+/// </summary>
+public record ArgumentNode(ArgumentModifier Modifier, AstNode Value)
+{
+    public static implicit operator ArgumentNode(AstNode value) => new(ArgumentModifier.None, value);
+}
+
 public record CallNode(
     AstNode Callee,
-    ImmutableArray<AstNode> Arguments
+    ImmutableArray<ArgumentNode> Arguments
 ) : AstNode
 {
     public virtual bool Equals(CallNode? other)
