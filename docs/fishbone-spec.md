@@ -213,6 +213,11 @@ Operator precedence, from highest to lowest:
 - `/` is true division: it always produces a `double`, regardless of operand types, so `5 / 2` is `2.5` and `4 / 2` is `2.0`. Integer division by zero therefore yields `double` infinity rather than an error. There is no dedicated floor-division operator; use `int(a / b)` when an integer quotient is required.
 - `%` is the remainder operator. It preserves `int` when both operands are `int` (only `/` promotes to `double`), and follows the C# truncated convention where the sign of the result follows the dividend: `-5 % 3` is `-2` and `5 % -3` is `2`. Integer remainder by zero raises an error; `double` remainder by zero yields `NaN`.
 
+### Equality and comparison semantics
+
+- `==` and `!=` are **total**: they never raise an error, whatever the operand types. Numbers compare by value across `int`/`double` (`1 == 1.0` is `true`); everything else uses value equality, which means operands of different or otherwise incompatible types are simply not equal (`1 == "1"` is `false`, not an error). Equality on .NET objects honors that type's own `Equals` (so records and other value-equal types compare by value); a type that does not define equality falls back to reference identity.
+- `<`, `>`, `<=`, `>=` require operands that can be ordered (the numeric types, or any .NET type that defines the relevant comparison). Unlike equality, comparing values that have no ordering relationship — for example a number and a string — raises an error rather than returning a result, because there is no meaningful answer.
+
 ## Statements
 
 Fishbone programs are sequences of statements. Each statement ends with a semicolon (`;`), except block statements and control flow bodies.
@@ -387,10 +392,10 @@ let count = list.Count;
 
 **Type conversions** — When calling .NET methods, Fishbone automatically converts values via `Convert.ChangeType`. Enum parameters accept both string names (`"Monday"`) and integer values, parsed via `Enum.Parse`.
 
-**Construction** — A host can register a .NET type with `FishboneConfiguration.RegisterType<T>()` (optionally under a custom name). A registered type is bound as a callable whose name acts like a constructor — there is no `new` keyword:
+**Construction** — A host can register a .NET type with `FishboneConfiguration.AddType<T>()` (optionally under a custom name). A registered type is bound as a callable whose name acts like a constructor — there is no `new` keyword:
 
 ```csharp
-// host: config.RegisterType<Point>();
+// host: config.AddType<Point>();
 let p = Point(3, 4);   // invokes the Point(int, int) constructor
 let sum = p.X + p.Y;   // instances are ordinary .NET objects
 ```
