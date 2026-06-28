@@ -384,7 +384,7 @@ public class FishboneInterpreter
     internal object InvokeBoundMethod(FishboneEnvironment env, BoundMethod boundMethod, IReadOnlyList<AstNode> argumentNodes)
     {
         foreach (var method in boundMethod.Methods)
-            if (TryBuildInvocation(env, method.GetParameters(), argumentNodes, out var args, out var writeBacks))
+            if (TryBuildInvocation(env, ReflectionCache.GetParameters(method), argumentNodes, out var args, out var writeBacks))
                 return InvokeMethod(env, boundMethod.Target, method, args, writeBacks);
 
         throw new Exception($"No overload of \"{boundMethod.Methods[0].Name}\" accepts {argumentNodes.Count} argument(s).");
@@ -392,7 +392,7 @@ public class FishboneInterpreter
 
     internal object InvokeReflectedCallable(FishboneEnvironment env, object? target, MethodInfo method, IReadOnlyList<AstNode> argumentNodes)
     {
-        if (!TryBuildInvocation(env, method.GetParameters(), argumentNodes, out var args, out var writeBacks))
+        if (!TryBuildInvocation(env, ReflectionCache.GetParameters(method), argumentNodes, out var args, out var writeBacks))
             throw new Exception($"Expected compatible args for \"{method.Name}\" but got {argumentNodes.Count}.");
 
         return InvokeMethod(env, target, method, args, writeBacks);
@@ -409,7 +409,9 @@ public class FishboneInterpreter
         OnFunctionEnter(method.Name, delegateEnv);
         try
         {
-            var result = method.Invoke(target, args);
+            // span overload is required, it is the only MethodInvoker.Invoke overload that
+            // writes by-ref (out/ref) results back into the supplied argument buffer.
+            var result = ReflectionCache.GetInvoker(method).Invoke(target, args.AsSpan());
             foreach (var writeBack in writeBacks)
                 env.Assign(writeBack.Name, args[writeBack.Index]!);
 
@@ -663,14 +665,8 @@ public class FishboneInterpreter
         throw new Exception($"Object of type \"{target.GetType().Name}\" does not support indexed assignment.");
     }
 
-    private static PropertyInfo[] GetSingleParameterIndexers(Type type)
-    {
-        const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
-        return type
-            .GetProperties(flags)
-            .Where(property => property.GetIndexParameters().Length == 1)
-            .ToArray();
-    }
+    private static PropertyInfo[] GetSingleParameterIndexers(Type type) =>
+        ReflectionCache.GetSingleParameterIndexers(type);
 
     internal object EvaluateMemberAccessNode(FishboneEnvironment env,  MemberAccessNode node)
     {
@@ -678,27 +674,17 @@ public class FishboneInterpreter
         if (target is null)
             throw new Exception($"Cannot access member \"{node.MemberName}\" on null.");
 
-        const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
         var type = target.GetType();
+        var member = ReflectionCache.ResolveMember(type, node.MemberName);
 
-        var property = type
-            .GetProperties(flags)
-            .FirstOrDefault(prop => prop.Name == node.MemberName && prop.GetIndexParameters().Length == 0);
-        if (property is not null)
-            return property.GetValue(target)!;
+        if (member.Property is not null)
+            return member.Property.GetValue(target)!;
 
-        var field = type
-            .GetFields(flags)
-            .FirstOrDefault(fieldInfo => fieldInfo.Name == node.MemberName);
-        if (field is not null)
-            return field.GetValue(target)!;
+        if (member.Field is not null)
+            return member.Field.GetValue(target)!;
 
-        var methods = type
-            .GetMethods(flags)
-            .Where(method => method.Name == node.MemberName && !method.IsSpecialName)
-            .ToArray();
-        if (methods.Length > 0)
-            return new BoundMethod(target, methods);
+        if (member.Methods is not null)
+            return new BoundMethod(target, member.Methods);
 
         throw new Exception($"Type \"{type.Name}\" does not have a public member named \"{node.MemberName}\".");
     }
