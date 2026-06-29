@@ -19,6 +19,7 @@ public static class VariableDisplayFormatter
 {
     private const int InlineMaxDepth = 2;
     private const int InlineMaxItems = 5;
+    private const int ScalarMaxLength = 48;
 
     public static bool IsCollection(object? value) => value is IList or IDictionary;
 
@@ -92,9 +93,9 @@ public static class VariableDisplayFormatter
             return FormatDictionary(dictionary, depth);
 
         if (value is IFormattable formattable)
-            return formattable.ToString(null, CultureInfo.InvariantCulture) ?? string.Empty;
+            return Truncate(formattable.ToString(null, CultureInfo.InvariantCulture) ?? string.Empty);
 
-        return value.ToString() ?? string.Empty;
+        return Truncate(value.ToString() ?? string.Empty);
     }
 
     private static string FormatList(IList list, int depth)
@@ -147,6 +148,18 @@ public static class VariableDisplayFormatter
         return key is string text
             ? QuoteString(text)
             : FormatValue(key, InlineMaxDepth, quoteStrings: true);
+    }
+
+    private static string Truncate(string value)
+    {
+        var firstLine = value.AsSpan();
+        int newline = firstLine.IndexOfAny('\r', '\n');
+        if (newline >= 0)
+            firstLine = firstLine[..newline];
+
+        return firstLine.Length <= ScalarMaxLength
+            ? firstLine.ToString()
+            : string.Concat(firstLine[..ScalarMaxLength], "…");
     }
 
     private static string QuoteString(string value)
