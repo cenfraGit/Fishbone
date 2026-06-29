@@ -19,14 +19,14 @@ int DoSomething()
     return 10;
 }
 
-config.AddBuiltIn("DoSomething", DoSomething);
+config.AddFunction("DoSomething", DoSomething);
 
 void TrySomething(out int a)
 {
     a = 10;
 }
 
-config.AddBuiltIn("TrySomething", TrySomething);
+config.AddFunction("TrySomething", TrySomething);
 
 string scriptPath = Path.Combine(AppContext.BaseDirectory, "Scripts", "test.fb");
 if (!File.Exists(scriptPath))
