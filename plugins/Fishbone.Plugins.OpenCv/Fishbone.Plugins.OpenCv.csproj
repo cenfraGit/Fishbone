@@ -15,6 +15,11 @@
       <Private>false</Private>
       <ExcludeAssets>runtime</ExcludeAssets>
     </ProjectReference>
+    <!-- boundMethod lives here; referenced for the contract, shipped by the host -->
+    <ProjectReference Include="..\..\src\Fishbone.Interpreter\Fishbone.Interpreter.csproj">
+      <Private>false</Private>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </ProjectReference>
   </ItemGroup>
 
   <ItemGroup>

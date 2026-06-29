@@ -1,19 +1,22 @@
-// note: requires the Fishbone.Pugins.OpenCv plugin already installed in ~/.fishbone/plugins
+// note: requires the Fishbone.Plugins.OpenCv plugin already installed in ~/.fishbone/plugins
 // replace "input.png" with an existing image
-// "edges.png" will be saved in the same location that this scrit is saved in
+// "edges.png" will be saved in the same location that this script is saved in
 
 println("OpenCV edge detection\n");
 
-// read the source image as grayscale
-let image = cv.imread("input.png", "Grayscale");
+// read the source image as grayscale (cv_im_read returns a Mat directly)
+let image = cv_im_read("input.png", "Grayscale");
 println("loaded " + image.Width + "x" + image.Height);
 
-// suppress noise before detecting edges
-let blurred = cv.gaussianBlur(image, 5);
+// OpenCV writes into a destination Mat you allocate, so create one and read it back afterwards.
+// suppress noise before detecting edges (the kernel size is a [w, h] list -> Size)
+let blurred = Mat();
+cv_gaussian_blur(image, blurred, [5, 5], 0);
 
-// detect edges
-let edges = cv.canny(blurred, 50, 150);
+// detect edges (apertureSize and L2gradient are optional and take their defaults)
+let edges = Mat();
+cv_canny(blurred, edges, 50, 150);
 
 // save the result
-cv.imwrite("edges.png", edges);
+cv_im_write("edges.png", edges);
 println("wrote edges.png");
