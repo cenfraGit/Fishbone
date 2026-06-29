@@ -66,6 +66,7 @@ public sealed class FishboneDebugAdapterSession :
         _lineCount = lineCount;
         _execute = execute;
         _coordinator.Paused += OnPaused;
+        _coordinator.Resumed += OnResumed;
     }
 
     public Task<int> Completion => _completion.Task;
@@ -308,10 +309,14 @@ public sealed class FishboneDebugAdapterSession :
         if (_coordinator.State != DebugSessionState.Paused)
             return;
 
+        // the "continued" notification is emitted by OnResumed, which the coordinator raises
+        // before it releases the interpreter, so it can never be overtaken by the next pause's
+        // 'stopped' notification (the bug behind intermittent stepping hangs / dropped sessions).
         action();
-        if (!_coordinator.LastResumeWasSuccessful)
-            return;
+    }
 
+    private void OnResumed(object? sender, EventArgs e)
+    {
         _handles.Clear();
         Enqueue(new ContinuedEvent { ThreadId = ThreadId, AllThreadsContinued = true });
     }
@@ -350,6 +355,7 @@ public sealed class FishboneDebugAdapterSession :
     public void Dispose()
     {
         _coordinator.Paused -= OnPaused;
+        _coordinator.Resumed -= OnResumed;
         _events.Writer.TryComplete();
         _executionCancellation.Dispose();
     }

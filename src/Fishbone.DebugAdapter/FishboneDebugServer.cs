@@ -135,7 +135,8 @@ public sealed class FishboneDebugServerSession : IAsyncDisposable
             _clientAccepted = true;
             _clientConnected.TrySetResult();
             _listener.Stop();
-            using NetworkStream stream = client.GetStream();
+            using NetworkStream networkStream = client.GetStream();
+            var stream = new DisconnectSignalingStream(networkStream);
             using DebugAdapterServer server = DebugAdapterServer.Create(options =>
             {
                 options.WithInput(stream).WithOutput(stream).AddHandler(activeSession);
@@ -144,7 +145,7 @@ public sealed class FishboneDebugServerSession : IAsyncDisposable
             activeSession.AttachServer(server, CancellationToken.None);
 
             Task initialize = server.Initialize(cancellationToken);
-            Task disconnected = MonitorDisconnectAsync(client, cancellationToken);
+            Task disconnected = stream.Disconnected;
             Task first = await Task.WhenAny(initialize, disconnected).ConfigureAwait(false);
             if (first == disconnected)
             {
@@ -215,16 +216,6 @@ public sealed class FishboneDebugServerSession : IAsyncDisposable
         foreach (var value in source.Values)
             clone.Values[value.Key] = value.Value;
         return clone;
-    }
-
-    private static async Task MonitorDisconnectAsync(TcpClient client, CancellationToken cancellationToken)
-    {
-        while (!cancellationToken.IsCancellationRequested)
-        {
-            if (client.Client.Poll(1000, SelectMode.SelectRead) && client.Client.Available == 0)
-                return;
-            await Task.Delay(100, cancellationToken).ConfigureAwait(false);
-        }
     }
 
     public async ValueTask DisposeAsync()

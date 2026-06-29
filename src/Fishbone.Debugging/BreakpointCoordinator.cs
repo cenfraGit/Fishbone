@@ -56,6 +56,13 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
     public event EventHandler<DebugStateChangedEventArgs>? StateChanged;
     public event EventHandler<DebugPausedEventArgs>? Paused;
 
+    /// <summary>
+    /// Raised when a paused session is about to resume, after the resume is committed but
+    /// <em>before</em> the interpreter thread is released. Listeners that emit a "resumed"
+    /// notification must do so here so it cannot be overtaken by the next pause's notification.
+    /// </summary>
+    public event EventHandler? Resumed;
+
     public void AddBreakpoint(int line)
     {
         if (line <= 0) throw new ArgumentOutOfRangeException(nameof(line));
@@ -237,8 +244,14 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
             _targetDepth = _frames.Count - 1;
             _lastResumeWasSuccessful = true;
             stateChange = SetStateLocked(DebugSessionState.Running);
-            _threadGate.Set();
         }
+
+        // Let listeners flush their "resumed" notification before the interpreter is released:
+        // once the gate opens, the interpreter can reach the next pause and raise Paused almost
+        // immediately, and that notification must not overtake this one in the client. The
+        // interpreter stays parked on the gate until Set, so running while not yet released is safe.
+        Resumed?.Invoke(this, EventArgs.Empty);
+        _threadGate.Set();
         PublishStateChange(stateChange);
     }
 

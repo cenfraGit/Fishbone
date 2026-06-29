@@ -78,7 +78,7 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
 
             _tcpClient = new TcpClient();
             await _tcpClient.ConnectAsync(host, port, linked.Token).ConfigureAwait(false);
-            NetworkStream stream = _tcpClient.GetStream();
+            var stream = new DisconnectSignalingStream(_tcpClient.GetStream());
             _client = DebugAdapterClient.Create(options =>
             {
                 options.WithInput(stream).WithOutput(stream);
@@ -97,7 +97,7 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
                 options.OnExited(value => _exitCode = checked((int)value.ExitCode));
             });
             _eventPump = PumpEventsAsync(_lifetime.Token);
-            _transportMonitor = MonitorTransportAsync(_tcpClient, _lifetime.Token);
+            _transportMonitor = WatchTransportAsync(stream.Disconnected, _lifetime.Token);
             await _client.Initialize(linked.Token).ConfigureAwait(false);
             var attach = new AttachRequestArguments();
             attach.ExtensionData["stopOnEntry"] = stopOnEntry;
@@ -399,26 +399,18 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
         Enqueue(new TransportFailedProtocolEvent(new IOException("fishbone-dap exited unexpectedly.")));
     }
 
-    private async Task MonitorTransportAsync(TcpClient client, CancellationToken cancellationToken)
+    private async Task WatchTransportAsync(Task disconnected, CancellationToken cancellationToken)
     {
+        // The wrapped transport stream completes 'disconnected' exactly when the protocol reader
+        // sees the peer go away, so there is no polling and no false positive under load. A
+        // disconnect that arrives after the session already finished is ignored downstream
+        // (PumpEventsAsync drops transport faults once the state is Completed/Stopping).
         try
         {
-            while (!cancellationToken.IsCancellationRequested)
-            {
-                if (client.Client.Poll(1000, SelectMode.SelectRead) && client.Client.Available == 0)
-                {
-                    Enqueue(new TransportFailedProtocolEvent(new IOException("The DAP connection was closed.")));
-                    return;
-                }
-                await Task.Delay(100, cancellationToken).ConfigureAwait(false);
-            }
+            await disconnected.WaitAsync(cancellationToken).ConfigureAwait(false);
+            Enqueue(new TransportFailedProtocolEvent(new IOException("The DAP connection was closed.")));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
-        catch (ObjectDisposedException) when (_disposed || State is FishboneDebugSessionState.Completed or FishboneDebugSessionState.Stopping) { }
-        catch (Exception exception)
-        {
-            Enqueue(new TransportFailedProtocolEvent(exception));
-        }
     }
 
     private async Task WaitForExitOrKillAsync()
