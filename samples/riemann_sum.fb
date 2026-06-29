@@ -1,6 +1,6 @@
 func f(x)
 {
-    return x * x;  
+    return x * x;
 }
 
 let a = 0; // lower limit
@@ -15,8 +15,8 @@ let i = 0;
 while (i < n)
 {
     let x = a + i * dx;
-    riemann_sum = riemann_sum + f(x) * dx; 
-    i = i + 1;   
+    riemann_sum = riemann_sum + f(x) * dx;
+    i = i + 1;
 }
 
 println("Approx integral is " + riemann_sum);
