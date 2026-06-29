@@ -13,7 +13,8 @@ public static class SampleCatalog
     [
         new("area_circle.fb", "Area of a Circle"),
         new("bubble_sort.fb", "Bubble Sort"),
-        new("riemann_sum.fb", "Riemann Sum")
+        new("riemann_sum.fb", "Riemann Sum"),
+        new("edge_detect.fb", "OpenCV Edge Detection")
     ];
 
     public static string Load(string fileName)

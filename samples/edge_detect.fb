@@ -1,0 +1,19 @@
+// note: requires the Fishbone.Pugins.OpenCv plugin already installed in ~/.fishbone/plugins
+// replace "input.png" with an existing image
+// "edges.png" will be saved in the same location that this scrit is saved in
+
+println("OpenCV edge detection\n");
+
+// read the source image as grayscale
+let image = cv.imread("input.png", "Grayscale");
+println("loaded " + image.Width + "x" + image.Height);
+
+// suppress noise before detecting edges
+let blurred = cv.gaussianBlur(image, 5);
+
+// detect edges
+let edges = cv.canny(blurred, 50, 150);
+
+// save the result
+cv.imwrite("edges.png", edges);
+println("wrote edges.png");

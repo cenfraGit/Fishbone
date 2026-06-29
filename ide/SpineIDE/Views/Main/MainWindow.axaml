@@ -110,6 +110,9 @@
 					<MenuItem Header="Riemann Sum"
                               Command="{Binding OpenSampleCommand}"
                               CommandParameter="riemann_sum.fb" />
+					<MenuItem Header="OpenCV Edge Detection"
+                              Command="{Binding OpenSampleCommand}"
+                              CommandParameter="edge_detect.fb" />
                 </MenuItem>
                 <Separator />
                 <MenuItem Header="_About" />
