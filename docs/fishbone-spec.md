@@ -386,7 +386,15 @@ let list = [1, 2, 3];
 let count = list.Count;
 ```
 
-**Method calls** — Methods are resolved at runtime. When a method has overloads, Fishbone first filters to those whose parameter count matches the argument count, then selects the *best* match: each argument is scored by how closely it matches the parameter type — an exact runtime-type match ranks above a reference/interface assignment (such as `int` to `object`), which ranks above a value conversion (such as `int` to `double`, or an enum from a string). The overload with the highest total score wins. If two overloads tie for the best score, the call is rejected as ambiguous rather than silently choosing one.
+**Method calls** — Methods are resolved at runtime. When a method has overloads, Fishbone filters to those whose parameters can accept the supplied arguments, then selects the *best* match: each argument is scored by how closely it matches the parameter type — an exact runtime-type match ranks above a reference/interface assignment (such as `int` to `object`), which ranks above a value conversion (such as `int` to `double`, or an enum from a string). The overload with the highest total score wins. If two overloads tie for the best score, the one that filled fewer optional parameters from their defaults wins; if they still tie, the call is rejected as ambiguous rather than silently choosing one.
+
+**Optional parameters** — Fishbone has no optional parameters of its own, but when calling a .NET method it may omit trailing arguments whose parameters declare default values; each omitted parameter is supplied from its default. Arguments are matched left to right, so only a contiguous tail may be omitted. Supplying more arguments than the method has parameters never binds, and a parameter without a default value must always be given. (`out`/`ref` parameters are never optional.)
+
+```csharp
+// void Canny(InputArray src, OutputArray dst, double t1, double t2, int aperture = 3, bool l2 = false)
+canny(src, dst, 100, 200);          // aperture and l2 take their defaults
+canny(src, dst, 100, 200, 5);       // aperture = 5, l2 takes its default
+```
 
 **Indexing** — The `[ ]` operator works with .NET indexers, `IList`, and `IDictionary`.
 

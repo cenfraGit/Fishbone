@@ -456,27 +456,35 @@ public class FishboneInterpreter
         object?[]? bestArgs = null;
         List<(string Name, int Index, bool IsOut)>? bestWriteBacks = null;
         int bestScore = -1;
+        int bestDefaultsUsed = int.MaxValue;
         bool ambiguous = false;
         string? deferredDiagnostic = null;
 
         foreach (var method in methods)
         {
             var parameters = ReflectionCache.GetParameters(method);
-            if (!TryBindOverload(parameters, argumentNodes, rawArgs, out var args, out var writeBacks, out var score, out var diagnostic))
+            if (!TryBindOverload(parameters, argumentNodes, rawArgs, out var args, out var writeBacks, out var score, out var defaultsUsed, out var diagnostic))
             {
                 deferredDiagnostic ??= diagnostic;
                 continue;
             }
 
-            if (best is null || score > bestScore)
+            // higher score wins; on a tie the overload that relied on fewer defaults wins, so an
+            // exact-arity overload is preferred over one that only matched by filling optionals
+            bool isBetter = best is null
+                || score > bestScore
+                || (score == bestScore && defaultsUsed < bestDefaultsUsed);
+
+            if (isBetter)
             {
                 best = method;
                 bestArgs = args;
                 bestWriteBacks = writeBacks;
                 bestScore = score;
+                bestDefaultsUsed = defaultsUsed;
                 ambiguous = false;
             }
-            else if (score == bestScore)
+            else if (score == bestScore && defaultsUsed == bestDefaultsUsed)
             {
                 ambiguous = true;
             }
@@ -567,19 +575,39 @@ public class FishboneInterpreter
         out object?[] args,
         out List<(string Name, int Index, bool IsOut)> writeBacks,
         out int score,
+        out int defaultsUsed,
         out string? diagnostic)
     {
         args = new object?[parameters.Length];
         writeBacks = [];
         score = 0;
+        defaultsUsed = 0;
         diagnostic = null;
 
-        if (parameters.Length != argumentNodes.Count)
+        // too many arguments can never bind; too few can still bind if the unmatched trailing
+        // parameters are optional (filled from their defaults below)
+        if (argumentNodes.Count > parameters.Length)
             return false;
 
         for (int i = 0; i < parameters.Length; i++)
         {
             var parameter = parameters[i];
+
+            // no argument was supplied for this parameter: accept the overload only if the parameter
+            // is optional, supplying its default value. out/ref parameters are never optional
+            if (i >= argumentNodes.Count)
+            {
+                if (!parameter.HasDefaultValue)
+                {
+                    diagnostic ??= $"No argument supplied for parameter \"{parameter.Name}\", which has no default value.";
+                    return false;
+                }
+
+                args[i] = parameter.DefaultValue;
+                defaultsUsed++;
+                continue;
+            }
+
             var parameterType = parameter.ParameterType;
             var isByRef = parameterType.IsByRef;
             var targetType = isByRef
