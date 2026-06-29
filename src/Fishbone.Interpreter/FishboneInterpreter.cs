@@ -9,12 +9,31 @@ public class FishboneInterpreter
 {
     private readonly CancellationToken _cancellationToken;
     private readonly IFishboneDebugger _debugger;
+    private readonly IReadOnlyDictionary<Type, FishboneTypeConverter> _typeConverters;
     private static readonly object DebuggerReportedKey = new();
 
-    public FishboneInterpreter(CancellationToken cancellationToken = default, IFishboneDebugger? debugger = null)
+    public FishboneInterpreter(
+        CancellationToken cancellationToken = default,
+        IFishboneDebugger? debugger = null,
+        IReadOnlyDictionary<Type, FishboneTypeConverter>? typeConverters = null)
     {
         _cancellationToken = cancellationToken;
         _debugger = debugger ?? NullFishboneDebugger.Instance;
+        _typeConverters = typeConverters ?? new Dictionary<Type, FishboneTypeConverter>();
+    }
+
+    /// <summary>
+    /// Normalizes a value crossing back into the script: if its runtime type has a registered
+    /// converter with a from-direction, applies it; otherwise returns the value unchanged so it
+    /// remains an ordinary .NET object the script can interop with.
+    /// </summary>
+    private object? ApplyFromNetConverter(object? value)
+    {
+        if (value is not null
+            && _typeConverters.TryGetValue(value.GetType(), out var converter)
+            && converter.FromNet is not null)
+            return converter.FromNet(value);
+        return value;
     }
 
     public object Evaluate(FishboneEnvironment env, AstNode node)
@@ -497,7 +516,7 @@ public class FishboneInterpreter
             var result = ReflectionCache.GetInvoker(method).Invoke(target, args.AsSpan());
             WriteBackByRefArguments(env, args, writeBacks);
 
-            return result!;
+            return ApplyFromNetConverter(result)!;
         }
         catch (TargetInvocationException ex)
         {
@@ -541,7 +560,7 @@ public class FishboneInterpreter
     /// expressions (that happens once in the caller) so it can be run against every candidate
     /// overload without repeating side effects.
     /// </summary>
-    private static bool TryBindOverload(
+    private bool TryBindOverload(
         ParameterInfo[] parameters,
         IReadOnlyList<ArgumentNode> argumentNodes,
         object?[] rawArgs,
@@ -630,14 +649,16 @@ public class FishboneInterpreter
         return true;
     }
 
-    private static void WriteBackByRefArguments(
+    private void WriteBackByRefArguments(
         FishboneEnvironment env,
         object?[] args,
         List<(string Name, int Index, bool IsOut)> writeBacks)
     {
         foreach (var writeBack in writeBacks)
         {
-            var value = args[writeBack.Index]!;
+            // an out/ref value crossing back into the script is normalized the same way a return
+            // value is, so a registered type (e.g. a wrapped tuple) becomes a plain script value
+            var value = ApplyFromNetConverter(args[writeBack.Index])!;
 
             // 'out' introduces the variable when it does not already exist; 'ref' (and an 'out'
             // that targets an existing variable) writes through to the existing binding
@@ -666,10 +687,10 @@ public class FishboneInterpreter
         Exact = 3        // runtime type already matches the parameter type
     }
 
-    private static bool TryConvertArgument(object? rawArg, Type targetType, out object? convertedArg) =>
+    private bool TryConvertArgument(object? rawArg, Type targetType, out object? convertedArg) =>
         ConvertArgument(rawArg, targetType, out convertedArg) != ArgumentMatch.None;
 
-    private static ArgumentMatch ConvertArgument(object? rawArg, Type targetType, out object? convertedArg)
+    private ArgumentMatch ConvertArgument(object? rawArg, Type targetType, out object? convertedArg)
     {
         var nullableType = Nullable.GetUnderlyingType(targetType);
         var conversionType = nullableType ?? targetType;
@@ -692,6 +713,22 @@ public class FishboneInterpreter
         {
             convertedArg = rawArg;
             return ArgumentMatch.Assignable;
+        }
+
+        // a host-registered converter handles types the generic path below cannot (anything not
+        // IConvertible or an enum); it takes precedence so registered types convert deterministically
+        if (_typeConverters.TryGetValue(conversionType, out var converter))
+        {
+            try
+            {
+                convertedArg = converter.ToNet(rawArg);
+                return ArgumentMatch.Convertible;
+            }
+            catch
+            {
+                convertedArg = null;
+                return ArgumentMatch.None;
+            }
         }
 
         try
@@ -740,7 +777,7 @@ public class FishboneInterpreter
         return GetIndexedValue(target, index);
     }
 
-    private static object GetIndexedValue(object? target, object? index)
+    private object GetIndexedValue(object? target, object? index)
     {
         if (target is null)
             throw new Exception("Cannot index null.");
@@ -785,7 +822,7 @@ public class FishboneInterpreter
         throw new Exception($"Object of type \"{target.GetType().Name}\" is not indexable.");
     }
 
-    private static void SetIndexedValue(object? target, object? index, object? value)
+    private void SetIndexedValue(object? target, object? index, object? value)
     {
         if (target is null)
             throw new Exception("Cannot assign through an index on null.");

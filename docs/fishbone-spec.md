@@ -392,6 +392,16 @@ let count = list.Count;
 
 **Type conversions** — When calling .NET methods, Fishbone automatically converts values via `Convert.ChangeType`. Enum parameters accept both string names (`"Monday"`) and integer values, parsed via `Enum.Parse`.
 
+**Custom type converters** — The automatic conversion above only covers types that are `IConvertible` or enums. For a .NET type that is neither (a wrapper such as a tuple or matrix type), a host can register a converter with `FishboneConfiguration.AddTypeConverter(type, toNet, fromNet?)`. The `toNet` direction is consulted wherever a value of that type is expected — by-value, `ref`, and `out` arguments alike — and ranks as an explicit conversion for overload resolution. The optional `fromNet` direction normalizes a value of that type back into a script value when it leaves a call as a return value or is written back through `out`/`ref`; omitting it leaves such values as opaque .NET objects. This lets a wrapped type be passed and received with ordinary script values:
+
+```csharp
+// host: config.AddTypeConverter(typeof(HTuple),
+//           toNet:   v => HalconTypeConverter.ToHTuple(v),
+//           fromNet: v => HalconTypeConverter.FromHTuple((HTuple)v));
+threshold(image, out region, 10, 255);      // 10 and 255 convert to HTuple on the way in
+area_center(region, out area, out row, out col);  // out HTuple values come back as numbers
+```
+
 **Construction** — A host can register a .NET type with `FishboneConfiguration.AddType<T>()` (optionally under a custom name). A registered type is bound as a callable whose name acts like a constructor — there is no `new` keyword:
 
 ```csharp

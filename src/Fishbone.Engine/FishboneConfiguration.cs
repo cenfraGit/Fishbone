@@ -21,6 +21,13 @@ public class FishboneConfiguration
     /// </summary>
     public Dictionary<string, object> Values { get; } = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// Host-registered conversions between script values and .NET types the generic interop path
+    /// cannot convert on its own (anything not <see cref="IConvertible"/> or an enum), keyed by the
+    /// .NET type. See <see cref="AddTypeConverter(Type, Func{object, object}, Func{object, object}?)"/>.
+    /// </summary>
+    public Dictionary<Type, FishboneTypeConverter> TypeConverters { get; } = [];
+
     public FishboneConfiguration(bool injectDefaults = true)
     {
         if (injectDefaults)
@@ -48,6 +55,23 @@ public class FishboneConfiguration
     public FishboneConfiguration AddFunction(string name, Delegate csharpMethod)
     {
         BuiltIns[name] = csharpMethod;
+        return this;
+    }
+
+    /// <summary>
+    /// Registers a conversion for a .NET type the generic interop path cannot handle (a type that is
+    /// neither <see cref="IConvertible"/> nor an enum). <paramref name="toNet"/> turns a script value
+    /// into <paramref name="netType"/> wherever one is expected (by-value, <c>ref</c>, or <c>out</c>
+    /// arguments); the optional <paramref name="fromNet"/> normalizes a value of that type back into a
+    /// script value when it returns from a call or is written back through <c>out</c>/<c>ref</c>. Omit
+    /// <paramref name="fromNet"/> to leave instances of the type as opaque .NET objects.
+    /// </summary>
+    public FishboneConfiguration AddTypeConverter(
+        Type netType,
+        Func<object, object> toNet,
+        Func<object, object>? fromNet = null)
+    {
+        TypeConverters[netType] = new FishboneTypeConverter(toNet, fromNet);
         return this;
     }
 
