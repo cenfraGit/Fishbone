@@ -11,7 +11,8 @@
       "name": "comment.line.double-slash.fb",
       "match": "//.*$"
     },
-    { "name": "keyword.control.fb", "match": "\\b(let|if|else|while|foreach|in|func|return|break|continue|import|and|or|xor|not)\\b" },
+    { "name": "keyword.control.fb", "match": "\\b(let|if|else|while|foreach|for|in|func|return|break|continue|out|ref)\\b" },
+    { "name": "keyword.operator.fb", "match": "\\b(and|or|xor|not)\\b" },
     { "name": "constant.language.fb", "match": "\\b(true|false|null)\\b" },
     { "name": "string.quoted.double.fb", "begin": "\"", "end": "\"" },
     { "name": "constant.numeric.fb", "match": "\\b\\d+(_+\\d+)*(\\.\\d+(_+\\d+)*)?\\b" },
