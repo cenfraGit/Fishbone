@@ -652,7 +652,10 @@ public class FishboneInterpreter
 
                 var refMatch = ConvertArgument(rawArgs[i], targetType, out var refConverted);
                 if (refMatch == ArgumentMatch.None)
+                {
+                    diagnostic ??= DescribeConversionFailure(i, rawArgs[i], parameter, targetType);
                     return false;
+                }
 
                 score += (int)refMatch;
                 args[i] = refConverted;
@@ -668,7 +671,10 @@ public class FishboneInterpreter
 
             var match = ConvertArgument(rawArgs[i], targetType, out var convertedArg);
             if (match == ArgumentMatch.None)
+            {
+                diagnostic ??= DescribeConversionFailure(i, rawArgs[i], parameter, targetType);
                 return false;
+            }
 
             score += (int)match;
             args[i] = convertedArg;
@@ -676,6 +682,11 @@ public class FishboneInterpreter
 
         return true;
     }
+
+    // builds the diagnostic shown when an argument cannot be converted to its parameter type
+    private static string DescribeConversionFailure(int index, object? rawArg, ParameterInfo parameter, Type targetType) =>
+        $"Argument {index + 1} of type \"{rawArg?.GetType().Name ?? "null"}\" is not compatible with parameter " +
+        $"\"{parameter.Name}\" of type \"{targetType.Name}\".";
 
     private void WriteBackByRefArguments(
         FishboneEnvironment env,
