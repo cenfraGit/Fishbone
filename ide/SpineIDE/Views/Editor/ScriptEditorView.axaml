@@ -8,10 +8,11 @@
              x:Class="SpineIDE.Views.Editor.ScriptEditorView"
              x:DataType="local:ScriptEditorVM">
   <AvaloniaEdit:TextEditor Name="Editor"
-                           Background="#1E1E1E"
-                           Foreground="#D4D4D4"
+                           Background="{DynamicResource EditorBackgroundBrush}"
+                           Foreground="{DynamicResource EditorForegroundBrush}"
                            ShowLineNumbers="True"
                            FontFamily="{StaticResource CascadiaCode}"
+						   LineNumbersMargin="10,0,0,0"
                            IsReadOnly="{Binding IsReadOnly}"
                            Document="{Binding ScriptDocument, Mode=TwoWay}"/>
 </UserControl>

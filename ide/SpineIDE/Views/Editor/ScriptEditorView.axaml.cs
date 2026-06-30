@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Styling;
 using AvaloniaEdit;
 using AvaloniaEdit.Document;
 using AvaloniaEdit.TextMate;
@@ -27,16 +28,35 @@ public partial class ScriptEditorView : UserControl
         DataContextChanged += OnDataContextChanged;
     }
 
+    private void OnThemeVariantChanged(object? sender, EventArgs e)
+    {
+        ApplyEditorTheme();
+        // custom-drawn adornments cache themed brushes per paint, so force them to repaint
+        _breakpointMargin?.InvalidateVisual();
+        Editor.TextArea.TextView.InvalidateVisual();
+    }
+
+    // keeps the editor's syntax theme in sync with the app's light/dark variant
+    private void ApplyEditorTheme()
+    {
+        if (_textMateInstallation is null)
+            return;
+        bool light = ActualThemeVariant == ThemeVariant.Light;
+        _textMateInstallation.SetTheme(RegistryOptions.GetTheme(light));
+    }
+
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
         RegisterMessengerRecipients();
+        ActualThemeVariantChanged += OnThemeVariantChanged;
 
         var editor = this.FindControl<TextEditor>("Editor");
         if (editor != null && _textMateInstallation == null)
         {
             _textMateInstallation = editor.InstallTextMate(RegistryOptions);
             _textMateInstallation.SetGrammar("source.fb");
+            ApplyEditorTheme();
 
             editor.Options.ConvertTabsToSpaces = true;
             editor.Options.IndentationSize = 4;
@@ -49,6 +69,9 @@ public partial class ScriptEditorView : UserControl
             AttachDebugAdornments(editor);
             _activeEditor = this;
         }
+
+        // re-apply in case the theme variant changed while this view was detached
+        ApplyEditorTheme();
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e) => AttachDebugAdornments(Editor);
@@ -70,6 +93,7 @@ public partial class ScriptEditorView : UserControl
     {
         base.OnDetachedFromVisualTree(e);
 
+        ActualThemeVariantChanged -= OnThemeVariantChanged;
         WeakReferenceMessenger.Default.UnregisterAll(this);
         _isMessengerRegistered = false;
 

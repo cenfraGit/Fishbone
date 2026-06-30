@@ -10,6 +10,41 @@
     </Application.DataTemplates>
 
     <Application.Resources>
+      <ResourceDictionary>
+        <ResourceDictionary.ThemeDictionaries>
+            <!-- Semantic brushes used across the IDE so panels and the editor follow the active
+                 theme variant instead of hardcoding dark colors. Editor* values match the TextMate
+                 editor themes (OneDark / OneLight) so the syntax theme and surface stay consistent. -->
+            <ResourceDictionary x:Key="Dark">
+                <!-- OneDark-derived palette: slate surface #282C34, darker chrome #21252B -->
+                <SolidColorBrush x:Key="AppBackgroundBrush" Color="#282C34" />
+                <SolidColorBrush x:Key="EditorBackgroundBrush" Color="#282C34" />
+                <SolidColorBrush x:Key="EditorForegroundBrush" Color="#ABB2BF" />
+                <SolidColorBrush x:Key="EditorGutterBrush" Color="#21252B" />
+                <SolidColorBrush x:Key="PausedLineBrush" Color="#403A2A" />
+                <SolidColorBrush x:Key="CodeSurfaceBrush" Color="#282C34" />
+                <SolidColorBrush x:Key="CodeSurfaceForegroundBrush" Color="#ABB2BF" />
+                <SolidColorBrush x:Key="PanelHeaderBrush" Color="#21252B" />
+                <SolidColorBrush x:Key="PanelBorderBrush" Color="#181A1F" />
+                <SolidColorBrush x:Key="VariableTypeBrush" Color="#9CDCFE" />
+                <SolidColorBrush x:Key="VariableValueBrush" Color="#CE9178" />
+                <SolidColorBrush x:Key="ToolbarIconBrush" Color="#ABB2BF" />
+            </ResourceDictionary>
+            <ResourceDictionary x:Key="Light">
+                <SolidColorBrush x:Key="AppBackgroundBrush" Color="#FAFAFA" />
+                <SolidColorBrush x:Key="EditorBackgroundBrush" Color="#FAFAFA" />
+                <SolidColorBrush x:Key="EditorForegroundBrush" Color="#383A42" />
+                <SolidColorBrush x:Key="EditorGutterBrush" Color="#ECECEC" />
+                <SolidColorBrush x:Key="PausedLineBrush" Color="#FFF3C4" />
+                <SolidColorBrush x:Key="CodeSurfaceBrush" Color="#F6F6F6" />
+                <SolidColorBrush x:Key="CodeSurfaceForegroundBrush" Color="#383A42" />
+                <SolidColorBrush x:Key="PanelHeaderBrush" Color="#ECECEC" />
+                <SolidColorBrush x:Key="PanelBorderBrush" Color="#D0D0D0" />
+                <SolidColorBrush x:Key="VariableTypeBrush" Color="#0070C1" />
+                <SolidColorBrush x:Key="VariableValueBrush" Color="#A31515" />
+                <SolidColorBrush x:Key="ToolbarIconBrush" Color="#383A42" />
+            </ResourceDictionary>
+        </ResourceDictionary.ThemeDictionaries>
 
         <FontFamily x:Key="CascadiaCode">avares://SpineIDE/Assets/Fonts#Cascadia Code</FontFamily>
         <FontFamily x:Key="TitilliumWeb">avares://SpineIDE/Assets/Fonts#Titillium Web</FontFamily>
@@ -41,7 +76,8 @@
 		<StreamGeometry x:Key="pause_regular">M17.75,7 C19.5449254,7 21,8.45507456 21,10.25 L21,37.75 C21,39.5449254 19.5449254,41 17.75,41 L12.25,41 C10.4550746,41 9,39.5449254 9,37.75 L9,10.25 C9,8.45507456 10.4550746,7 12.25,7 L17.75,7 Z M35.75,7 C37.5449254,7 39,8.45507456 39,10.25 L39,37.75 C39,39.5449254 37.5449254,41 35.75,41 L30.25,41 C28.4550746,41 27,39.5449254 27,37.75 L27,10.25 C27,8.45507456 28.4550746,7 30.25,7 L35.75,7 Z M17.75,9.5 L12.25,9.5 C11.8357864,9.5 11.5,9.83578644 11.5,10.25 L11.5,37.75 C11.5,38.1642136 11.8357864,38.5 12.25,38.5 L17.75,38.5 C18.1642136,38.5 18.5,38.1642136 18.5,37.75 L18.5,10.25 C18.5,9.83578644 18.1642136,9.5 17.75,9.5 Z M35.75,9.5 L30.25,9.5 C29.8357864,9.5 29.5,9.83578644 29.5,10.25 L29.5,37.75 C29.5,38.1642136 29.8357864,38.5 30.25,38.5 L35.75,38.5 C36.1642136,38.5 36.5,38.1642136 36.5,37.75 L36.5,10.25 C36.5,9.83578644 36.1642136,9.5 35.75,9.5 Z</StreamGeometry>
 
 		<StreamGeometry x:Key="stop_regular">M19.25 4.5C19.3881 4.5 19.5 4.61193 19.5 4.75V19.25C19.5 19.3881 19.3881 19.5 19.25 19.5H4.75C4.61193 19.5 4.5 19.3881 4.5 19.25V4.75C4.5 4.61193 4.61193 4.5 4.75 4.5H19.25ZM4.75 3C3.7835 3 3 3.7835 3 4.75V19.25C3 20.2165 3.7835 21 4.75 21H19.25C20.2165 21 21 20.2165 21 19.25V4.75C21 3.7835 20.2165 3 19.25 3H4.75Z</StreamGeometry>
-		
+
+      </ResourceDictionary>
     </Application.Resources>
 
     <Application.Styles>
@@ -55,6 +91,12 @@
         <Style Selector="Window">
             <Setter Property="FontFamily" Value="{StaticResource TitilliumWeb}" />
             <Setter Property="FontSize" Value="13" />
+            <Setter Property="Background" Value="{DynamicResource AppBackgroundBrush}" />
+        </Style>
+
+        <!-- the menu bar shares the app background so the chrome reads as one surface -->
+        <Style Selector="Menu">
+            <Setter Property="Background" Value="{DynamicResource AppBackgroundBrush}" />
         </Style>
 
         <Style Selector="TextBlock">

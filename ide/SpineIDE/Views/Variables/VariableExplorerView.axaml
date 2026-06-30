@@ -4,12 +4,14 @@
              x:Class="SpineIDE.Views.Variables.VariableExplorerView"
              x:DataType="panels:VariableExplorerVM">
     <Grid RowDefinitions="Auto,*">
-        <Grid ColumnDefinitions="2*,*,3*" Background="#252526" Height="28">
+        <Grid ColumnDefinitions="2*,*,3*" Background="{DynamicResource PanelHeaderBrush}" Height="28">
             <TextBlock Grid.Column="0" Text="Name" Margin="8,5" FontWeight="SemiBold" />
             <TextBlock Grid.Column="1" Text="Type" Margin="8,5" FontWeight="SemiBold" />
             <TextBlock Grid.Column="2" Text="Value" Margin="8,5" FontWeight="SemiBold" />
         </Grid>
-        <TreeView Grid.Row="1" ItemsSource="{Binding Variables}" Background="#1E1E1E">
+        <TreeView Grid.Row="1" ItemsSource="{Binding Variables}"
+                  Background="{DynamicResource CodeSurfaceBrush}"
+                  Foreground="{DynamicResource CodeSurfaceForegroundBrush}">
             <TreeView.Styles>
                 <Style Selector="TreeViewItem">
                     <Setter Property="IsExpanded" Value="{ReflectionBinding IsExpanded, Mode=TwoWay}" />
@@ -26,8 +28,8 @@
                             <TextBlock Text=">" FontSize="16" />
                         </Button>
                         <TextBlock Grid.Column="1" Text="{Binding Name}" Margin="5,3" />
-                        <TextBlock Grid.Column="2" Text="{Binding Type}" Margin="5,3" Foreground="#9CDCFE" />
-                        <TextBlock Grid.Column="3" Text="{Binding ValueDisplay}" Margin="5,3" Foreground="#CE9178" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="2" Text="{Binding Type}" Margin="5,3" Foreground="{DynamicResource VariableTypeBrush}" />
+                        <TextBlock Grid.Column="3" Text="{Binding ValueDisplay}" Margin="5,3" Foreground="{DynamicResource VariableValueBrush}" TextTrimming="CharacterEllipsis" />
                     </Grid>
                 </TreeDataTemplate>
             </TreeView.ItemTemplate>

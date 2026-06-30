@@ -1,0 +1,80 @@
+{
+    "name": "OneLight",
+    "type": "light",
+    "colors": {
+        "editor.background": "#fafafa",
+        "editor.foreground": "#383a42",
+        "editor.lineHighlightBackground": "#f0f0f0",
+        "editorCursor.foreground": "#526fff",
+        "editorWhitespace.foreground": "#d4d4d4",
+        "editorIndentGuide.background": "#e5e5e6",
+        "editorIndentGuide.activeBackground": "#c9c9c9",
+        "editor.selectionBackground": "#e5e5e6",
+        "editor.selectionHighlightBackground": "#e5e5e6",
+        "editor.wordHighlightBackground": "#e5e5e6",
+        "editor.findMatchBackground": "#a2c1ff",
+        "editor.findMatchHighlightBackground": "#a2c1ff80",
+        "editor.lineNumber.foreground": "#9d9d9f",
+        "editor.lineNumber.activeForeground": "#383a42",
+        "editorBracketMatch.background": "#d4d4d4",
+        "editorBracketMatch.border": "#383a42"
+    },
+    "tokenColors": [
+        {
+            "scope": ["comment", "punctuation.definition.comment"],
+            "settings": {
+                "foreground": "#a0a1a7",
+                "fontStyle": "italic"
+            }
+        },
+        {
+            "scope": ["string", "punctuation.definition.string"],
+            "settings": {
+                "foreground": "#50a14f"
+            }
+        },
+        {
+            "scope": ["constant.numeric", "constant.language"],
+            "settings": {
+                "foreground": "#986801"
+            }
+        },
+        {
+            "scope": ["keyword", "storage.type", "storage.modifier"],
+            "settings": {
+                "foreground": "#a626a4"
+            }
+        },
+        {
+            "scope": ["keyword.operator"],
+            "settings": {
+                "foreground": "#0184bc"
+            }
+        },
+        {
+            "scope": ["entity.name.function", "support.function"],
+            "settings": {
+                "foreground": "#4078f2"
+            }
+        },
+        {
+            "scope": ["entity.name.class", "entity.name.type"],
+            "settings": {
+                "foreground": "#c18401"
+            }
+        },
+        {
+            "scope": ["variable", "variable.parameter"],
+            "settings": {
+                "foreground": "#e45649"
+            }
+        },
+        {
+            "scope": ["invalid"],
+            "settings": {
+                "foreground": "#ff0000",
+                "fontStyle": "underline"
+            }
+        }
+    ]
+}

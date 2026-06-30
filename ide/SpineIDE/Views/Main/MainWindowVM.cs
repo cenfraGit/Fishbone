@@ -52,6 +52,17 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
     [ObservableProperty] IFactory? _factory;
     [ObservableProperty] IRootDock? _layout;
 
+    // toggled from the Views menu; drives the app-wide light/dark theme variant
+    [ObservableProperty] private bool _isLightTheme;
+
+    partial void OnIsLightThemeChanged(bool value)
+    {
+        if (Avalonia.Application.Current is { } app)
+            app.RequestedThemeVariant = value
+                ? Avalonia.Styling.ThemeVariant.Light
+                : Avalonia.Styling.ThemeVariant.Dark;
+    }
+
     // --------------------------------------------------------------------------------
     // construtor
     // --------------------------------------------------------------------------------

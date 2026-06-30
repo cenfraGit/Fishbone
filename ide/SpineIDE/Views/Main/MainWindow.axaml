@@ -25,8 +25,8 @@
                      TextWrapping="NoWrap"
                      FontFamily="Cascadia Code, Consolas"
                      FontSize="13"
-                     Background="#1E1E1E"
-                     Foreground="#D4D4D4"
+                     Background="{DynamicResource CodeSurfaceBrush}"
+                     Foreground="{DynamicResource CodeSurfaceForegroundBrush}"
                      BorderThickness="0"
                      Padding="8"
                      ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -96,6 +96,8 @@
             </MenuItem>
 
             <MenuItem Header="_Views">
+                <MenuItem Header="Light Theme" ToggleType="CheckBox" IsChecked="{Binding IsLightTheme, Mode=TwoWay}" />
+                <Separator />
                 <MenuItem Header="Show Variable Explorer" ToggleType="CheckBox" />
             </MenuItem>
 
@@ -120,14 +122,14 @@
         </Menu>
 
         <Border DockPanel.Dock="Top" Padding="4" Margin="5"
-                BorderBrush="#333333" BorderThickness="0.7" CornerRadius="2">
+                BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="0.7" CornerRadius="2">
 
             <DockPanel  LastChildFill="False">
 
                 <Button DockPanel.Dock="Left" ToolTip.Tip="Open"
                         Command="{Binding OpenFileCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource folder_open_regular}" Foreground="Gray" Width="16" Height="16" />
+                        <PathIcon Data="{StaticResource folder_open_regular}" Foreground="{DynamicResource ToolbarIconBrush}" Width="16" Height="16" />
                     </StackPanel>
                 </Button>
 
@@ -140,34 +142,34 @@
 
                 <Button DockPanel.Dock="Left" ToolTip.Tip="Copy" Command="{Binding CopyCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource copy_regular}" Width="16" Height="16" />
+                        <PathIcon Data="{StaticResource copy_regular}" Foreground="{DynamicResource ToolbarIconBrush}" Width="16" Height="16" />
                     </StackPanel>
                 </Button>
 
                 <Button DockPanel.Dock="Left" ToolTip.Tip="Cut" Command="{Binding CutCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource cut_regular}" Width="16" Height="16" />
+                        <PathIcon Data="{StaticResource cut_regular}" Foreground="{DynamicResource ToolbarIconBrush}" Width="16" Height="16" />
                     </StackPanel>
                 </Button>
 
                 <Button DockPanel.Dock="Left" ToolTip.Tip="Paste" Command="{Binding PasteCommand}"
                         Margin="0,0,13,0">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource clipboard_paste_regular}" Width="16" Height="16" />
+                        <PathIcon Data="{StaticResource clipboard_paste_regular}" Foreground="{DynamicResource ToolbarIconBrush}" Width="16" Height="16" />
                     </StackPanel>
                 </Button>
 
                 <Button DockPanel.Dock="Left" ToolTip.Tip="Undo"
                         Command="{Binding UndoCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource arrow_undo_regular}" Foreground="DarkSlateGray" Width="16" Height="16" />
+                        <PathIcon Data="{StaticResource arrow_undo_regular}" Foreground="{DynamicResource ToolbarIconBrush}" Width="16" Height="16" />
                     </StackPanel>
                 </Button>
 
                 <Button DockPanel.Dock="Left" ToolTip.Tip="Redo"
                         Command="{Binding RedoCommand}" Margin="0,0,13,0">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource arrow_undo_regular}" Foreground="DarkSlateGray" Width="16" Height="16">
+                        <PathIcon Data="{StaticResource arrow_undo_regular}" Foreground="{DynamicResource ToolbarIconBrush}" Width="16" Height="16">
                             <!-- redo symbol outputs same as undo. gh issue unanswered, -->
                             <!-- so just flip? -->
                             <PathIcon.RenderTransform>
@@ -180,14 +182,14 @@
                 <Button DockPanel.Dock="Left" ToolTip.Tip="Remove line comment"
                         Command="{Binding RemoveLineCommentCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource text_bullet_list_add_regular}" Foreground="DarkRed" Width="16" Height="16" />
+                        <PathIcon Data="{StaticResource text_bullet_list_add_regular}" Foreground="{DynamicResource ToolbarIconBrush}" Width="16" Height="16" />
                     </StackPanel>
                 </Button>
 
                 <Button DockPanel.Dock="Left" ToolTip.Tip="Add line comment"
                         Command="{Binding AddLineCommentCommand}" Margin="0,0,13,0">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource text_bullet_list_add_regular}" Foreground="Green" Width="16" Height="16" />
+                        <PathIcon Data="{StaticResource text_bullet_list_add_regular}" Foreground="{DynamicResource ToolbarIconBrush}" Width="16" Height="16" />
                     </StackPanel>
                 </Button>
 
@@ -200,14 +202,14 @@
 
                 <Button DockPanel.Dock="Right" Command="{Binding StepOutCommand}" ToolTip.Tip="Step Out">
 					<StackPanel Orientation="Horizontal" Spacing="8">
-					    <PathIcon Data="{StaticResource arrow_curve_up_right_regular}" Width="16" Height="16" Foreground="Gray" />
+					    <PathIcon Data="{StaticResource arrow_curve_up_right_regular}" Width="16" Height="16" Foreground="{DynamicResource ToolbarIconBrush}" />
                         <TextBlock Text="Out" />
 					</StackPanel>
                 </Button>
 
                 <Button DockPanel.Dock="Right" Command="{Binding StepIntoCommand}" ToolTip.Tip="Step Into">
 					<StackPanel Orientation="Horizontal" Spacing="8">
-					    <PathIcon Data="{StaticResource arrow_curve_up_right_regular}" Width="16" Height="16" Foreground="Gray">
+					    <PathIcon Data="{StaticResource arrow_curve_up_right_regular}" Width="16" Height="16" Foreground="{DynamicResource ToolbarIconBrush}">
 						    <PathIcon.RenderTransform>
 							    <ScaleTransform ScaleY="-1" />
 						    </PathIcon.RenderTransform>
@@ -218,7 +220,7 @@
 
 				<Button DockPanel.Dock="Right" Command="{Binding StepOverCommand}" ToolTip.Tip="Step Over">
 					<StackPanel Orientation="Horizontal" Spacing="8">
-						<PathIcon Data="{StaticResource arrow_curve_up_left_regular}" Width="16" Height="16" Foreground="Gray">
+						<PathIcon Data="{StaticResource arrow_curve_up_left_regular}" Width="16" Height="16" Foreground="{DynamicResource ToolbarIconBrush}">
 							<PathIcon.RenderTransform>
 								<RotateTransform Angle="90" />
 							</PathIcon.RenderTransform>
@@ -229,7 +231,7 @@
 
 				<Button DockPanel.Dock="Right" Command="{Binding PauseCommand}" ToolTip.Tip="Pause">
 					<StackPanel Orientation="Horizontal" Spacing="8">
-						<PathIcon Data="{StaticResource pause_regular}" Width="16" Height="16" Foreground="Gray" />
+						<PathIcon Data="{StaticResource pause_regular}" Width="16" Height="16" Foreground="{DynamicResource ToolbarIconBrush}" />
 						<TextBlock Text="Pause" />
 					</StackPanel>
 				</Button>

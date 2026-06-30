@@ -1,5 +1,6 @@
 using System;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using AvaloniaEdit;
@@ -15,7 +16,7 @@ internal sealed class BreakpointMargin : AbstractMargin
     private readonly Func<ScriptEditorVM?> viewModelProvider;
     private static readonly IBrush BreakpointBrush = new SolidColorBrush(Color.Parse("#E05555"));
     private static readonly IBrush UnverifiedBreakpointBrush = new SolidColorBrush(Color.Parse("#777777"));
-    private static readonly IBrush GutterBrush = new SolidColorBrush(Color.Parse("#161616"));
+    private static readonly IBrush FallbackGutterBrush = new SolidColorBrush(Color.Parse("#161616"));
 
     public BreakpointMargin(TextEditor editor, Func<ScriptEditorVM?> viewModelProvider)
     {
@@ -29,7 +30,7 @@ internal sealed class BreakpointMargin : AbstractMargin
     public override void Render(DrawingContext context)
     {
         base.Render(context);
-        context.FillRectangle(GutterBrush, Bounds);
+        context.FillRectangle(ResolveBrush(this, "EditorGutterBrush", FallbackGutterBrush), Bounds);
         var textView = editor.TextArea.TextView;
         if (!textView.VisualLinesValid)
             return;
@@ -64,11 +65,18 @@ internal sealed class BreakpointMargin : AbstractMargin
         InvalidateVisual();
         e.Handled = true;
     }
+
+    // resolves a themed brush from app resources for the control's active variant, falling back to a
+    // fixed brush so rendering never depends on the resource being present
+    internal static IBrush ResolveBrush(Control control, string key, IBrush fallback) =>
+        control.TryFindResource(key, control.ActualThemeVariant, out var value) && value is IBrush brush
+            ? brush
+            : fallback;
 }
 
 internal sealed class PausedLineRenderer : IBackgroundRenderer
 {
-    private static readonly IBrush PausedBrush = new SolidColorBrush(Color.Parse("#403A2A"));
+    private static readonly IBrush FallbackPausedBrush = new SolidColorBrush(Color.Parse("#403A2A"));
 
     public int? Line { get; set; }
     public KnownLayer Layer => KnownLayer.Background;
@@ -78,8 +86,9 @@ internal sealed class PausedLineRenderer : IBackgroundRenderer
         if (Line is null || Line < 1 || Line > textView.Document.LineCount)
             return;
 
+        IBrush pausedBrush = BreakpointMargin.ResolveBrush(textView, "PausedLineBrush", FallbackPausedBrush);
         DocumentLine line = textView.Document.GetLineByNumber(Line.Value);
         foreach (var rectangle in BackgroundGeometryBuilder.GetRectsForSegment(textView, line))
-            drawingContext.FillRectangle(PausedBrush, new Rect(0, rectangle.Top, textView.Bounds.Width, rectangle.Height));
+            drawingContext.FillRectangle(pausedBrush, new Rect(0, rectangle.Top, textView.Bounds.Width, rectangle.Height));
     }
 }
