@@ -5,7 +5,9 @@ using Avalonia.Interactivity;
 using Avalonia.Styling;
 using AvaloniaEdit;
 using AvaloniaEdit.Document;
+using AvaloniaEdit.Folding;
 using AvaloniaEdit.TextMate;
+using Avalonia.Threading;
 using System;
 using SpineIDE.Models.Messages;
 using CommunityToolkit.Mvvm.Messaging;
@@ -21,6 +23,9 @@ public partial class ScriptEditorView : UserControl
     private BreakpointMargin? _breakpointMargin;
     private PausedLineRenderer? _pausedLineRenderer;
     private ScriptEditorVM? _subscribedViewModel;
+    private FoldingManager? _foldingManager;
+    private readonly BraceFoldingStrategy _foldingStrategy = new();
+    private DispatcherTimer? _foldingTimer;
 
     public ScriptEditorView()
     {
@@ -70,8 +75,29 @@ public partial class ScriptEditorView : UserControl
             _activeEditor = this;
         }
 
+        // folding is installed independently of the one-time text-mate setup so it is restored if
+        // this view is detached and re-attached (e.g. when its dock tab is floated)
+        if (editor != null && _foldingManager == null)
+        {
+            _foldingManager = FoldingManager.Install(editor.TextArea);
+            UpdateFoldings();
+            _foldingTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            _foldingTimer.Tick += OnFoldingTimerTick;
+            _foldingTimer.Start();
+        }
+
         // re-apply in case the theme variant changed while this view was detached
         ApplyEditorTheme();
+    }
+
+    private void OnFoldingTimerTick(object? sender, EventArgs e) => UpdateFoldings();
+
+    // recomputes brace foldings from the current document; reading Editor.Document each time keeps it
+    // correct even when the bound document is swapped (e.g. a remote source replaces the content)
+    private void UpdateFoldings()
+    {
+        if (_foldingManager is not null && Editor.Document is { } document)
+            _foldingStrategy.UpdateFoldings(_foldingManager, document);
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e) => AttachDebugAdornments(Editor);
@@ -96,6 +122,18 @@ public partial class ScriptEditorView : UserControl
         ActualThemeVariantChanged -= OnThemeVariantChanged;
         WeakReferenceMessenger.Default.UnregisterAll(this);
         _isMessengerRegistered = false;
+
+        if (_foldingTimer is not null)
+        {
+            _foldingTimer.Stop();
+            _foldingTimer.Tick -= OnFoldingTimerTick;
+            _foldingTimer = null;
+        }
+        if (_foldingManager is not null)
+        {
+            FoldingManager.Uninstall(_foldingManager);
+            _foldingManager = null;
+        }
 
         if (ReferenceEquals(_activeEditor, this))
             _activeEditor = null;
