@@ -407,6 +407,9 @@ public class FishboneInterpreter
         if (callee is BoundMethod boundMethod)
             return InvokeBoundMethod(env, boundMethod, argumentNodes);
 
+        if (callee is INativeCallable nativeCallable)
+            return InvokeNativeCallable(env, nativeCallable, argumentNodes);
+
         if (callee is RegisteredType registeredType)
             return InvokeConstructorOverload(env, registeredType, argumentNodes);
 
@@ -429,6 +432,69 @@ public class FishboneInterpreter
             throw new Exception($"Type \"{registeredType.Type.Name}\" has no public constructor to call.");
 
         return InvokeBestOverload(env, target: null, constructors, argumentNodes, registeredType.Type.Name);
+    }
+
+    /// <summary>
+    /// Invokes a host-supplied <see cref="INativeCallable"/>. Unlike the reflection path there is a
+    /// single fixed signature, so no overload resolution is needed; arguments are bound positionally,
+    /// converted through the same registered-converter logic as .NET calls, and out/ref results are
+    /// written back via the shared <see cref="WriteBackByRefArguments"/> helper.
+    /// </summary>
+    internal object InvokeNativeCallable(
+        FishboneEnvironment env,
+        INativeCallable callable,
+        IReadOnlyList<ArgumentNode> argumentNodes)
+    {
+        var parameters = callable.Parameters;
+        if (argumentNodes.Count != parameters.Count)
+            throw new Exception($"Expected {parameters.Count} argument(s) but got {argumentNodes.Count}.");
+
+        var args = new object?[parameters.Count];
+        var writeBacks = new List<(string Name, int Index, bool IsOut)>();
+
+        for (int i = 0; i < parameters.Count; i++)
+        {
+            var parameter = parameters[i];
+            var argument = argumentNodes[i];
+
+            switch (parameter.Direction)
+            {
+                case ParameterDirection.Out:
+                    if (argument.Modifier != ArgumentModifier.Out)
+                        throw new Exception($"Parameter \"{parameter.Name}\" is an out parameter; pass the argument with 'out'.");
+                    if (argument.Value is not IdentifierNode outTarget)
+                        throw new Exception($"Out argument \"{parameter.Name}\" must be a variable.");
+                    // an out parameter introduces or overwrites the variable; pass a default placeholder
+                    args[i] = GetDefaultValue(parameter.Type);
+                    writeBacks.Add((outTarget.Name, i, true));
+                    break;
+
+                case ParameterDirection.Ref:
+                    if (argument.Modifier != ArgumentModifier.Ref)
+                        throw new Exception($"Parameter \"{parameter.Name}\" is a ref parameter; pass the argument with 'ref'.");
+                    if (argument.Value is not IdentifierNode)
+                        throw new Exception($"Ref argument \"{parameter.Name}\" must be a variable.");
+                    var refRaw = Evaluate(env, argument.Value);
+                    if (ConvertArgument(refRaw, parameter.Type, out var refConverted) == ArgumentMatch.None)
+                        throw new Exception(DescribeConversionFailure(i, refRaw, parameter.Name, parameter.Type));
+                    args[i] = refConverted;
+                    writeBacks.Add((((IdentifierNode)argument.Value).Name, i, false));
+                    break;
+
+                default: // In
+                    if (argument.Modifier != ArgumentModifier.None)
+                        throw new Exception($"Parameter \"{parameter.Name}\" is passed by value; remove '{argument.Modifier.ToString().ToLowerInvariant()}'.");
+                    var raw = Evaluate(env, argument.Value);
+                    if (ConvertArgument(raw, parameter.Type, out var converted) == ArgumentMatch.None)
+                        throw new Exception(DescribeConversionFailure(i, raw, parameter.Name, parameter.Type));
+                    args[i] = converted;
+                    break;
+            }
+        }
+
+        object? result = callable.Invoke(args);
+        WriteBackByRefArguments(env, args, writeBacks);
+        return ApplyFromNetConverter(result)!;
     }
 
     /// <summary>
@@ -653,7 +719,7 @@ public class FishboneInterpreter
                 var refMatch = ConvertArgument(rawArgs[i], targetType, out var refConverted);
                 if (refMatch == ArgumentMatch.None)
                 {
-                    diagnostic ??= DescribeConversionFailure(i, rawArgs[i], parameter, targetType);
+                    diagnostic ??= DescribeConversionFailure(i, rawArgs[i], parameter.Name!, targetType);
                     return false;
                 }
 
@@ -672,7 +738,7 @@ public class FishboneInterpreter
             var match = ConvertArgument(rawArgs[i], targetType, out var convertedArg);
             if (match == ArgumentMatch.None)
             {
-                diagnostic ??= DescribeConversionFailure(i, rawArgs[i], parameter, targetType);
+                diagnostic ??= DescribeConversionFailure(i, rawArgs[i], parameter.Name!, targetType);
                 return false;
             }
 
@@ -684,9 +750,9 @@ public class FishboneInterpreter
     }
 
     // builds the diagnostic shown when an argument cannot be converted to its parameter type
-    private static string DescribeConversionFailure(int index, object? rawArg, ParameterInfo parameter, Type targetType) =>
+    private static string DescribeConversionFailure(int index, object? rawArg, string parameterName, Type targetType) =>
         $"Argument {index + 1} of type \"{rawArg?.GetType().Name ?? "null"}\" is not compatible with parameter " +
-        $"\"{parameter.Name}\" of type \"{targetType.Name}\".";
+        $"\"{parameterName}\" of type \"{targetType.Name}\".";
 
     private void WriteBackByRefArguments(
         FishboneEnvironment env,

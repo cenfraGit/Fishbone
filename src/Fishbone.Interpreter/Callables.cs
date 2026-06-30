@@ -9,6 +9,43 @@ public interface ICallable
     object Call(FishboneInterpreter interpreter, List<object> arguments);
 }
 
+/// <summary>Direction of a single <see cref="INativeCallable"/> parameter.</summary>
+public enum ParameterDirection
+{
+    /// <summary>A by-value input; the argument is read and converted before the call.</summary>
+    In,
+    /// <summary>An output written back to the caller's variable; passed with <c>out</c>.</summary>
+    Out,
+    /// <summary>An in/out value read before the call and written back after; passed with <c>ref</c>.</summary>
+    Ref
+}
+
+/// <summary>One parameter of an <see cref="INativeCallable"/> signature.</summary>
+public sealed record CallableParameter(string Name, Type Type, ParameterDirection Direction);
+
+/// <summary>
+/// A host-supplied callable that declares a typed in/out/ref signature without being a reflected
+/// .NET method. The interpreter owns the generic part (evaluating and converting inputs (honouring
+/// registered type converters) and writing <c>out</c>/<c>ref</c> results back into script variables)
+/// while the implementation supplies only the <see cref="Invoke"/> body. This lets a plugin expose
+/// callables that participate in native <c>out</c>/<c>ref</c> syntax even though they are not .NET
+/// methods.
+/// </summary>
+public interface INativeCallable
+{
+    /// <summary>The parameters, in call-site order.</summary>
+    IReadOnlyList<CallableParameter> Parameters { get; }
+
+    /// <summary>
+    /// Runs the call. <paramref name="arguments"/> is indexed parallel to <see cref="Parameters"/>;
+    /// <see cref="ParameterDirection.In"/> and <see cref="ParameterDirection.Ref"/> slots hold the
+    /// converted inputs. The implementation writes each <see cref="ParameterDirection.Out"/> and
+    /// <see cref="ParameterDirection.Ref"/> slot back in place, mirroring how a .NET method writes
+    /// its by-ref results. Returns an optional result value (or <c>null</c> when there is none).
+    /// </summary>
+    object? Invoke(object?[] arguments);
+}
+
 public class FishboneFunction : ICallable
 {
     private readonly FunctionDefinitionNode _definition;
