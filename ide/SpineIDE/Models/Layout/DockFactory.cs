@@ -89,22 +89,18 @@ public class DockFactory : Factory
                 IsCollapsable = false,
                 VisibleDockables = CreateList<IDockable>
                 (
-                    leftVerticalPanel, // nested vertical
-                    new ProportionalDockSplitter(),
                     documentDock
                 )
             };
 
-            // main layout
+            // main layout — panels start hidden; Views menu re-adds them via ShowTool
             var proportionalDock = new ProportionalDock
             {
                 Orientation = Orientation.Vertical,
                 IsCollapsable = false,
                 VisibleDockables = CreateList<IDockable>
                 (
-                    editorLayout,
-                    new ProportionalDockSplitter(),
-                    outputToolDock
+                    editorLayout
                 )
             };
 
@@ -143,7 +139,8 @@ public class DockFactory : Factory
         /// <summary>True when the tool currently occupies space in the layout.</summary>
         public bool IsToolVisible(IDockable tool) => ReferenceEquals(tool, VariableExplorer)
             ? _editorLayout.VisibleDockables?.Contains(_leftPanel) == true
-            : OutputToolDock.VisibleDockables?.Contains(tool) == true;
+            : OutputToolDock.VisibleDockables?.Contains(tool) == true
+              && _rootLayout.VisibleDockables?.Contains(OutputToolDock) == true;
 
         public void ShowTool(IDockable tool)
         {

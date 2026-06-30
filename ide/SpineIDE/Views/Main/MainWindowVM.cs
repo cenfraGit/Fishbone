@@ -65,9 +65,9 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
     }
 
     // Views-menu toggles for the dockable tools. They start visible to match the initial layout.
-    [ObservableProperty] private bool _isVariableExplorerVisible = true;
-    [ObservableProperty] private bool _isOutputVisible = true;
-    [ObservableProperty] private bool _isErrorsVisible = true;
+    [ObservableProperty] private bool _isVariableExplorerVisible = false;
+    [ObservableProperty] private bool _isOutputVisible = false;
+    [ObservableProperty] private bool _isErrorsVisible = false;
 
     // set while syncing a checkmark from a dock-driven close, so we don't loop back into the dock
     private bool _suppressVisibilitySync;
