@@ -17,12 +17,14 @@ namespace SpineIDE.Views.Editor;
 public partial class ScriptEditorView : UserControl
 {
     private static readonly FishboneRegistryOptions RegistryOptions = new();
+    private static readonly TextDocument EmptyDocument = new();
     private TextMate.Installation? _textMateInstallation = null;
     private static ScriptEditorView? _activeEditor;
     private bool _isMessengerRegistered;
     private BreakpointMargin? _breakpointMargin;
     private PausedLineRenderer? _pausedLineRenderer;
     private ScriptEditorVM? _subscribedViewModel;
+    private ScriptEditorVM? _documentViewModel;
     private FoldingManager? _foldingManager;
     private readonly BraceFoldingStrategy _foldingStrategy = new();
     private DispatcherTimer? _foldingTimer;
@@ -30,6 +32,11 @@ public partial class ScriptEditorView : UserControl
     public ScriptEditorView()
     {
         InitializeComponent();
+        // Document is managed manually (not via AXAML binding) so it is never null.
+        // AvaloniaEdit throws "Document is null" in mouse-event handlers; a null can arise when
+        // Dock.Avalonia clears the DataContext on the inactive tab, which would propagate null
+        // through an AXAML TwoWay binding.
+        Editor.Document = EmptyDocument;
         DataContextChanged += OnDataContextChanged;
     }
 
@@ -41,10 +48,12 @@ public partial class ScriptEditorView : UserControl
         Editor.TextArea.TextView.InvalidateVisual();
     }
 
-    // keeps the editor's syntax theme in sync with the app's light/dark variant
+    // keeps the editor's syntax theme in sync with the app's light/dark variant. Requires a document:
+    // TextMate defers its editor model until one is bound, and applying a theme before then throws
+    // "Document is null". It is re-applied from OnEditorDocumentChanged once the document arrives.
     private void ApplyEditorTheme()
     {
-        if (_textMateInstallation is null)
+        if (_textMateInstallation is null || Editor.Document is null)
             return;
         bool light = ActualThemeVariant == ThemeVariant.Light;
         _textMateInstallation.SetTheme(RegistryOptions.GetTheme(light));
@@ -62,6 +71,9 @@ public partial class ScriptEditorView : UserControl
             _textMateInstallation = editor.InstallTextMate(RegistryOptions);
             _textMateInstallation.SetGrammar("source.fb");
             ApplyEditorTheme();
+            // rebuild folding when the bound document is (re)assigned — the document may not exist yet
+            // at attach time, and remote sources can swap it later
+            editor.DocumentChanged += OnEditorDocumentChanged;
 
             editor.Options.ConvertTabsToSpaces = true;
             editor.Options.IndentationSize = 4;
@@ -77,10 +89,9 @@ public partial class ScriptEditorView : UserControl
 
         // folding is installed independently of the one-time text-mate setup so it is restored if
         // this view is detached and re-attached (e.g. when its dock tab is floated)
-        if (editor != null && _foldingManager == null)
+        if (editor != null && _foldingTimer == null)
         {
-            _foldingManager = FoldingManager.Install(editor.TextArea);
-            UpdateFoldings();
+            TryInstallFolding();
             _foldingTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
             _foldingTimer.Tick += OnFoldingTimerTick;
             _foldingTimer.Start();
@@ -90,7 +101,35 @@ public partial class ScriptEditorView : UserControl
         ApplyEditorTheme();
     }
 
-    private void OnFoldingTimerTick(object? sender, EventArgs e) => UpdateFoldings();
+    private void OnFoldingTimerTick(object? sender, EventArgs e)
+    {
+        // a late-bound document also gets folding here, so the install survives any attach ordering
+        TryInstallFolding();
+        UpdateFoldings();
+    }
+
+    private void OnEditorDocumentChanged(object? sender, EventArgs e)
+    {
+        // the folding manager is tied to a specific document; rebuild it against the new one
+        if (_foldingManager is not null)
+        {
+            FoldingManager.Uninstall(_foldingManager);
+            _foldingManager = null;
+        }
+        TryInstallFolding();
+        // a theme applied before the document existed was skipped, so (re)apply it now
+        ApplyEditorTheme();
+    }
+
+    // installs folding only once the editor actually has a document (Install throws on a null document)
+    private void TryInstallFolding()
+    {
+        if (_foldingManager is null && Editor.Document is not null)
+        {
+            _foldingManager = FoldingManager.Install(Editor.TextArea);
+            UpdateFoldings();
+        }
+    }
 
     // recomputes brace foldings from the current document; reading Editor.Document each time keeps it
     // correct even when the bound document is swapped (e.g. a remote source replaces the content)
@@ -100,7 +139,54 @@ public partial class ScriptEditorView : UserControl
             _foldingStrategy.UpdateFoldings(_foldingManager, document);
     }
 
-    private void OnDataContextChanged(object? sender, EventArgs e) => AttachDebugAdornments(Editor);
+    private void OnDataContextChanged(object? sender, EventArgs e)
+    {
+        // unsubscribe from the old VM's property changes before switching
+        if (_documentViewModel is not null)
+        {
+            _documentViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+            _documentViewModel = null;
+        }
+
+        if (DataContext is ScriptEditorVM vm)
+        {
+            _documentViewModel = vm;
+            vm.PropertyChanged += OnViewModelPropertyChanged;
+            SetDocument(vm.ScriptDocument);
+        }
+        else
+        {
+            // DataContext cleared (e.g. Dock switching tabs): fall back to the shared empty
+            // document so the TextArea never has a null Document during mouse events.
+            SetDocument(EmptyDocument);
+        }
+
+        AttachDebugAdornments(Editor);
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ScriptEditorVM.ScriptDocument) && sender is ScriptEditorVM vm)
+            SetDocument(vm.ScriptDocument);
+    }
+
+    private void SetDocument(TextDocument document)
+    {
+        if (ReferenceEquals(Editor.Document, document))
+            return;
+
+        // FoldingElementGenerator validates its document synchronously inside
+        // TextArea.OnDocumentChanged (caret reset → visual line build) which fires before
+        // editor.DocumentChanged gives our handler a chance to react. Uninstall first so the
+        // generator is gone by the time the swap happens; OnEditorDocumentChanged reinstalls.
+        if (_foldingManager is not null)
+        {
+            FoldingManager.Uninstall(_foldingManager);
+            _foldingManager = null;
+        }
+
+        Editor.Document = document;
+    }
 
     private void AttachDebugAdornments(TextEditor editor)
     {
@@ -122,6 +208,12 @@ public partial class ScriptEditorView : UserControl
         ActualThemeVariantChanged -= OnThemeVariantChanged;
         WeakReferenceMessenger.Default.UnregisterAll(this);
         _isMessengerRegistered = false;
+
+        if (_documentViewModel is not null)
+        {
+            _documentViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+            _documentViewModel = null;
+        }
 
         if (_foldingTimer is not null)
         {
