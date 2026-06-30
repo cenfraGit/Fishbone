@@ -91,7 +91,8 @@ public sealed class FishboneDebugServerSession : IAsyncDisposable
         {
             string source = _options.SourceCode;
             int lineCount = source.Count(character => character == '\n') + 1;
-            FishboneConfiguration configuration = CloneConfiguration(_options.Configuration);
+            // clone carries every field (builtins, values, type converters) so nothing is dropped
+            FishboneConfiguration configuration = _options.Configuration.Clone();
             using var coordinator = new BreakpointCoordinator(_options.SourceIdentity, cancellationToken);
             FishboneDebugAdapterSession? session = null;
             if (_options.RedirectOutput)
@@ -201,22 +202,6 @@ public sealed class FishboneDebugServerSession : IAsyncDisposable
             Default = true
         })
     };
-
-    private static FishboneConfiguration CloneConfiguration(FishboneConfiguration source)
-    {
-        var clone = new FishboneConfiguration(injectDefaults: false)
-        {
-            EnableImports = source.EnableImports,
-            EnableLoops = source.EnableLoops,
-            EnableFunctionDeclaration = source.EnableFunctionDeclaration,
-            EnableFunctionCall = source.EnableFunctionCall
-        };
-        foreach (var builtIn in source.BuiltIns)
-            clone.BuiltIns[builtIn.Key] = builtIn.Value;
-        foreach (var value in source.Values)
-            clone.Values[value.Key] = value.Value;
-        return clone;
-    }
 
     public async ValueTask DisposeAsync()
     {

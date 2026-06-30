@@ -89,6 +89,28 @@ public class FishboneConfiguration
         return this;
     }
 
+    /// <summary>
+    /// Creates an independent copy carrying all ambient state (builtins, preseeded values, type
+    /// converters, and the capability flags).
+    /// </summary>
+    public FishboneConfiguration Clone()
+    {
+        var clone = new FishboneConfiguration(injectDefaults: false)
+        {
+            EnableImports = EnableImports,
+            EnableLoops = EnableLoops,
+            EnableFunctionDeclaration = EnableFunctionDeclaration,
+            EnableFunctionCall = EnableFunctionCall
+        };
+        foreach (var builtIn in BuiltIns)
+            clone.BuiltIns[builtIn.Key] = builtIn.Value;
+        foreach (var value in Values)
+            clone.Values[value.Key] = value.Value;
+        foreach (var converter in TypeConverters)
+            clone.TypeConverters[converter.Key] = converter.Value;
+        return clone;
+    }
+
     private void AddDefaults()
     {
         AddDefaultConstants();

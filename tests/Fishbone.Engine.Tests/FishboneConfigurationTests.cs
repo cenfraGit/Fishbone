@@ -36,4 +36,33 @@ public class FishboneConfigurationTests
         Assert.Equal(2, config.BuiltIns["name"]);
         Assert.Equal(2, config.BuiltIns.Count);
     }
+
+    [Fact]
+    public void Clone_CarriesBuiltInsValuesAndTypeConverters()
+    {
+        var converter = new Func<object, object>(o => o);
+        var source = new FishboneConfiguration(injectDefaults: false)
+            .AddBuiltIn("answer", 42)
+            .AddValue("seed", 7)
+            .AddTypeConverter(typeof(Uri), converter);
+
+        var clone = source.Clone();
+
+        Assert.NotSame(source, clone);
+        Assert.Equal(42, clone.BuiltIns["answer"]);
+        Assert.Equal(7, clone.Values["seed"]);
+        Assert.True(clone.TypeConverters.ContainsKey(typeof(Uri)));
+        Assert.Same(converter, clone.TypeConverters[typeof(Uri)].ToNet);
+    }
+
+    [Fact]
+    public void Clone_IsIndependentOfSource()
+    {
+        var source = new FishboneConfiguration(injectDefaults: false).AddBuiltIn("a", 1);
+
+        var clone = source.Clone();
+        clone.AddBuiltIn("b", 2);
+
+        Assert.False(source.BuiltIns.ContainsKey("b"));
+    }
 }
