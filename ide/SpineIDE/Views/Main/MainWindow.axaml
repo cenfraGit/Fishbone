@@ -98,7 +98,9 @@
             <MenuItem Header="_Views">
                 <MenuItem Header="Light Theme" ToggleType="CheckBox" IsChecked="{Binding IsLightTheme, Mode=TwoWay}" />
                 <Separator />
-                <MenuItem Header="Show Variable Explorer" ToggleType="CheckBox" />
+                <MenuItem Header="Variable Explorer" ToggleType="CheckBox" IsChecked="{Binding IsVariableExplorerVisible, Mode=TwoWay}" />
+                <MenuItem Header="Output" ToggleType="CheckBox" IsChecked="{Binding IsOutputVisible, Mode=TwoWay}" />
+                <MenuItem Header="Errors" ToggleType="CheckBox" IsChecked="{Binding IsErrorsVisible, Mode=TwoWay}" />
             </MenuItem>
 
             <MenuItem Header="_Help">

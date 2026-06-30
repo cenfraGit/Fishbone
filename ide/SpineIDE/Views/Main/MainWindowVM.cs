@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -63,6 +64,64 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
                 : Avalonia.Styling.ThemeVariant.Dark;
     }
 
+    // Views-menu toggles for the dockable tools. They start visible to match the initial layout.
+    [ObservableProperty] private bool _isVariableExplorerVisible = true;
+    [ObservableProperty] private bool _isOutputVisible = true;
+    [ObservableProperty] private bool _isErrorsVisible = true;
+
+    // set while syncing a checkmark from a dock-driven close, so we don't loop back into the dock
+    private bool _suppressVisibilitySync;
+
+    private DockFactory? DockFactory => Factory as DockFactory;
+
+    partial void OnIsVariableExplorerVisibleChanged(bool value) => ApplyToolVisibility(DockFactory?.VariableExplorer, value);
+    partial void OnIsOutputVisibleChanged(bool value) => ApplyToolVisibility(DockFactory?.OutputPanel, value);
+    partial void OnIsErrorsVisibleChanged(bool value) => ApplyToolVisibility(DockFactory?.ErrorPanel, value);
+
+    // drives the dock from a checkmark change; guarded so a sync coming the other way doesn't loop
+    private void ApplyToolVisibility(IDockable? tool, bool visible)
+    {
+        if (_suppressVisibilitySync || DockFactory is not { } f || tool is null)
+            return;
+
+        if (visible)
+            f.ShowTool(tool);
+        else
+            f.HideTool(tool);
+    }
+
+    // keeps the Views-menu checkmarks in sync when a tool is shown/hidden by the dock itself
+    // (e.g. via a tab's close button, which the factory routes through HideTool)
+    private void OnToolVisibilityChanged(IDockable tool, bool visible)
+    {
+        if (DockFactory is not { } f)
+            return;
+
+        _suppressVisibilitySync = true;
+        if (ReferenceEquals(tool, f.VariableExplorer)) IsVariableExplorerVisible = visible;
+        else if (ReferenceEquals(tool, f.OutputPanel)) IsOutputVisible = visible;
+        else if (ReferenceEquals(tool, f.ErrorPanel)) IsErrorsVisible = visible;
+        _suppressVisibilitySync = false;
+    }
+
+    // brings the Errors tool to the front (re-showing and expanding it if needed) whenever an error
+    // is reported, so failures are never hidden behind another panel
+    private void OnErrorsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.Action != NotifyCollectionChangedAction.Add)
+            return;
+        Dispatcher.UIThread.Post(FocusErrors);
+    }
+
+    private void FocusErrors()
+    {
+        if (DockFactory is not { } f)
+            return;
+
+        f.ShowTool(f.ErrorPanel);     // re-shows and activates; no-op if already visible
+        f.OutputToolDock.IsExpanded = true;
+    }
+
     // --------------------------------------------------------------------------------
     // construtor
     // --------------------------------------------------------------------------------
@@ -83,6 +142,10 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         Layout = Factory?.CreateLayout();
         if (Layout != null)
             Factory?.InitLayout(Layout);
+
+        if (DockFactory is { } dockFactory)
+            dockFactory.ToolVisibilityChanged += OnToolVisibilityChanged;
+        ErrorService.Errors.CollectionChanged += OnErrorsCollectionChanged;
 
         WeakReferenceMessenger.Default.Register<MessageExecute>(this);
         WeakReferenceMessenger.Default.Register<MessageVariableDetailsRequested>(this);
