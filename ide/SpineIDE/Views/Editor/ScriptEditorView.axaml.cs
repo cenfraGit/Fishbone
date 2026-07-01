@@ -4,11 +4,14 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Styling;
 using AvaloniaEdit;
+using AvaloniaEdit.CodeCompletion;
 using AvaloniaEdit.Document;
 using AvaloniaEdit.Folding;
 using AvaloniaEdit.TextMate;
 using Avalonia.Threading;
 using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using SpineIDE.Models.Messages;
 using CommunityToolkit.Mvvm.Messaging;
 
@@ -28,6 +31,13 @@ public partial class ScriptEditorView : UserControl
     private FoldingManager? _foldingManager;
     private readonly BraceFoldingStrategy _foldingStrategy = new();
     private DispatcherTimer? _foldingTimer;
+    private CompletionWindow? _completionWindow;
+    private OverloadInsightWindow? _insightWindow;
+    private FishboneSignatureProvider? _signatureProvider;
+    private string? _signatureName;
+    // debounces auto-opening the completion popup so it appears on a typing pause, not every keystroke
+    private readonly DispatcherTimer _completionTimer;
+    private static readonly TimeSpan CompletionDebounce = TimeSpan.FromMilliseconds(150);
 
     public ScriptEditorView()
     {
@@ -38,6 +48,9 @@ public partial class ScriptEditorView : UserControl
         // through an AXAML TwoWay binding.
         Editor.Document = EmptyDocument;
         DataContextChanged += OnDataContextChanged;
+
+        _completionTimer = new DispatcherTimer { Interval = CompletionDebounce };
+        _completionTimer.Tick += OnCompletionTimerTick;
     }
 
     private void OnThemeVariantChanged(object? sender, EventArgs e)
@@ -83,6 +96,12 @@ public partial class ScriptEditorView : UserControl
             editor.AddHandler(InputElement.PointerPressedEvent, OnEditorPointerPressed, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
             editor.TextArea.AddHandler(InputElement.GotFocusEvent, OnEditorGotFocus, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
             editor.TextArea.AddHandler(InputElement.PointerPressedEvent, OnEditorPointerPressed, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+            // completion: auto-open as an identifier is typed (Ctrl+Space forces it in OnEditorKeyDown)
+            editor.TextArea.TextEntered += OnTextEntered;
+            // signature help: re-evaluate the enclosing call whenever the caret moves (typing, arrows, clicks)
+            editor.TextArea.Caret.PositionChanged += OnCaretPositionChanged;
+            // build the global catalog off-thread so the first keystroke doesn't pay the plugin-load cost
+            Task.Run(() => _ = FishboneCompletionCatalog.Shared);
             AttachDebugAdornments(editor);
             _activeEditor = this;
         }
@@ -227,6 +246,13 @@ public partial class ScriptEditorView : UserControl
             _foldingManager = null;
         }
 
+        Editor.TextArea.TextEntered -= OnTextEntered;
+        Editor.TextArea.Caret.PositionChanged -= OnCaretPositionChanged;
+        _completionTimer.Stop();
+        _completionWindow?.Hide();
+        _completionWindow = null;
+        CloseSignatureHelp();
+
         if (ReferenceEquals(_activeEditor, this))
             _activeEditor = null;
         if (_subscribedViewModel is not null)
@@ -314,6 +340,21 @@ public partial class ScriptEditorView : UserControl
     {
         if (Editor.IsReadOnly)
             return;
+
+        // while the completion popup is open, let it own Enter/Tab/Escape/arrows so Enter accepts the
+        // highlighted item instead of our auto-indent handler swallowing it
+        if (_completionWindow is not null)
+            return;
+
+        // Ctrl+Space forces the completion popup open, even with no prefix typed yet
+        if (e.Key == Key.Space && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            e.Handled = true;
+            _completionTimer.Stop(); // cancel any pending auto-open; show immediately
+            ShowCompletion(explicitTrigger: true);
+            return;
+        }
+
         if (e.Key != Key.Enter)
             return;
 
@@ -340,6 +381,177 @@ public partial class ScriptEditorView : UserControl
             document.Insert(caretOffset, newline + indent);
             Editor.CaretOffset = caretOffset + newline.Length + indent.Length;
         }
+    }
+
+    // auto-open completion as soon as the user starts (or continues) typing an identifier; once the
+    // window is open it filters itself against subsequent keystrokes, so we no-op while it lives
+    private void OnTextEntered(object? sender, TextInputEventArgs e)
+    {
+        if (Editor.IsReadOnly || _completionWindow is not null)
+            return;
+        if (string.IsNullOrEmpty(e.Text))
+            return;
+
+        char typed = e.Text[0];
+        if (!char.IsLetter(typed) && typed != '_')
+            return;
+
+        // (re)start the debounce: keep typing and it never fires; pause briefly and the popup opens
+        _completionTimer.Stop();
+        _completionTimer.Start();
+    }
+
+    private void OnCompletionTimerTick(object? sender, EventArgs e)
+    {
+        _completionTimer.Stop();
+        ShowCompletion(explicitTrigger: false);
+    }
+
+    private void ShowCompletion(bool explicitTrigger)
+    {
+        if (Editor.IsReadOnly || _completionWindow is not null || Editor.Document is not { } document)
+            return;
+
+        int caret = Editor.CaretOffset;
+        int start = caret;
+        while (start > 0 && IsIdentifierPart(document.GetCharAt(start - 1)))
+            start--;
+
+        // on auto-trigger require at least one typed character; Ctrl+Space opens with an empty prefix
+        if (!explicitTrigger && caret == start)
+            return;
+
+        var window = new CompletionWindow(Editor.TextArea)
+        {
+            StartOffset = start,
+            EndOffset = caret
+        };
+        window.CompletionList.IsFiltering = true;
+
+        var catalog = FishboneCompletionCatalog.Shared;
+        IList<ICompletionData> items = window.CompletionList.CompletionData;
+        var added = new HashSet<string>(StringComparer.Ordinal);
+
+        // locals declared above the caret (small set — always included, filtered live by the window)
+        foreach (var local in FishboneLocalSymbolScanner.Scan(document.GetText(0, caret)))
+            if (added.Add(local.Text))
+                items.Add(local);
+
+        IReadOnlyList<FishboneCompletionData>? globals;
+        if (caret > start)
+            catalog.GlobalsByInitial.TryGetValue(char.ToLowerInvariant(document.GetCharAt(start)), out globals);
+        else
+            globals = catalog.Globals; // explicit Ctrl+Space with no prefix: offer everything
+
+        if (globals is not null)
+            foreach (var global in globals)
+                if (added.Add(global.Text))
+                    items.Add(global);
+
+        foreach (var keyword in catalog.Keywords)
+            if (added.Add(keyword.Text))
+                items.Add(keyword);
+
+        if (items.Count == 0)
+            return;
+
+        window.Closed += (_, _) => _completionWindow = null;
+        _completionWindow = window;
+        window.Show();
+    }
+
+    private static bool IsIdentifierPart(char c) => char.IsLetterOrDigit(c) || c == '_';
+
+    private void OnCaretPositionChanged(object? sender, EventArgs e) => UpdateSignatureHelp();
+
+    // opens/updates/closes the parameter-hint popup based on the call the caret currently sits inside
+    private void UpdateSignatureHelp()
+    {
+        if (Editor.IsReadOnly || Editor.Document is not { } document)
+        {
+            CloseSignatureHelp();
+            return;
+        }
+
+        if (!TryResolveCall(document, Editor.CaretOffset, out string name, out int activeParameter)
+            || !FishboneCompletionCatalog.Shared.Signatures.TryGetValue(name, out var signatures))
+        {
+            CloseSignatureHelp();
+            return;
+        }
+
+        // (re)create the window when entering a different call; otherwise just move the active parameter
+        if (_insightWindow is null || _signatureName != name)
+        {
+            CloseSignatureHelp();
+            _signatureProvider = new FishboneSignatureProvider(signatures);
+            _signatureName = name;
+            _insightWindow = new OverloadInsightWindow(Editor.TextArea) { Provider = _signatureProvider };
+            _insightWindow.Closed += (_, _) =>
+            {
+                _insightWindow = null;
+                _signatureProvider = null;
+                _signatureName = null;
+            };
+            _insightWindow.Show();
+        }
+
+        _signatureProvider!.ActiveParameterIndex = activeParameter;
+    }
+
+    private void CloseSignatureHelp()
+    {
+        _insightWindow?.Hide();
+        _insightWindow = null;
+        _signatureProvider = null;
+        _signatureName = null;
+    }
+
+    private static bool TryResolveCall(TextDocument document, int caret, out string name, out int activeParameter)
+    {
+        name = string.Empty;
+        activeParameter = 0;
+
+        int depth = 0;
+        int openParen = -1;
+        for (int i = caret - 1; i >= 0; i--)
+        {
+            char c = document.GetCharAt(i);
+            if (c == ')')
+                depth++;
+            else if (c == '(')
+            {
+                if (depth == 0) { openParen = i; break; }
+                depth--;
+            }
+        }
+        if (openParen < 0)
+            return false;
+
+        // identifier immediately before the '(' (skipping whitespace)
+        int end = openParen;
+        while (end > 0 && char.IsWhiteSpace(document.GetCharAt(end - 1)))
+            end--;
+        int startIdent = end;
+        while (startIdent > 0 && IsIdentifierPart(document.GetCharAt(startIdent - 1)))
+            startIdent--;
+        if (startIdent == end)
+            return false;
+        name = document.GetText(startIdent, end - startIdent);
+
+        // count top-level commas between the '(' and the caret
+        int nesting = 0;
+        for (int i = openParen + 1; i < caret; i++)
+        {
+            char c = document.GetCharAt(i);
+            if (c is '(' or '[' or '{')
+                nesting++;
+            else if (c is ')' or ']' or '}')
+                nesting--;
+            else if (c == ',' && nesting == 0)
+                activeParameter++;
+        }
+        return true;
     }
 
     private void OnEditorTextInput(object? sender, TextInputEventArgs e)
