@@ -51,6 +51,8 @@ public partial class App : Application
             desktop.MainWindow = mainWindow;
             if (StartupOptions.AttachPort is int attachPort)
                 Dispatcher.UIThread.Post(() => _ = mainWindowViewModel.AttachRemoteAsync("127.0.0.1", attachPort));
+            if (StartupOptions.FilePath is string filePath)
+                Dispatcher.UIThread.Post(() => _ = mainWindowViewModel.OpenFileFromPathAsync(filePath));
         }
 
         base.OnFrameworkInitializationCompleted();

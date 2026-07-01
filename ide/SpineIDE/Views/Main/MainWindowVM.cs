@@ -728,6 +728,27 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         }
     }
 
+    public async Task OpenFileFromPathAsync(string path)
+    {
+        var scriptsDock = GetScriptsDock(Layout);
+        var existing = scriptsDock?.VisibleDockables?.OfType<ScriptEditorVM>()
+            .FirstOrDefault(editor => !editor.IsRemote && editor.ScriptPath == path);
+        if (existing is not null)
+        {
+            scriptsDock!.ActiveDockable = existing;
+            return;
+        }
+
+        var scriptEditor = new ScriptEditorVM(Path.GetFileName(path), path, await File.ReadAllTextAsync(path));
+        OpenEditorDocument(scriptEditor);
+
+        ScriptEditorVM? initialBlank = scriptsDock?.VisibleDockables?.OfType<ScriptEditorVM>().FirstOrDefault(candidate =>
+            !ReferenceEquals(candidate, scriptEditor) && !candidate.IsRemote && candidate.ScriptPath is null &&
+            !candidate.IsDirty && candidate.ScriptDocument.Text.Length == 0 && candidate.BreakpointLines.Count == 0);
+        if (initialBlank is not null)
+            scriptsDock!.VisibleDockables!.Remove(initialBlank);
+    }
+
     [RelayCommand]
     private void OpenSample(string? fileName)
     {
