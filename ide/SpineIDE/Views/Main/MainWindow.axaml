@@ -41,6 +41,10 @@
     <Window.KeyBindings>
         <KeyBinding Gesture="F5" Command="{Binding DebugCommand}" />
         <KeyBinding Gesture="Ctrl+F5" Command="{Binding ButtonRunCommand}" />
+        <KeyBinding Gesture="Ctrl+N" Command="{Binding NewFileCommand}" />
+        <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenFileCommand}" />
+        <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveFileCommand}" />
+        <KeyBinding Gesture="Ctrl+W" Command="{Binding CloseActiveTabCommand}" />
     </Window.KeyBindings>
 
     <DockPanel>
@@ -111,10 +115,10 @@
                     <MenuItem Header="Bubble Sort"
                               Command="{Binding OpenSampleCommand}"
                               CommandParameter="bubble_sort.fb" />
-					<MenuItem Header="Riemann Sum"
+                    <MenuItem Header="Riemann Sum"
                               Command="{Binding OpenSampleCommand}"
                               CommandParameter="riemann_sum.fb" />
-					<MenuItem Header="OpenCV Edge Detection"
+                    <MenuItem Header="OpenCV Edge Detection"
                               Command="{Binding OpenSampleCommand}"
                               CommandParameter="edge_detect.fb" />
                 </MenuItem>
@@ -123,53 +127,58 @@
             </MenuItem>
         </Menu>
 
-        <Border DockPanel.Dock="Top" Padding="4" Margin="5"
-                BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="0.7" CornerRadius="2">
+        <Border DockPanel.Dock="Top" Padding="4" Margin="5,5" Background="{DynamicResource ToolbarBackgroundBrush}">
 
-            <DockPanel  LastChildFill="False">
+            <DockPanel LastChildFill="False">
 
-                <Button DockPanel.Dock="Left" ToolTip.Tip="Open"
+                <Button Classes="toolbar" DockPanel.Dock="Left" ToolTip.Tip="Open" Margin="0,0,2,0"
                         Command="{Binding OpenFileCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <PathIcon Data="{StaticResource folder_open_regular}" Foreground="{DynamicResource ToolbarIconBrush}" Width="16" Height="16" />
+                        <TextBlock Text="Open..." FontSize="10" VerticalAlignment="Center" />
                     </StackPanel>
                 </Button>
 
-                <Button DockPanel.Dock="Left" ToolTip.Tip="Save" Margin="0,0,13,0"
+                <Button Classes="toolbar" DockPanel.Dock="Left" ToolTip.Tip="Save" Margin="0,0,4,0"
                         Command="{Binding SaveFileCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource save_regular}" Foreground="Orange" Width="16" Height="16" />
+                        <PathIcon Data="{StaticResource save_regular}" Foreground="{DynamicResource ToolbarAccentBrush}" Width="16" Height="16" />
+                        <TextBlock Text="Save" FontSize="10" VerticalAlignment="Center" />
                     </StackPanel>
                 </Button>
 
-                <Button DockPanel.Dock="Left" ToolTip.Tip="Copy" Command="{Binding CopyCommand}">
+                <Border DockPanel.Dock="Left" Width="1" Margin="0,3,4,3" Background="{DynamicResource ToolbarBorderBrush}" />
+
+                <Button Classes="toolbar" DockPanel.Dock="Left" ToolTip.Tip="Copy" Command="{Binding CopyCommand}" Margin="0,0,2,0">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <PathIcon Data="{StaticResource copy_regular}" Foreground="{DynamicResource ToolbarIconBrush}" Width="16" Height="16" />
                     </StackPanel>
                 </Button>
 
-                <Button DockPanel.Dock="Left" ToolTip.Tip="Cut" Command="{Binding CutCommand}">
+                <Button Classes="toolbar" DockPanel.Dock="Left" ToolTip.Tip="Cut" Command="{Binding CutCommand}" Margin="0,0,2,0">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <PathIcon Data="{StaticResource cut_regular}" Foreground="{DynamicResource ToolbarIconBrush}" Width="16" Height="16" />
                     </StackPanel>
                 </Button>
 
-                <Button DockPanel.Dock="Left" ToolTip.Tip="Paste" Command="{Binding PasteCommand}"
-                        Margin="0,0,13,0">
+                <Button Classes="toolbar" DockPanel.Dock="Left" ToolTip.Tip="Paste" Command="{Binding PasteCommand}"
+                        Margin="0,0,4,0">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <PathIcon Data="{StaticResource clipboard_paste_regular}" Foreground="{DynamicResource ToolbarIconBrush}" Width="16" Height="16" />
                     </StackPanel>
                 </Button>
 
-                <Button DockPanel.Dock="Left" ToolTip.Tip="Undo"
+                <Border DockPanel.Dock="Left" Width="1" Margin="0,3,4,3" Background="{DynamicResource ToolbarBorderBrush}" />
+
+                <Button Classes="toolbar" DockPanel.Dock="Left" ToolTip.Tip="Undo" Margin="0,0,2,0"
                         Command="{Binding UndoCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <PathIcon Data="{StaticResource arrow_undo_regular}" Foreground="{DynamicResource ToolbarIconBrush}" Width="16" Height="16" />
                     </StackPanel>
                 </Button>
 
-                <Button DockPanel.Dock="Left" ToolTip.Tip="Redo"
-                        Command="{Binding RedoCommand}" Margin="0,0,13,0">
+                <Button Classes="toolbar" DockPanel.Dock="Left" ToolTip.Tip="Redo"
+                        Command="{Binding RedoCommand}" Margin="0,0,4,0">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <PathIcon Data="{StaticResource arrow_undo_regular}" Foreground="{DynamicResource ToolbarIconBrush}" Width="16" Height="16">
                             <!-- redo symbol outputs same as undo. gh issue unanswered, -->
@@ -181,81 +190,83 @@
                     </StackPanel>
                 </Button>
 
-                <Button DockPanel.Dock="Left" ToolTip.Tip="Remove line comment"
+                <Border DockPanel.Dock="Left" Width="1" Margin="0,3,4,3" Background="{DynamicResource ToolbarBorderBrush}" />
+
+                <Button Classes="toolbar" DockPanel.Dock="Left" ToolTip.Tip="Remove line comment" Margin="0,0,2,0"
                         Command="{Binding RemoveLineCommentCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource text_bullet_list_add_regular}" Foreground="{DynamicResource ToolbarIconBrush}" Width="16" Height="16" />
+                        <PathIcon Data="{StaticResource text_collapse_regular}" Foreground="{DynamicResource ToolbarIconBrush}" Width="16" Height="16" />
                     </StackPanel>
                 </Button>
 
-                <Button DockPanel.Dock="Left" ToolTip.Tip="Add line comment"
-                        Command="{Binding AddLineCommentCommand}" Margin="0,0,13,0">
+                <Button Classes="toolbar" DockPanel.Dock="Left" ToolTip.Tip="Add line comment"
+                        Command="{Binding AddLineCommentCommand}" Margin="0,0,4,0">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <PathIcon Data="{StaticResource text_bullet_list_add_regular}" Foreground="{DynamicResource ToolbarIconBrush}" Width="16" Height="16" />
                     </StackPanel>
                 </Button>
 
-				<Button DockPanel.Dock="Right" Command="{Binding StopCommand}" ToolTip.Tip="Stop">
-					<StackPanel Orientation="Horizontal" Spacing="8">
-						<PathIcon Data="{StaticResource stop_regular}" Width="16" Height="16" Foreground="Red" />
-						<TextBlock Text="Stop" />
-					</StackPanel>
-				</Button>
+                <Border DockPanel.Dock="Left" Width="1" Margin="0,3,4,3" Background="{DynamicResource ToolbarBorderBrush}" />
 
-                <Button DockPanel.Dock="Right" Command="{Binding StepOutCommand}" ToolTip.Tip="Step Out">
-					<StackPanel Orientation="Horizontal" Spacing="8">
-					    <PathIcon Data="{StaticResource arrow_curve_up_right_regular}" Width="16" Height="16" Foreground="{DynamicResource ToolbarIconBrush}" />
-                        <TextBlock Text="Out" />
-					</StackPanel>
-                </Button>
-
-                <Button DockPanel.Dock="Right" Command="{Binding StepIntoCommand}" ToolTip.Tip="Step Into">
-					<StackPanel Orientation="Horizontal" Spacing="8">
-					    <PathIcon Data="{StaticResource arrow_curve_up_right_regular}" Width="16" Height="16" Foreground="{DynamicResource ToolbarIconBrush}">
-						    <PathIcon.RenderTransform>
-							    <ScaleTransform ScaleY="-1" />
-						    </PathIcon.RenderTransform>
-					    </PathIcon>
-                        <TextBlock Text="Into" />
-					</StackPanel>
-                </Button>
-
-				<Button DockPanel.Dock="Right" Command="{Binding StepOverCommand}" ToolTip.Tip="Step Over">
-					<StackPanel Orientation="Horizontal" Spacing="8">
-						<PathIcon Data="{StaticResource arrow_curve_up_left_regular}" Width="16" Height="16" Foreground="{DynamicResource ToolbarIconBrush}">
-							<PathIcon.RenderTransform>
-								<RotateTransform Angle="90" />
-							</PathIcon.RenderTransform>
-						</PathIcon>
-						<TextBlock Text="Over" />
-					</StackPanel>
-				</Button>
-
-				<Button DockPanel.Dock="Right" Command="{Binding PauseCommand}" ToolTip.Tip="Pause">
-					<StackPanel Orientation="Horizontal" Spacing="8">
-						<PathIcon Data="{StaticResource pause_regular}" Width="16" Height="16" Foreground="{DynamicResource ToolbarIconBrush}" />
-						<TextBlock Text="Pause" />
-					</StackPanel>
-				</Button>
-
-                <Button DockPanel.Dock="Right" Command="{Binding ContinueCommand}" ToolTip.Tip="Continue">
-					<StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource play_regular}" Width="16" Height="16" Foreground="Green" />
-					    <TextBlock Text="Continue" VerticalAlignment="Center" />
-					</StackPanel>
-                </Button>
-
-                <Button DockPanel.Dock="Right" Command="{Binding ButtonRunCommand}" ToolTip.Tip="Run without debugging">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource play_regular}" Width="16" Height="16" Foreground="Green" />
-                        <TextBlock Text="Run" VerticalAlignment="Center" />
+                <Button Classes="toolbar" DockPanel.Dock="Left" Command="{Binding DebugCommand}" ToolTip.Tip="Debug" Width="70" Margin="0,0,2,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                        <PathIcon Data="{StaticResource play_regular}" Width="14" Height="14" Foreground="{DynamicResource ToolbarAccentBrush}" />
+                        <TextBlock Text="Debug" VerticalAlignment="Center" FontSize="10" />
                     </StackPanel>
                 </Button>
 
-                <Button DockPanel.Dock="Right" Command="{Binding DebugCommand}" ToolTip.Tip="Debug">
+                <Button Classes="toolbar" DockPanel.Dock="Left" Command="{Binding ButtonRunCommand}" Width="70" ToolTip.Tip="Run without debugging">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                        <PathIcon Data="{StaticResource play_regular}" Width="14" Height="14" Foreground="{DynamicResource ToolbarRunBrush}" />
+                        <TextBlock Text="Run" VerticalAlignment="Center" FontSize="10" />
+                    </StackPanel>
+                </Button>
+
+                <Button Classes="toolbar" DockPanel.Dock="Right" Command="{Binding StopCommand}" ToolTip.Tip="Stop" Margin="2,0,0,0">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource play_regular}" Width="16" Height="16" Foreground="Orange" />
-                        <TextBlock Text="Debug" VerticalAlignment="Center" />
+                        <PathIcon Data="{StaticResource stop_regular}" Width="16" Height="16" Foreground="Red" />
+                    </StackPanel>
+                </Button>
+
+                <Border DockPanel.Dock="Right" Width="1" Margin="4,3,2,3" Background="{DynamicResource ToolbarBorderBrush}" />
+
+                <Button Classes="toolbar" DockPanel.Dock="Right" Command="{Binding StepOutCommand}" ToolTip.Tip="Step Out" Margin="2,0,0,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <PathIcon Data="{StaticResource arrow_curve_up_right_regular}" Width="16" Height="16" Foreground="{DynamicResource ToolbarIconBrush}" />
+                    </StackPanel>
+                </Button>
+
+                <Button Classes="toolbar" DockPanel.Dock="Right" Command="{Binding StepIntoCommand}" ToolTip.Tip="Step Into" Margin="2,0,0,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <PathIcon Data="{StaticResource arrow_curve_up_right_regular}" Width="16" Height="16" Foreground="{DynamicResource ToolbarIconBrush}">
+                            <PathIcon.RenderTransform>
+                                <ScaleTransform ScaleY="-1" />
+                            </PathIcon.RenderTransform>
+                        </PathIcon>
+                    </StackPanel>
+                </Button>
+
+                <Button Classes="toolbar" DockPanel.Dock="Right" Command="{Binding StepOverCommand}" ToolTip.Tip="Step Over" Margin="2,0,0,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <PathIcon Data="{StaticResource arrow_curve_up_left_regular}" Width="16" Height="16" Foreground="{DynamicResource ToolbarIconBrush}">
+                            <PathIcon.RenderTransform>
+                                <RotateTransform Angle="90" />
+                            </PathIcon.RenderTransform>
+                        </PathIcon>
+                    </StackPanel>
+                </Button>
+
+                <Border DockPanel.Dock="Right" Width="1" Margin="4,3,2,3" Background="{DynamicResource ToolbarBorderBrush}" />
+
+                <Button Classes="toolbar" DockPanel.Dock="Right" Command="{Binding PauseCommand}" ToolTip.Tip="Pause" Margin="2,0,0,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <PathIcon Data="{StaticResource pause_regular}" Width="16" Height="16" Foreground="{DynamicResource ToolbarIconBrush}" />
+                    </StackPanel>
+                </Button>
+
+                <Button Classes="toolbar" DockPanel.Dock="Right" Command="{Binding ContinueCommand}" ToolTip.Tip="Continue" Margin="2,0,0,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <PathIcon Data="{StaticResource play_regular}" Width="16" Height="16" Foreground="{DynamicResource ToolbarRunBrush}" />
                     </StackPanel>
                 </Button>
 
@@ -267,77 +278,9 @@
 
             <TextBlock DockPanel.Dock="Left"
                        Text="SpineIDE v0.1"
-					   FontSize="12"
+                       FontSize="12"
                        VerticalAlignment="Center"
                        Margin="8,3" />
-
-            <!--<Button Name="ErrorButton"
-                    DockPanel.Dock="Right"
-                    Width="120"
-                    Margin="3"
-                    HorizontalContentAlignment="Center">
-                <Button.Flyout>
-                    <Flyout Placement="Top">
-                        <DockPanel MinWidth="350" MaxWidth="350" MinHeight="500" MaxHeight="500">
-
-                            <TextBlock DockPanel.Dock="Top" Text="Current errors" />
-
-                            <ListBox DockPanel.Dock="Top" ItemsSource="{Binding ErrorService.Errors}">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <DockPanel Margin="5,5,5,0">
-                                            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal">
-
-                                                <TextBlock DockPanel.Dock="Top"
-                                                           Foreground="Orange"
-                                                           Text="Error in line "
-                                                           VerticalAlignment="Center"/>
-
-                                                <TextBlock DockPanel.Dock="Top"
-                                                           Foreground="Orange"
-                                                       Text="{Binding Line}"
-                                                       FontWeight="Bold"
-                                                       VerticalAlignment="Center"/>
-
-                                                <TextBlock DockPanel.Dock="Top"
-                                                           Foreground="Orange"
-                                                           Text=", column "
-                                                           VerticalAlignment="Center"/>
-
-                                                <TextBlock DockPanel.Dock="Top"
-                                                           Foreground="Orange"
-                                                           Text="{Binding Column}"
-                                                           FontWeight="Bold"
-                                                           VerticalAlignment="Center"/>
-                                            </StackPanel>
-
-                                            <TextBlock DockPanel.Dock="Top"
-                                                       Text="{Binding ExMessage}"
-                                                       TextWrapping="Wrap"/>
-                                        </DockPanel>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                        </DockPanel>
-                    </Flyout>
-                </Button.Flyout>
-
-                <StackPanel Orientation="Horizontal" Spacing="5">
-                    <TextBlock Text="Errors"/>
-                    <Border Background="Red"
-                            CornerRadius="10"
-                            Padding="5,0"
-                            IsVisible="{Binding ErrorService.Errors.Count}">
-                        <TextBlock Text="{Binding ErrorService.Errors.Count}"
-                                   FontSize="10"
-                                   Foreground="White"
-                                   VerticalAlignment="Center"
-                                   HorizontalAlignment="Center"
-                                   FontWeight="Bold"/>
-                    </Border>
-                </StackPanel>
-            </Button>-->
-
         </DockPanel>
 
         <dock:DockControl DockPanel.Dock="Top" Layout="{Binding Layout}" />

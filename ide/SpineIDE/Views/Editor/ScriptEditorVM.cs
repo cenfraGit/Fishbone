@@ -26,6 +26,10 @@ public partial class ScriptEditorVM : Document, IRecipient<MessageRunActiveScrip
     [NotifyPropertyChangedFor(nameof(IsReadOnly))]
     [NotifyPropertyChangedFor(nameof(CanToggleBreakpoints))]
     private bool _isDebugging;
+
+    // tracks unsaved edits so closing a tab can prompt to save; reset on save, set on any text edit
+    [ObservableProperty] private bool _isDirty;
+    private TextDocument? _trackedDocument;
     public string SourceId { get; }
     public bool IsRemote { get; }
     public bool IsReadOnly => IsDebugging || IsRemote;
@@ -73,6 +77,16 @@ public partial class ScriptEditorVM : Document, IRecipient<MessageRunActiveScrip
     // --------------------------------------------------------------------------------
     // methods
     // --------------------------------------------------------------------------------
+
+    partial void OnScriptDocumentChanged(TextDocument value)
+    {
+        if (_trackedDocument is not null)
+            _trackedDocument.TextChanged -= OnDocumentTextChanged;
+        _trackedDocument = value;
+        value.TextChanged += OnDocumentTextChanged;
+    }
+
+    private void OnDocumentTextChanged(object? sender, EventArgs e) => IsDirty = true;
 
     public async void Receive(MessageRunActiveScript m)
     {

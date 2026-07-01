@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using SpineIDE.Models;
 using SpineIDE.Panels;
 using SpineIDE.Views.Input;
 using SpineIDE.Views.Variables;
@@ -20,6 +21,7 @@ public interface IDialogService
     Task ShowVariableDetailsAsync(string name, object? value);
     Task<string> ShowScriptInputAsync(CancellationToken cancellationToken);
     Task<RemoteAttachEndpoint?> ShowRemoteAttachAsync();
+    Task<SaveConfirmationResult> ShowSaveConfirmationAsync(string fileName);
 }
 
 public class DialogService : IDialogService
@@ -89,6 +91,15 @@ public class DialogService : IDialogService
         if (_mainWindow == null)
             throw new InvalidOperationException("DialogService: window was null");
         return await new RemoteAttachWindow().ShowDialog<RemoteAttachEndpoint?>(_mainWindow);
+    }
+
+    public async Task<SaveConfirmationResult> ShowSaveConfirmationAsync(string fileName)
+    {
+        if (_mainWindow == null)
+            throw new InvalidOperationException("DialogService: window was null");
+
+        var window = new SaveConfirmationWindow(fileName);
+        return await window.ShowDialog<SaveConfirmationResult>(_mainWindow);
     }
 
     private static FilePickerFileType SvsFileType => new("Fishbone Files")

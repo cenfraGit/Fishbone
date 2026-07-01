@@ -2,6 +2,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="SpineIDE.App"
              xmlns:local="using:SpineIDE"
+             xmlns:dockc="clr-namespace:Dock.Avalonia.Controls;assembly=Dock.Avalonia"
+             xmlns:aefolding="clr-namespace:AvaloniaEdit.Folding;assembly=AvaloniaEdit"
              RequestedThemeVariant="Dark">
     <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
 
@@ -29,6 +31,12 @@
                 <SolidColorBrush x:Key="VariableTypeBrush" Color="#9CDCFE" />
                 <SolidColorBrush x:Key="VariableValueBrush" Color="#CE9178" />
                 <SolidColorBrush x:Key="ToolbarIconBrush" Color="#ABB2BF" />
+                <!-- toolbar-specific: border dimmer than icon text; accent/run tuned for dark bg -->
+                <Color x:Key="ToolbarBorderColor">#3E4452</Color>
+                <SolidColorBrush x:Key="ToolbarBorderBrush" Color="{StaticResource ToolbarBorderColor}" />
+                <SolidColorBrush x:Key="ToolbarBackgroundBrush" Color="{StaticResource ToolbarBorderColor}" Opacity="0.18" />
+                <SolidColorBrush x:Key="ToolbarAccentBrush" Color="#E08A10" />
+                <SolidColorBrush x:Key="ToolbarRunBrush" Color="#4EC96E" />
             </ResourceDictionary>
             <ResourceDictionary x:Key="Light">
                 <SolidColorBrush x:Key="AppBackgroundBrush" Color="#FAFAFA" />
@@ -43,6 +51,12 @@
                 <SolidColorBrush x:Key="VariableTypeBrush" Color="#0070C1" />
                 <SolidColorBrush x:Key="VariableValueBrush" Color="#A31515" />
                 <SolidColorBrush x:Key="ToolbarIconBrush" Color="#383A42" />
+                <!-- toolbar-specific: darker border for visibility on light bg; accent/run tuned for light bg -->
+                <Color x:Key="ToolbarBorderColor">#9AA1AE</Color>
+                <SolidColorBrush x:Key="ToolbarBorderBrush" Color="{StaticResource ToolbarBorderColor}" />
+                <SolidColorBrush x:Key="ToolbarBackgroundBrush" Color="{StaticResource ToolbarBorderColor}" Opacity="0.12" />
+                <SolidColorBrush x:Key="ToolbarAccentBrush" Color="#B85A00" />
+                <SolidColorBrush x:Key="ToolbarRunBrush" Color="#2D7A3A" />
             </ResourceDictionary>
         </ResourceDictionary.ThemeDictionaries>
 
@@ -77,6 +91,10 @@
 
 		<StreamGeometry x:Key="stop_regular">M19.25 4.5C19.3881 4.5 19.5 4.61193 19.5 4.75V19.25C19.5 19.3881 19.3881 19.5 19.25 19.5H4.75C4.61193 19.5 4.5 19.3881 4.5 19.25V4.75C4.5 4.61193 4.61193 4.5 4.75 4.5H19.25ZM4.75 3C3.7835 3 3 3.7835 3 4.75V19.25C3 20.2165 3.7835 21 4.75 21H19.25C20.2165 21 21 20.2165 21 19.25V4.75C21 3.7835 20.2165 3 19.25 3H4.75Z</StreamGeometry>
 
+        <StreamGeometry x:Key="text_collapse_regular">M6.75 4.5H21.25C21.6642 4.5 22 4.16421 22 3.75C22 3.3703 21.7178 3.05651 21.3518 3.00685L21.25 3H6.75C6.33579 3 6 3.33579 6 3.75C6 4.1297 6.28215 4.44349 6.64823 4.49315L6.75 4.5Z M6.75 19.5H21.25C21.6642 19.5 22 19.1642 22 18.75C22 18.3703 21.7178 18.0565 21.3518 18.0068L21.25 18H6.75C6.33579 18 6 18.3358 6 18.75C6 19.1297 6.28215 19.4435 6.64823 19.4932L6.75 19.5Z M13.75 8C13.3358 8 13 8.33579 13 8.75C13 9.16421 13.3358 9.5 13.75 9.5H21.25C21.6642 9.5 22 9.16421 22 8.75C22 8.33579 21.6642 8 21.25 8H13.75Z M13 13.75C13 13.3358 13.3358 13 13.75 13H21.25C21.6642 13 22 13.3358 22 13.75C22 14.1642 21.6642 14.5 21.25 14.5H13.75C13.3358 14.5 13 14.1642 13 13.75Z M11 11.5C11 13.9853 8.98528 16 6.5 16C4.01472 16 2 13.9853 2 11.5C2 9.01472 4.01472 7 6.5 7C8.98528 7 11 9.01472 11 11.5ZM9 11.5C9 11.2239 8.77614 11 8.5 11H4.5C4.22386 11 4 11.2239 4 11.5C4 11.7761 4.22386 12 4.5 12H8.5C8.77614 12 9 11.7761 9 11.5Z</StreamGeometry>
+
+        <StreamGeometry x:Key="line_horizontal_5_regular">M2 3.5C2 3.22386 2.22386 3 2.5 3H17.5C17.7761 3 18 3.22386 18 3.5C18 3.77614 17.7761 4 17.5 4H2.5C2.22386 4 2 3.77614 2 3.5Z M2 9.5C2 9.22386 2.22386 9 2.5 9H17.5C17.7761 9 18 9.22386 18 9.5C18 9.77614 17.7761 10 17.5 10H2.5C2.22386 10 2 9.77614 2 9.5Z M2.5 6C2.22386 6 2 6.22386 2 6.5C2 6.77614 2.22386 7 2.5 7H17.5C17.7761 7 18 6.77614 18 6.5C18 6.22386 17.7761 6 17.5 6H2.5Z M2 12.5C2 12.2239 2.22386 12 2.5 12H17.5C17.7761 12 18 12.2239 18 12.5C18 12.7761 17.7761 13 17.5 13H2.5C2.22386 13 2 12.7761 2 12.5Z M2.5 15C2.22386 15 2 15.2239 2 15.5C2 15.7761 2.22386 16 2.5 16H17.5C17.7761 16 18 15.7761 18 15.5C18 15.2239 17.7761 15 17.5 15H2.5Z</StreamGeometry>
+
       </ResourceDictionary>
     </Application.Resources>
 
@@ -97,11 +115,44 @@
         <!-- the menu bar shares the app background so the chrome reads as one surface -->
         <Style Selector="Menu">
             <Setter Property="Background" Value="{DynamicResource AppBackgroundBrush}" />
+            <Setter Property="Padding" Value="0,2" />
+        </Style>
+
+        <Style Selector="MenuItem">
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="MinHeight" Value="20" />
+        </Style>
+
+        <!-- scoped to toolbar buttons only so dock tab-close and other buttons are unaffected -->
+        <Style Selector="Button.toolbar">
+            <Setter Property="Padding" Value="4,3" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="BorderThickness" Value="0.8" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ToolbarBorderBrush}" />
+        </Style>
+
+        <!-- shrink the document/tool tab strips: the fluent theme's tab item ControlTheme sets an
+             explicit Height, which beats a MinHeight-only override, so Height must be set here too -->
+        <Style Selector="dockc|DocumentTabStripItem">
+            <Setter Property="Padding" Value="8,0" />
+            <Setter Property="FontSize" Value="8" />
+			<Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
         <Style Selector="TextBlock">
             <Setter Property="FontFamily" Value="{StaticResource TitilliumWeb}" />
-            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontSize" Value="11" />
+        </Style>
+
+        <!-- code-folding [+]/[-] markers: FoldingMarginMarker.Render always draws the +/- symbol
+             lines with SelectedFoldingMarkerBrush (not conditional on hover) - only the box fill
+             and border swap between the non-hover and "Selected" (hover) brush pairs. So the symbol
+             brush must contrast with the non-hover fill, or it's invisible until hovered. -->
+        <Style Selector="aefolding|FoldingMargin">
+            <Setter Property="FoldingMarkerBrush" Value="{DynamicResource EditorForegroundBrush}" />
+            <Setter Property="FoldingMarkerBackgroundBrush" Value="{DynamicResource EditorBackgroundBrush}" />
+            <Setter Property="SelectedFoldingMarkerBrush" Value="{DynamicResource EditorForegroundBrush}" />
+            <Setter Property="SelectedFoldingMarkerBackgroundBrush" Value="{DynamicResource ToolbarBorderBrush}" />
         </Style>
     </Application.Styles>
 </Application>

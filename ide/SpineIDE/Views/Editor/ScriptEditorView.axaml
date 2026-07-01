@@ -12,6 +12,6 @@
                            Foreground="{DynamicResource EditorForegroundBrush}"
                            ShowLineNumbers="True"
                            FontFamily="{StaticResource CascadiaCode}"
-					   LineNumbersMargin="10,0,0,0"
+                           LineNumbersMargin="10,0,0,0"
                            IsReadOnly="{Binding IsReadOnly}"/>
 </UserControl>

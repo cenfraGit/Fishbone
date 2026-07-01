@@ -20,6 +20,7 @@ using Fishbone.Parser;
 using SpineIDE.Models.Layout;
 using SpineIDE.Models.Messages;
 using SpineIDE.Models;
+using SaveConfirmationResult = SpineIDE.Models.SaveConfirmationResult;
 using SpineIDE.Panels;
 using SpineIDE.Services;
 using SpineIDE.Views.Editor;
@@ -783,6 +784,7 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         }
 
         await File.WriteAllTextAsync(activeEditor.ScriptPath, activeEditor.ScriptDocument.Text);
+        activeEditor.IsDirty = false;
     }
 
     [RelayCommand]
@@ -810,6 +812,30 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
                 // ...?
             }
         }
+    }
+
+    [RelayCommand]
+    private async Task CloseActiveTab()
+    {
+        var scriptsDock = GetScriptsDock(Layout);
+        if (scriptsDock?.ActiveDockable is not ScriptEditorVM activeEditor)
+            return;
+
+        if (activeEditor.IsDirty)
+        {
+            var choice = await _dialogService.ShowSaveConfirmationAsync(activeEditor.Title ?? "Untitled");
+            if (choice == SaveConfirmationResult.Cancel)
+                return;
+
+            if (choice == SaveConfirmationResult.Save)
+            {
+                await OnSaveFile();
+                if (activeEditor.IsDirty)
+                    return; // save was cancelled (e.g. Save As dialog dismissed)
+            }
+        }
+
+        scriptsDock.VisibleDockables?.Remove(activeEditor);
     }
 
     [RelayCommand]

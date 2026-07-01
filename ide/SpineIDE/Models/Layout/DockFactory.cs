@@ -60,7 +60,13 @@ public class DockFactory : Factory
             VariableExplorer = variableExplorer;
             VariablesToolDock = variablesToolDock;
             OutputToolDock = outputToolDock;
-            var documentDock = new DocumentDock { Id = "Scripts", ActiveDockable = scriptEditor, VisibleDockables = CreateList<IDockable>(scriptEditor) };
+            var documentDock = new DocumentDock
+            {
+                Id = "Scripts",
+                ActiveDockable = scriptEditor,
+                VisibleDockables = CreateList<IDockable>(scriptEditor),
+                IsCollapsable = false
+            };
 
             //variablesToolDock.Proportion = 0.5;
             _outputPanel.Id = "Output";
