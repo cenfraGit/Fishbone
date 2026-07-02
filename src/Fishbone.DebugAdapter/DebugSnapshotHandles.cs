@@ -47,7 +47,8 @@ public sealed class DebugSnapshotHandles
                 CreateScope("Locals", frame.Variables, "locals")
             };
 
-            if (_frames.First().Key == frameId)
+            if (_frames.First().Key == frameId
+                && !SameVariableSet(frame.Variables, _snapshot.VisibleVariables))
                 scopes.Add(CreateScope("Visible Variables", _snapshot.VisibleVariables, "locals"));
 
             var globals = _snapshot.CallStack[^1].Variables;
@@ -82,6 +83,21 @@ public sealed class DebugSnapshotHandles
     public DebugExceptionSnapshot? GetException()
     {
         lock (_sync) return _snapshot?.Exception;
+    }
+
+    // Two scopes are treated as the same when they expose the same set of variable names — enough to
+    // recognize that "Visible Variables" adds nothing over "Locals" at global scope.
+    private static bool SameVariableSet(IReadOnlyList<DebugVariableSnapshot> a, IReadOnlyList<DebugVariableSnapshot> b)
+    {
+        if (a.Count != b.Count)
+            return false;
+        var names = new HashSet<string>(a.Count);
+        foreach (var variable in a)
+            names.Add(variable.Name);
+        foreach (var variable in b)
+            if (!names.Contains(variable.Name))
+                return false;
+        return true;
     }
 
     private Scope CreateScope(string name, IReadOnlyList<DebugVariableSnapshot> values, string? hint)

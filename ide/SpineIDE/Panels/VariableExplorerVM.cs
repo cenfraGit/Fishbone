@@ -22,52 +22,74 @@ public partial class VariableItem : ObservableObject
     public ObservableCollection<VariableItem> Children { get; } = [];
     public FishboneVariableHandle? ChildrenHandle { get; init; }
     public IFishboneDebugClientSession? Session { get; init; }
+
+    /// <summary>
+    /// A stand-in child that makes the native tree expander chevron appear for a lazily-loaded node
+    /// before its real children are fetched; it is replaced by the real children on first expand.
+    /// </summary>
+    public bool IsPlaceholder { get; init; }
+
     [ObservableProperty] private bool _isExpanded;
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private bool _canLoadChildren = true;
-    public bool HasChildren => Children.Count > 0 || ChildrenHandle is not null;
 
-    [RelayCommand]
-    private async Task ToggleExpanded()
+    private bool _childrenLoaded;
+    private bool _loadingChildren;
+
+    // The native expander toggles IsExpanded (TwoWay-bound in XAML); load lazy children when it opens.
+    partial void OnIsExpandedChanged(bool value)
     {
-        if (IsExpanded)
-        {
-            IsExpanded = false;
-            return;
-        }
-
-        if (Children.Count == 0 && ChildrenHandle is not null && Session is not null && CanLoadChildren)
-        {
-            IsLoading = true;
-            try
-            {
-                foreach (FishboneDebugVariable child in await Session.GetVariablesAsync(ChildrenHandle))
-                    Children.Add(FromDebugVariable(child, Session));
-            }
-            catch (InvalidOperationException)
-            {
-                CanLoadChildren = false;
-            }
-            finally
-            {
-                IsLoading = false;
-            }
-        }
-        IsExpanded = true;
+        if (value)
+            _ = EnsureChildrenLoadedAsync();
     }
 
-    public static VariableItem FromDebugVariable(FishboneDebugVariable variable, IFishboneDebugClientSession session) => new()
+    private async Task EnsureChildrenLoadedAsync()
     {
-        Name = variable.Name,
-        Type = variable.Type ?? string.Empty,
-        ValueDisplay = variable.Value,
-        ChildrenHandle = variable.ChildrenHandle,
-        Session = session
-    };
+        if (_childrenLoaded || _loadingChildren)
+            return;
+        if (ChildrenHandle is null || Session is null || !CanLoadChildren)
+            return;
+
+        _loadingChildren = true;
+        IsLoading = true;
+        try
+        {
+            var loaded = await Session.GetVariablesAsync(ChildrenHandle);
+            Children.Clear(); // remove the placeholder now that the real children are available
+            foreach (FishboneDebugVariable child in loaded)
+                Children.Add(FromDebugVariable(child, Session));
+            _childrenLoaded = true;
+        }
+        catch (InvalidOperationException)
+        {
+            CanLoadChildren = false;
+        }
+        finally
+        {
+            _loadingChildren = false;
+            IsLoading = false;
+        }
+    }
+
+    public static VariableItem FromDebugVariable(FishboneDebugVariable variable, IFishboneDebugClientSession session)
+    {
+        var item = new VariableItem
+        {
+            Name = variable.Name,
+            Type = variable.Type ?? string.Empty,
+            ValueDisplay = variable.Value,
+            ChildrenHandle = variable.ChildrenHandle,
+            Session = session
+        };
+        // seed a placeholder so the native expander shows for a not-yet-loaded lazy node
+        if (variable.ChildrenHandle is not null)
+            item.Children.Add(new VariableItem { IsPlaceholder = true });
+        return item;
+    }
 
     public void InvalidateUnloadedHandles()
     {
-        if (ChildrenHandle is not null && Children.Count == 0)
+        if (ChildrenHandle is not null && !_childrenLoaded)
             CanLoadChildren = false;
         foreach (VariableItem child in Children)
             child.InvalidateUnloadedHandles();

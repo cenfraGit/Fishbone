@@ -19,17 +19,11 @@
             </TreeView.Styles>
             <TreeView.ItemTemplate>
                 <TreeDataTemplate DataType="panels:VariableItem" ItemsSource="{Binding Children}">
-                    <Grid ColumnDefinitions="Auto,2*,*,3*" MinHeight="25">
-                        <Button Grid.Column="0"
-                                Command="{Binding ToggleExpandedCommand}"
-                                IsVisible="{Binding HasChildren}"
-                                Background="Transparent" BorderThickness="0" Padding="3"
-                                ToolTip.Tip="Expand variable">
-                            <TextBlock Text=">" FontSize="16" />
-                        </Button>
-                        <TextBlock Grid.Column="1" Text="{Binding Name}" Margin="5,3" />
-                        <TextBlock Grid.Column="2" Text="{Binding Type}" Margin="5,3" Foreground="{DynamicResource VariableTypeBrush}" />
-                        <TextBlock Grid.Column="3" Text="{Binding ValueDisplay}" Margin="5,3" Foreground="{DynamicResource VariableValueBrush}" TextTrimming="CharacterEllipsis" />
+                    <!-- expand/collapse uses the TreeView's native chevron; rows are vertically centered -->
+                    <Grid ColumnDefinitions="2*,*,3*" MinHeight="22">
+                        <TextBlock Grid.Column="0" Text="{Binding Name}" Margin="4,0" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Text="{Binding Type}" Margin="4,0" VerticalAlignment="Center" Foreground="{DynamicResource VariableTypeBrush}" />
+                        <TextBlock Grid.Column="2" Text="{Binding ValueDisplay}" Margin="4,0" VerticalAlignment="Center" Foreground="{DynamicResource VariableValueBrush}" TextTrimming="CharacterEllipsis" />
                     </Grid>
                 </TreeDataTemplate>
             </TreeView.ItemTemplate>
