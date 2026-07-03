@@ -17,6 +17,13 @@ sealed class Program
             return;
         }
 
+        // Single instance: if a SpineIDE window is already open, hand it our startup
+        // options (attach port / file to open) and exit — its window re-attaches in
+        // place instead of a second window opening. If the primary can't be reached
+        // (e.g. it is mid-shutdown), fall through and start normally.
+        if (!SingleInstance.TryBecomePrimary() && SingleInstance.TrySignalPrimary(startupOptions))
+            return;
+
         App.StartupOptions = startupOptions;
         BuildAvaloniaApp().StartWithClassicDesktopLifetime([]);
     }
