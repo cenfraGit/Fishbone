@@ -63,11 +63,30 @@ internal static class ReflectionCache
         var methods = type
             .GetMethods(InstanceMembers)
             .Where(method => method.Name == name && !method.IsSpecialName)
+            // a 'new'-style redeclaration (e.g. Exception.GetType hiding Object.GetType) surfaces
+            // as two identical signatures; keep only the most-derived one so overload resolution
+            // doesn't consider the call ambiguous
+            .GroupBy(SignatureKey)
+            .Select(group => group.OrderByDescending(m => DerivationDepth(m.DeclaringType)).First())
             .ToArray();
         if (methods.Length > 0)
             return new MemberLookup { Methods = methods };
 
         return MemberLookup.None;
+    }
+
+    private static string SignatureKey(MethodInfo method) =>
+        $"{method.GetGenericArguments().Length}:{string.Join(",", method.GetParameters().Select(p => p.ParameterType.FullName ?? p.ParameterType.Name))}";
+
+    private static int DerivationDepth(Type? type)
+    {
+        int depth = 0;
+        while (type is not null)
+        {
+            depth++;
+            type = type.BaseType;
+        }
+        return depth;
     }
 }
 
