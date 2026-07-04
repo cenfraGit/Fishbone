@@ -49,8 +49,9 @@ if (false)
         var ifNode = Assert.IsType<IfNode>(ast.Statements[1]);
         AssertLocation(ifNode, 4, 1);
 
+        // an "else if" is a nested ifStat, so the node anchors at its own `if` keyword
         var elseIfNode = Assert.IsType<IfNode>(ifNode.ElseBranch);
-        AssertLocation(elseIfNode, 7, 3);
+        AssertLocation(elseIfNode, 7, 8);
         AssertLocation(elseIfNode.Condition, 7, 12);
     }
 
