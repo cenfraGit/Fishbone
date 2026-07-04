@@ -76,7 +76,8 @@ COLON  : ':' ;
 
 INT    : [0-9]+ ('_'+ [0-9]+)* ;
 DOUBLE : [0-9]* '.' [0-9]+ ;
-STRING : '"' ~["]* '"' ; // anything that isnt a quote
+STRING : '"' (ESC | ~["\\\r\n])* '"' ;
+fragment ESC : '\\' . ;
 
 PLUS  : '+' ;
 MINUS : '-' ;

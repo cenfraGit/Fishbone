@@ -1,4 +1,5 @@
 using Fishbone.Interpreter;
+using System.Globalization;
 
 namespace Fishbone.Engine;
 
@@ -133,18 +134,20 @@ public class FishboneConfiguration
 
     private void AddDefaultReflection()
     {
+        // conversions parse and format with the invariant culture so scripts behave the
+        // same regardless of the host machine's locale
         BuiltIns["int"] = new Func<object?, int>(value =>
         {
             if (value is null) return 0;
             if (value is string str)
             {
-                if (double.TryParse(str, out double strDouble))
+                if (double.TryParse(str, NumberStyles.Float, CultureInfo.InvariantCulture, out double strDouble))
                     return (int)strDouble;
-                return int.TryParse(str, out int strInt) ? strInt : 0;
+                return int.TryParse(str, NumberStyles.Integer, CultureInfo.InvariantCulture, out int strInt) ? strInt : 0;
             }
             try
             {
-                return (int)Convert.ChangeType(value, typeof(int));
+                return (int)Convert.ChangeType(value, typeof(int), CultureInfo.InvariantCulture);
             }
             catch
             {
@@ -156,12 +159,12 @@ public class FishboneConfiguration
         {
             if (value is null) return 0.0;
             if (value is string str)
-                if (double.TryParse(str, out double strDouble))
+                if (double.TryParse(str, NumberStyles.Float, CultureInfo.InvariantCulture, out double strDouble))
                     return strDouble;
 
             try
             {
-                return (double)Convert.ChangeType(value, typeof(double));
+                return (double)Convert.ChangeType(value, typeof(double), CultureInfo.InvariantCulture);
             }
             catch
             {
@@ -169,6 +172,6 @@ public class FishboneConfiguration
             }
         });
 
-        BuiltIns["string"] = new Func<object?, string>(value => value?.ToString() ?? string.Empty);
+        BuiltIns["string"] = new Func<object?, string>(value => Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty);
     }
 }
