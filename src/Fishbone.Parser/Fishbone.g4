@@ -55,6 +55,7 @@ expr
     | (MINUS|NOT) expr                        #UnaryExpr
     | expr (MUL|DIV|MOD) expr                 #BinaryExpr
     | expr (PLUS|MINUS) expr                  #BinaryExpr
+    | expr AS ID                              #CastExpr
     | expr (GE|LE|GT|LT) expr                 #BinaryExpr
     | expr (EQ|NEQ) expr                      #BinaryExpr
     | expr (AND|OR|XOR) expr                  #BoolOperatorExpr
@@ -116,6 +117,7 @@ WHILE   : 'while' ;
 FOREACH : 'foreach' ;
 FOR     : 'for' ;
 IN      : 'in';
+AS      : 'as';
 FUNC    : 'func' ;
 BREAK   : 'break' ;
 CONTINUE: 'continue' ;

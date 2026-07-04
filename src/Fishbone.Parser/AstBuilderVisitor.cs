@@ -258,6 +258,13 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         return new IdentifierNode(context.ID().GetText()) { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }
 
+    public override AstNode VisitCastExpr(FishboneParser.CastExprContext context)
+    {
+        var value = Visit(context.expr());
+        var typeName = context.ID().GetText();
+        return new CastNode(value, typeName) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+    }
+
     public override AstNode VisitIntExpr(FishboneParser.IntExprContext context)
     {
         var text = context.INT().GetText();

@@ -24,7 +24,7 @@ public sealed class FishboneCompletionCatalog
     // grammar keywords (Fishbone.g4). 'import' is included since it is script-level syntax.
     private static readonly string[] KeywordNames =
     [
-        "let", "func", "if", "else", "while", "foreach", "in",
+        "let", "func", "if", "else", "while", "foreach", "in", "as",
         "return", "break", "continue", "true", "false", "null"
     ];
 

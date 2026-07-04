@@ -51,6 +51,18 @@ public class FishboneEnvironment
     public bool IsDefined(string name) =>
         _values.ContainsKey(name) || (_parent?.IsDefined(name) ?? false);
 
+    public bool TryGetValue(string name, out object? value)
+    {
+        if (_values.TryGetValue(name, out value))
+            return true;
+        if (_builtins.TryGetValue(name, out value))
+            return true;
+        if (_parent != null)
+            return _parent.TryGetValue(name, out value);
+        value = null;
+        return false;
+    }
+
     public object GetValue(string name)
     {
         if (_values.TryGetValue(name, out var val))

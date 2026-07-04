@@ -1,6 +1,7 @@
 using Fishbone.Core;
 using Fishbone.Debugging;
 using System.Collections;
+using System.Globalization;
 using System.Reflection;
 
 namespace Fishbone.Interpreter;
@@ -56,6 +57,7 @@ public class FishboneInterpreter
             IndexedAssignmentNode indexedAssignment => EvaluateIndexedAssignment(env, indexedAssignment),
             UnaryOpNode unary => EvaluateUnary(env, unary),
             BinaryOpNode binary => EvaluateBinary(env, binary),
+            CastNode castNode => EvaluateCast(env, castNode)!,
             IfNode ifNode => EvaluateIf(env, ifNode),
             WhileNode whileNode => EvaluateWhile(env, whileNode),
             ForeachNode foreachNode => EvaluateForeach(env, foreachNode),
@@ -231,6 +233,46 @@ public class FishboneInterpreter
             ">=" => left >= right,
             _ => throw new Exception($"Unknown binary operator: {node.Operator}")
         };
+    }
+
+    // names accepted as cast targets when the environment doesn't resolve them to a type;
+    // "int" etc. normally resolve to the conversion builtins, which are functions, not types
+    private static readonly Dictionary<string, Type> PrimitiveTypeNames = new(StringComparer.Ordinal)
+    {
+        ["int"] = typeof(int),
+        ["double"] = typeof(double),
+        ["string"] = typeof(string),
+        ["bool"] = typeof(bool),
+    };
+
+    internal object? EvaluateCast(FishboneEnvironment env, CastNode node)
+    {
+        var targetType = ResolveCastTargetType(env, node);
+        var value = Evaluate(env, node.Value);
+
+        if (value is null)
+            return null;
+        if (targetType.IsInstanceOfType(value))
+            return value;
+        return TryConvertArgument(value, targetType, out var converted) ? converted : null;
+    }
+
+    private Type ResolveCastTargetType(FishboneEnvironment env, CastNode node)
+    {
+        if (env.TryGetValue(node.TypeName, out var resolved))
+        {
+            if (resolved is RegisteredType registeredType)
+                return registeredType.Type;
+            if (resolved is Type type)
+                return type;
+        }
+
+        if (PrimitiveTypeNames.TryGetValue(node.TypeName, out var primitive))
+            return primitive;
+
+        throw new FishboneRuntimeException(
+            $"\"{node.TypeName}\" is not a type; casting requires a registered type (AddType) or one of: {string.Join(", ", PrimitiveTypeNames.Keys)}.",
+            node.Line, node.Column);
     }
 
     internal object EvaluateIf(FishboneEnvironment env, IfNode node)
@@ -848,7 +890,7 @@ public class FishboneInterpreter
 
             if (rawArg is IConvertible && typeof(IConvertible).IsAssignableFrom(conversionType))
             {
-                convertedArg = Convert.ChangeType(rawArg, conversionType);
+                convertedArg = Convert.ChangeType(rawArg, conversionType, CultureInfo.InvariantCulture);
                 return ArgumentMatch.Convertible;
             }
         }

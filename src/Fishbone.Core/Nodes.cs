@@ -26,6 +26,7 @@ public record WhileNode(AstNode Condition, AstNode Body) : AstNode;
 public record ForeachNode(string IteratorName, AstNode Iterable, AstNode Body) : AstNode;
 public record ForNode(string IteratorName, AstNode Start, AstNode End, AstNode? Step, AstNode Body) : AstNode;
 public record IdentifierNode(string Name) : AstNode;
+public record CastNode(AstNode Value, string TypeName) : AstNode;
 public record LiteralNode(object Value) : AstNode;
 
 
