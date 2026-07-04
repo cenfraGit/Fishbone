@@ -266,9 +266,56 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
     {
         var text = context.STRING().GetText();
         var trimmed = text[1..^1];
-        string unescaped = Regex.Unescape(trimmed);
+        string unescaped = Unescape(trimmed, context.Start.Line, context.Start.Column + 1);
         return new LiteralNode(unescaped) { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }
+
+    private static string Unescape(string text, int line, int column)
+    {
+        if (!text.Contains('\\'))
+            return text;
+
+        var builder = new StringBuilder(text.Length);
+        for (int i = 0; i < text.Length; i++)
+        {
+            char current = text[i];
+            if (current != '\\')
+            {
+                builder.Append(current);
+                continue;
+            }
+
+            // the lexer only emits a backslash with a character after it
+            char escape = text[++i];
+            switch (escape)
+            {
+                case '"': builder.Append('"'); break;
+                case '\'': builder.Append('\''); break;
+                case '\\': builder.Append('\\'); break;
+                case '0': builder.Append('\0'); break;
+                case 'a': builder.Append('\a'); break;
+                case 'b': builder.Append('\b'); break;
+                case 'f': builder.Append('\f'); break;
+                case 'n': builder.Append('\n'); break;
+                case 'r': builder.Append('\r'); break;
+                case 't': builder.Append('\t'); break;
+                case 'v': builder.Append('\v'); break;
+                case 'u':
+                    if (i + 4 >= text.Length
+                        || !ushort.TryParse(text.AsSpan(i + 1, 4), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var codePoint))
+                        throw InvalidEscape(@"\u requires exactly four hexadecimal digits", line, column);
+                    builder.Append((char)codePoint);
+                    i += 4;
+                    break;
+                default:
+                    throw InvalidEscape($@"unrecognized escape sequence '\{escape}'", line, column);
+            }
+        }
+        return builder.ToString();
+    }
+
+    private static FishboneParseException InvalidEscape(string reason, int line, int column) =>
+        new([new ParseError(line, column, $"Invalid string literal: {reason}.", null)]);
 
     public override AstNode VisitBoolExpr(FishboneParser.BoolExprContext context)
     {
