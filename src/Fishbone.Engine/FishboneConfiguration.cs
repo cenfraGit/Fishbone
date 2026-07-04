@@ -4,11 +4,6 @@ namespace Fishbone.Engine;
 
 public class FishboneConfiguration
 {
-    public bool EnableImports { get; set; } = true;
-    public bool EnableLoops { get; set; } = true;
-    public bool EnableFunctionDeclaration { get; set; } = true;
-    public bool EnableFunctionCall { get; set; } = true;
-
     /// <summary>
     /// Ambient names available to every script — functions, types, and constants. These are not
     /// shown in the debugger's variables view.
@@ -90,18 +85,12 @@ public class FishboneConfiguration
     }
 
     /// <summary>
-    /// Creates an independent copy carrying all ambient state (builtins, preseeded values, type
-    /// converters, and the capability flags).
+    /// Creates an independent copy carrying all ambient state (builtins, preseeded values, and
+    /// type converters).
     /// </summary>
     public FishboneConfiguration Clone()
     {
-        var clone = new FishboneConfiguration(injectDefaults: false)
-        {
-            EnableImports = EnableImports,
-            EnableLoops = EnableLoops,
-            EnableFunctionDeclaration = EnableFunctionDeclaration,
-            EnableFunctionCall = EnableFunctionCall
-        };
+        var clone = new FishboneConfiguration(injectDefaults: false);
         foreach (var builtIn in BuiltIns)
             clone.BuiltIns[builtIn.Key] = builtIn.Value;
         foreach (var value in Values)
