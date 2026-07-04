@@ -3,6 +3,7 @@ using Fishbone.Debugging;
 using System.Collections;
 using System.Globalization;
 using System.Reflection;
+using System.Runtime.ExceptionServices;
 
 namespace Fishbone.Interpreter;
 
@@ -12,6 +13,13 @@ public class FishboneInterpreter
     private readonly IFishboneDebugger _debugger;
     private readonly IReadOnlyDictionary<Type, FishboneTypeConverter> _typeConverters;
     private static readonly object DebuggerReportedKey = new();
+
+    // dynamic nesting depth of script 'try' blocks: while > 0, exceptions are not reported to
+    // the debugger because the script will observe them (or they re-surface past the try)
+    private int _tryDepth;
+
+    // exceptions currently bound by enclosing catch blocks; the top is what a bare 'throw;' rethrows
+    private readonly Stack<Exception> _activeCatchExceptions = new();
 
     public FishboneInterpreter(
         CancellationToken cancellationToken = default,
@@ -73,19 +81,27 @@ public class FishboneInterpreter
             ReturnNode returnNode => EvaluateReturn(env, returnNode),
             BreakNode breakNode => EvaluateBreak(env, breakNode),
             ContinueNode continueNode => EvaluateContinue(env, continueNode),
+            TryNode tryNode => EvaluateTry(env, tryNode),
+            ThrowNode throwNode => EvaluateThrow(env, throwNode),
                 _ => throw new NotImplementedException($"Execution for {node.GetType().Name} not yet implemented.")
             };
         }
         catch (Exception exception) when (ShouldReport(exception))
         {
-            _debugger.OnRuntimeException(exception, node, env);
+            // while inside a script 'try', skip debugger reporting: the script observes the
+            // exception through 'catch', or it is reported once it escapes past the try
+            if (_tryDepth == 0)
+                _debugger.OnRuntimeException(exception, node, env);
+
             if (exception is FishboneRuntimeException)
             {
-                exception.Data[DebuggerReportedKey] = true;
+                if (_tryDepth == 0)
+                    exception.Data[DebuggerReportedKey] = true;
                 throw;
             }
             var wrapped = new FishboneRuntimeException(exception.Message, node.Line, node.Column, exception);
-            wrapped.Data[DebuggerReportedKey] = true;
+            if (_tryDepth == 0)
+                wrapped.Data[DebuggerReportedKey] = true;
             throw wrapped;
         }
     }
@@ -1100,6 +1116,77 @@ public class FishboneInterpreter
     internal object EvaluateContinue(FishboneEnvironment env, ContinueNode node)
     {
         throw new ContinueException();
+    }
+
+    internal object EvaluateTry(FishboneEnvironment env, TryNode node)
+    {
+        try
+        {
+            try
+            {
+                _tryDepth++;
+                return Evaluate(env, node.TryBlock);
+            }
+            finally
+            {
+                _tryDepth--;
+            }
+        }
+        catch (Exception exception) when (node.CatchBlock is not null && IsCatchableByScript(exception))
+        {
+            var catchEnv = new FishboneEnvironment(env);
+            if (node.ExceptionName is not null)
+                catchEnv.Declare(node.ExceptionName, UnwrapForScript(exception));
+
+            _activeCatchExceptions.Push(exception);
+            try
+            {
+                return Evaluate(catchEnv, node.CatchBlock);
+            }
+            finally
+            {
+                _activeCatchExceptions.Pop();
+            }
+        }
+        finally
+        {
+            if (node.FinallyBlock is not null)
+                Evaluate(env, node.FinallyBlock);
+        }
+    }
+
+    internal object EvaluateThrow(FishboneEnvironment env, ThrowNode node)
+    {
+        if (node.Value is null)
+        {
+            if (_activeCatchExceptions.Count == 0)
+                throw new FishboneRuntimeException(
+                    "A bare 'throw;' is only valid inside a catch block.", node.Line, node.Column);
+            ExceptionDispatchInfo.Capture(_activeCatchExceptions.Peek()).Throw();
+        }
+
+        var value = Evaluate(env, node.Value!);
+        if (value is Exception exception)
+            throw exception;
+        throw new FishboneScriptException(value);
+    }
+
+    // cancellation and the loop/function control-flow signals must never be observable
+    // by a script catch
+    private static bool IsCatchableByScript(Exception exception) =>
+        exception is not OperationCanceledException
+            and not ReturnException
+            and not BreakException
+            and not ContinueException;
+
+    // a script catch binds the actual .NET exception, not the interpreter's location wrapper
+    // (reflection's TargetInvocationException is peeled for the same reason)
+    private static Exception UnwrapForScript(Exception exception)
+    {
+        while (exception is FishboneRuntimeException or TargetInvocationException
+               && exception.InnerException is not null)
+            exception = exception.InnerException;
+        return exception;
     }
 
     internal bool IsTruthy(object? value) => value switch

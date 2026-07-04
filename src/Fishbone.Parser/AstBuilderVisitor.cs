@@ -66,6 +66,31 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         return new ReturnNode(values) { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }
 
+    public override AstNode VisitTryStat(FishboneParser.TryStatContext context)
+    {
+        var line = context.Start.Line;
+        var column = context.Start.Column + 1;
+
+        var catchClause = context.catchClause();
+        var finallyClause = context.finallyClause();
+        if (catchClause is null && finallyClause is null)
+            throw new FishboneParseException([new ParseError(line, column,
+                "A 'try' statement requires a 'catch' or a 'finally' clause.", "try")]);
+
+        var tryBlock = (BlockNode)Visit(context.blockStat());
+        string? exceptionName = catchClause?.ID()?.GetText();
+        var catchBlock = catchClause is null ? null : (BlockNode)Visit(catchClause.blockStat());
+        var finallyBlock = finallyClause is null ? null : (BlockNode)Visit(finallyClause.blockStat());
+
+        return new TryNode(tryBlock, exceptionName, catchBlock, finallyBlock) { Line = line, Column = column };
+    }
+
+    public override AstNode VisitThrowStat(FishboneParser.ThrowStatContext context)
+    {
+        var value = context.expr() is null ? null : Visit(context.expr());
+        return new ThrowNode(value) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+    }
+
     public override AstNode VisitBreakStat(FishboneParser.BreakStatContext context)
     {
         return new BreakNode() { Line = context.Start.Line, Column = context.Start.Column + 1 };

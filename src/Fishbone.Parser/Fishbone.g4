@@ -19,9 +19,11 @@ statement
     | foreachStat
     | forStat
     | blockStat
+    | tryStat
     | returnStat SEMI
     | breakStat SEMI
     | continueStat SEMI
+    | throwStat SEMI
     ;
 
 blockStat : '{' statement* '}' ;
@@ -38,6 +40,13 @@ foreachStat : FOREACH '(' ID IN expr ')' statement ;
 forStat     : FOR '(' ID IN expr (COMMA expr (COMMA expr)?)? ')' statement ;
 
 functionDefinitionStat : FUNC ID '(' (ID (COMMA ID)*)? ')' blockStat ;
+
+// at least one of catchClause/finallyClause is required (enforced when building the AST)
+tryStat       : TRY blockStat catchClause? finallyClause? ;
+catchClause   : CATCH ('(' ID ')')? blockStat ;
+finallyClause : FINALLY blockStat ;
+
+throwStat : THROW expr? ; // bare 'throw;' rethrows, only valid inside catch
 
 argument     : (OUT|REF)? expr ;
 returnStat   : RETURN (expr (COMMA expr)*)? ;
@@ -133,6 +142,10 @@ FUNC    : 'func' ;
 BREAK   : 'break' ;
 CONTINUE: 'continue' ;
 RETURN  : 'return' ;
+TRY     : 'try' ;
+CATCH   : 'catch' ;
+FINALLY : 'finally' ;
+THROW   : 'throw' ;
 LET     : 'let' ;
 OUT     : 'out' ;
 REF     : 'ref' ;

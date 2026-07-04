@@ -25,7 +25,8 @@ public sealed class FishboneCompletionCatalog
     private static readonly string[] KeywordNames =
     [
         "let", "func", "if", "else", "while", "foreach", "in", "as",
-        "return", "break", "continue", "true", "false", "null"
+        "return", "break", "continue", "try", "catch", "finally", "throw",
+        "true", "false", "null"
     ];
 
     private FishboneCompletionCatalog(

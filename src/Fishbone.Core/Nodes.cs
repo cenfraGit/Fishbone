@@ -52,6 +52,14 @@ public record ReturnNode(IReadOnlyList<AstNode> ReturnValues) : AstNode
 }
 public record BreakNode() : AstNode;
 public record ContinueNode() : AstNode;
+public record TryNode(
+    BlockNode TryBlock,
+    string? ExceptionName,
+    BlockNode? CatchBlock,
+    BlockNode? FinallyBlock
+) : AstNode;
+
+public record ThrowNode(AstNode? Value) : AstNode;
 
 public record ProgramNode(IReadOnlyList<AstNode> Statements) : AstNode
 {
