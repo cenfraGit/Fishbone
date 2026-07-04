@@ -1,7 +1,8 @@
 using Antlr4.Runtime.Misc;
 using Fishbone.Core;
 using System.Collections.Immutable;
-using System.Text.RegularExpressions;
+using System.Globalization;
+using System.Text;
 
 namespace Fishbone.Parser;
 
@@ -200,20 +201,16 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
 
     public override AstNode VisitIfStat(FishboneParser.IfStatContext context)
     {
-        var condition = Visit(context.expr(0));
-        var thenBranch = Visit(context.blockStat(0)); // first block
+        var condition = Visit(context.expr());
+        var thenBranch = VisitBody(context.statement(0));
 
-        var elseIfCount = context.ELSEIF().Length;
-        var hasElse = context.ELSE() is not null;
-        AstNode? elseBranch = hasElse
-            ? Visit(context.blockStat(context.blockStat().Length - 1))
-            : null;
-
-        for (int i = elseIfCount - 1; i >= 0; i--)
+        // an "else if" is just an else whose statement is another ifStat, so chains
+        // arrive here pre-nested; keep the resulting IfNode unwrapped
+        AstNode? elseBranch = null;
+        if (context.statement().Length > 1)
         {
-            var elseIfCondition = Visit(context.expr(i + 1));
-            var elseIfBranch = Visit(context.blockStat(i + 1));
-            elseBranch = new IfNode(elseIfCondition, elseIfBranch, elseBranch) { Line = context.ELSEIF(i).Symbol.Line, Column = context.ELSEIF(i).Symbol.Column + 1 };
+            var elseNode = Visit(context.statement(1));
+            elseBranch = elseNode is BlockNode or IfNode ? elseNode : WrapInBlock(elseNode);
         }
 
         return new IfNode(condition, thenBranch, elseBranch) { Line = context.Start.Line, Column = context.Start.Column + 1 };
@@ -222,7 +219,7 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
     public override AstNode VisitWhileStat(FishboneParser.WhileStatContext context)
     {
         var condition = Visit(context.expr());
-        var body = Visit(context.blockStat());
+        var body = VisitBody(context.statement());
         return new WhileNode(condition, body) { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }
 
@@ -230,7 +227,7 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
     {
         var iteratorName = context.ID().GetText();
         var iterable = Visit(context.expr());
-        var body = Visit(context.blockStat());
+        var body = VisitBody(context.statement());
         return new ForeachNode(iteratorName, iterable, body) { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }
 
@@ -240,10 +237,21 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         var start = Visit(context.expr(0));
         var end = Visit(context.expr(1));
         var step = (context.expr().Length > 2) ? Visit(context.expr(2)) : null;
-        var body = Visit(context.blockStat());
-        return new ForNode(iteratorName, start, end, step, body) 
+        var body = VisitBody(context.statement());
+        return new ForNode(iteratorName, start, end, step, body)
         { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }
+
+    // single-statement bodies get wrapped in a block so they scope and execute
+    // exactly like their braced equivalent
+    private AstNode VisitBody(FishboneParser.StatementContext context)
+    {
+        var node = Visit(context);
+        return node is BlockNode ? node : WrapInBlock(node);
+    }
+
+    private static BlockNode WrapInBlock(AstNode statement) =>
+        new BlockNode([statement]) { Line = statement.Line, Column = statement.Column };
 
     public override AstNode VisitIdExpr(FishboneParser.IdExprContext context)
     {

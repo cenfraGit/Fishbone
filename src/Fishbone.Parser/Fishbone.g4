@@ -31,11 +31,11 @@ assignmentStat        : ID (COMMA ID)* ASSIGN expr ;
 indexedAssignmentStat : expr ASSIGN expr ;
 compoundAssignmentStat : expr (PLUS_ASSIGN|MINUS_ASSIGN|MUL_ASSIGN|DIV_ASSIGN|MOD_ASSIGN) expr ;
 
-ifStat : IF '(' expr ')' blockStat (ELSEIF '(' expr ')' blockStat)* (ELSE blockStat)? ;
+ifStat : IF '(' expr ')' statement (ELSE statement)? ;
 
-whileStat   : WHILE '(' expr ')' blockStat ;
-foreachStat : FOREACH '(' ID IN expr ')' blockStat ;
-forStat     : FOR '(' ID IN expr (COMMA expr (COMMA expr)?)? ')' blockStat ;
+whileStat   : WHILE '(' expr ')' statement ;
+foreachStat : FOREACH '(' ID IN expr ')' statement ;
+forStat     : FOR '(' ID IN expr (COMMA expr (COMMA expr)?)? ')' statement ;
 
 functionDefinitionStat : FUNC ID '(' (ID (COMMA ID)*)? ')' blockStat ;
 
@@ -110,7 +110,6 @@ ASSIGN : '=' ;
 TRUE    : 'true' ;
 FALSE   : 'false' ;
 IF      : 'if' ;
-ELSEIF  : 'else if' ;
 ELSE    : 'else' ;
 
 WHILE   : 'while' ;
