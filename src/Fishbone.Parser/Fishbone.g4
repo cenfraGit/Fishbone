@@ -64,8 +64,13 @@ expr
     | INT                                     #IntExpr
     | DOUBLE                                  #DoubleExpr
     | STRING                                  #StringExpr
+    | RAW_STRING                              #RawStringExpr
+    | INTERP_STRING                           #InterpStringExpr
     | (TRUE|FALSE)                            #BoolExpr
     ;
+
+// entry point for parsing a single expression (used for interpolation holes)
+exprStandalone : expr EOF ;
 
 // --------------------------------------------------------------------------------
 // lexer rules
@@ -78,6 +83,12 @@ COLON  : ':' ;
 INT    : [0-9]+ ('_'+ [0-9]+)* ;
 DOUBLE : [0-9]* '.' [0-9]+ ;
 STRING : '"' (ESC | ~["\\\r\n])* '"' ;
+
+RAW_STRING : '@"' ('""' | ~["])* '"' ;
+
+INTERP_STRING : '$"' (ESC | '{{' | '}}' | HOLE | ~["\\{}\r\n])* '"' ;
+fragment HOLE : '{' (RAW_STRING | STRING | HOLE | ~["{}])* '}' ;
+
 fragment ESC : '\\' . ;
 
 PLUS  : '+' ;

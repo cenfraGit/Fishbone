@@ -238,6 +238,24 @@ public record ListNode(
     }
 }
 
+public record InterpolatedStringNode(ImmutableArray<AstNode> Parts) : AstNode
+{
+    public virtual bool Equals(InterpolatedStringNode? other)
+    {
+        if (other is null) return false;
+        if (ReferenceEquals(this, other)) return true;
+        return Parts.SequenceEqual(other.Parts);
+    }
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        foreach (var part in Parts)
+            hash.Add(part);
+        return hash.ToHashCode();
+    }
+}
+
 public record KeyValuePairNode(AstNode Key, AstNode Value) : AstNode;
 
 public record DictionaryNode(

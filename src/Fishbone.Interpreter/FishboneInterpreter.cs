@@ -58,6 +58,7 @@ public class FishboneInterpreter
             UnaryOpNode unary => EvaluateUnary(env, unary),
             BinaryOpNode binary => EvaluateBinary(env, binary),
             CastNode castNode => EvaluateCast(env, castNode)!,
+            InterpolatedStringNode interpolated => EvaluateInterpolatedString(env, interpolated),
             IfNode ifNode => EvaluateIf(env, ifNode),
             WhileNode whileNode => EvaluateWhile(env, whileNode),
             ForeachNode foreachNode => EvaluateForeach(env, foreachNode),
@@ -273,6 +274,22 @@ public class FishboneInterpreter
         throw new FishboneRuntimeException(
             $"\"{node.TypeName}\" is not a type; casting requires a registered type (AddType) or one of: {string.Join(", ", PrimitiveTypeNames.Keys)}.",
             node.Line, node.Column);
+    }
+
+    internal object EvaluateInterpolatedString(FishboneEnvironment env, InterpolatedStringNode node)
+    {
+        var builder = new System.Text.StringBuilder();
+        foreach (var part in node.Parts)
+        {
+            var value = Evaluate(env, part);
+            builder.Append(value switch
+            {
+                null => string.Empty,
+                string text => text,
+                _ => Convert.ToString(value, CultureInfo.InvariantCulture)
+            });
+        }
+        return builder.ToString();
     }
 
     internal object EvaluateIf(FishboneEnvironment env, IfNode node)

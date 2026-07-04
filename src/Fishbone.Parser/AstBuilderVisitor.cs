@@ -285,6 +285,135 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         return new LiteralNode(unescaped) { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }
 
+    public override AstNode VisitRawStringExpr(FishboneParser.RawStringExprContext context)
+    {
+        var text = context.RAW_STRING().GetText();
+        var content = text[2..^1].Replace("\"\"", "\"");
+        return new LiteralNode(content) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+    }
+
+    public override AstNode VisitInterpStringExpr(FishboneParser.InterpStringExprContext context)
+    {
+        var token = context.Start;
+        var text = context.INTERP_STRING().GetText();
+        var inner = text[2..^1]; // between $" and the closing quote
+
+        var parts = new List<AstNode>();
+        var literal = new StringBuilder();
+        int curLine = token.Line;
+        int curCol = token.Column + 1 + 2; // first char after $"
+        int litLine = curLine, litCol = curCol;
+
+        void FlushLiteral()
+        {
+            if (literal.Length == 0)
+                return;
+            var unescaped = Unescape(literal.ToString(), litLine, litCol);
+            parts.Add(new LiteralNode(unescaped) { Line = litLine, Column = litCol });
+            literal.Clear();
+        }
+
+        for (int i = 0; i < inner.Length; i++)
+        {
+            char c = inner[i];
+            if (c == '\\')
+            {
+                // keep the pair raw; Unescape processes it when the run is flushed
+                literal.Append(c).Append(inner[i + 1]);
+                i++; curCol += 2;
+                continue;
+            }
+            if (c == '{' && i + 1 < inner.Length && inner[i + 1] == '{')
+            {
+                literal.Append('{');
+                i++; curCol += 2;
+                continue;
+            }
+            if (c == '}')
+            {
+                // the lexer only allows }} outside a hole
+                literal.Append('}');
+                i++; curCol += 2;
+                continue;
+            }
+            if (c != '{')
+            {
+                literal.Append(c);
+                curCol++;
+                continue;
+            }
+
+            // start of a {expr} hole
+            FlushLiteral();
+            curCol++; // past '{'
+            int holeStart = i + 1;
+            int holeLine = curLine, holeCol = curCol;
+            int depth = 1;
+            int j = holeStart;
+            while (j < inner.Length)
+            {
+                char h = inner[j];
+                if (h == '"')
+                {
+                    j = SkipQuoted(inner, j, ref curLine, ref curCol);
+                    continue;
+                }
+                if (h == '{') depth++;
+                else if (h == '}' && --depth == 0) break;
+                Advance(h, ref curLine, ref curCol);
+                j++;
+            }
+            parts.Add(ParseHole(inner[holeStart..j], holeLine, holeCol));
+            curCol++; // past '}'
+            i = j;
+            litLine = curLine; litCol = curCol;
+        }
+        FlushLiteral();
+
+        return new InterpolatedStringNode([.. parts]) { Line = token.Line, Column = token.Column + 1 };
+    }
+
+    private static AstNode ParseHole(string holeText, int line, int column)
+    {
+        if (string.IsNullOrWhiteSpace(holeText))
+            throw new FishboneParseException([new ParseError(line, column, "Empty interpolation hole in interpolated string.", null)]);
+
+        // pad the fragment so the sub-parsed expression reports positions in the original script
+        var padded = new string('\n', line - 1) + new string(' ', column - 1) + holeText;
+        return ASTParser.ParseExpression(padded);
+    }
+
+    // skips a quoted string inside a hole (index is at the opening quote); returns the
+    // index just past the closing quote. Backslash pairs are skipped so an escaped quote
+    // doesn't terminate the string early, keeping braces inside quotes out of depth counting.
+    private static int SkipQuoted(string text, int index, ref int line, ref int col)
+    {
+        Advance(text[index], ref line, ref col);
+        index++;
+        while (index < text.Length)
+        {
+            char c = text[index];
+            if (c == '\\' && index + 1 < text.Length)
+            {
+                Advance(c, ref line, ref col);
+                Advance(text[index + 1], ref line, ref col);
+                index += 2;
+                continue;
+            }
+            Advance(c, ref line, ref col);
+            index++;
+            if (c == '"')
+                break;
+        }
+        return index;
+    }
+
+    private static void Advance(char c, ref int line, ref int col)
+    {
+        if (c == '\n') { line++; col = 1; }
+        else col++;
+    }
+
     private static string Unescape(string text, int line, int column)
     {
         if (!text.Contains('\\'))

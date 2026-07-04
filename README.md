@@ -162,10 +162,11 @@ var loaded = FishbonePluginLoader.LoadPlugins(
 ## Quick look at the syntax
 
 ```csharp
-// variables, arithmetic, string concatenation
+// variables, arithmetic, string interpolation
 let name = "Fishbone";
 let area = PI * pow(3, 2);
-println("hello from " + name);
+println($"hello from {name}, area is {area}");
+let path = @"C:\raw\strings\too";
 
 func add(a, b)
 {
