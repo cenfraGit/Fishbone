@@ -55,7 +55,15 @@ public sealed record FishbonePauseSnapshot(
     string Reason,
     string? Description,
     ImmutableArray<FishboneDebugFrame> Frames,
-    FishboneDebugException? Exception);
+    FishboneDebugException? Exception)
+{
+    /// <summary>
+    /// <see cref="Reason"/> value for the final pause emitted when a stepping session runs off the
+    /// end of the script. It carries the final variable state but is not an interactive stop, so a
+    /// UI should show the variables, drop the current-line highlight, and let the session finish.
+    /// </summary>
+    public const string ProgramExitReason = "program-exit";
+}
 
 public abstract record FishboneDebugEvent;
 public sealed record FishboneDebugStateChanged(FishboneDebugSessionState State) : FishboneDebugEvent;

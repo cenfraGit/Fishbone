@@ -15,7 +15,10 @@ public enum DebugPauseReason
     Breakpoint,
     ManualPause,
     Step,
-    Exception
+    Exception,
+    // the program ran off its end while stepping; this pause exists only to surface the final
+    // state (the last statement's assignments) and is not an interactive stop
+    Completed
 }
 
 public sealed record DebugSourceLocation(string SourceId, int Line, int Column);
