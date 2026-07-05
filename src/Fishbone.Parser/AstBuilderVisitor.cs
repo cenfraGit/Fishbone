@@ -294,9 +294,18 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
 
     public override AstNode VisitIntExpr(FishboneParser.IntExprContext context)
     {
-        var text = context.INT().GetText();
-        text = text.Replace("_", string.Empty);
-        return new LiteralNode(int.Parse(text, CultureInfo.InvariantCulture)) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        var text = context.INT().GetText().Replace("_", string.Empty);
+        var line = context.Start.Line;
+        var column = context.Start.Column + 1;
+
+        // like C#, an integer literal is the smallest type that fits: int, then long
+        if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var intValue))
+            return new LiteralNode(intValue) { Line = line, Column = column };
+        if (long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var longValue))
+            return new LiteralNode(longValue) { Line = line, Column = column };
+
+        throw new FishboneParseException([new ParseError(line, column,
+            $"Integer literal '{context.INT().GetText()}' is too large for a 64-bit integer.", context.INT().GetText())]);
     }
 
     public override AstNode VisitDoubleExpr(FishboneParser.DoubleExprContext context)
