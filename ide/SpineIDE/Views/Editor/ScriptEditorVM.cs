@@ -12,7 +12,7 @@ using Fishbone.DebugClient;
 
 namespace SpineIDE.Views.Editor;
 
-public partial class ScriptEditorVM : Document, IRecipient<MessageRunActiveScript>
+public partial class ScriptEditorVM : Document
 {
     // --------------------------------------------------------------------------------
     // fields and properties
@@ -66,7 +66,6 @@ public partial class ScriptEditorVM : Document, IRecipient<MessageRunActiveScrip
         SourceId = sourceId ?? Guid.NewGuid().ToString("N");
         IsRemote = isRemote;
 
-        WeakReferenceMessenger.Default.Register(this);
         WeakReferenceMessenger.Default.Register<MessageDebugEditingChanged>(this, (recipient, message) =>
         {
             if (message.SourceId == SourceId)
@@ -87,16 +86,6 @@ public partial class ScriptEditorVM : Document, IRecipient<MessageRunActiveScrip
     }
 
     private void OnDocumentTextChanged(object? sender, EventArgs e) => IsDirty = true;
-
-    public async void Receive(MessageRunActiveScript m)
-    {
-        // whenever we receive a "run script" message, we'll broadcast back a message with the script data
-        if (this.IsActive && !IsRemote)
-        {
-            var scriptData = new Script(this.ScriptName, this.ScriptPath, ScriptDocument.Text, SourceId);
-            WeakReferenceMessenger.Default.Send(new MessageExecute(scriptData, m.Mode, BreakpointLines));
-        }
-    }
 
     public IReadOnlyList<int> BreakpointLines => _breakpoints
         .Where(anchor => !anchor.IsDeleted)

@@ -643,13 +643,20 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
     private bool CanStop() => DebugState is FishboneDebugSessionState.Starting or FishboneDebugSessionState.Running or FishboneDebugSessionState.Paused;
 
     [RelayCommand(CanExecute = nameof(CanStartExecution))]
-    private async Task OnButtonRun()
-    {
-        WeakReferenceMessenger.Default.Send(new MessageRunActiveScript(ScriptLaunchMode.Run));
-    }
+    private void OnButtonRun() => RunActiveScript(ScriptLaunchMode.Run);
 
     [RelayCommand(CanExecute = nameof(CanStartExecution))]
-    private void Debug() => WeakReferenceMessenger.Default.Send(new MessageRunActiveScript(ScriptLaunchMode.Debug));
+    private void Debug() => RunActiveScript(ScriptLaunchMode.Debug);
+
+    private void RunActiveScript(ScriptLaunchMode mode)
+    {
+        if (GetScriptsDock(Layout)?.ActiveDockable is not ScriptEditorVM activeEditor || activeEditor.IsRemote)
+            return;
+
+        var scriptData = new Script(
+            activeEditor.ScriptName, activeEditor.ScriptPath, activeEditor.ScriptDocument.Text, activeEditor.SourceId);
+        WeakReferenceMessenger.Default.Send(new MessageExecute(scriptData, mode, activeEditor.BreakpointLines));
+    }
 
     [RelayCommand(CanExecute = nameof(CanStartExecution))]
     private async Task AttachRemote()

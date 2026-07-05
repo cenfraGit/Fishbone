@@ -4,11 +4,9 @@ using Fishbone.DebugClient;
 
 namespace SpineIDE.Models.Messages;
 
-// used to "request" the active script's code
 public enum ScriptLaunchMode { Run, Debug }
-public record MessageRunActiveScript(ScriptLaunchMode Mode);
 
-// used to broadcast the script code
+// used to broadcast the script code to run/debug (sent by MainWindowVM for the active tab)
 public record MessageExecute(Script Script, ScriptLaunchMode Mode, IReadOnlyList<int> BreakpointLines);
 
 public class MessageExecutionFinished
