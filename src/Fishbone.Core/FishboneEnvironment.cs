@@ -26,7 +26,7 @@ public class FishboneEnvironment
     public void Declare(string name, object value)
     {
         if (_values.ContainsKey(name))
-            throw new Exception($"Variable \"{name}\" is already declared.");
+            throw new FishboneRuntimeException($"Variable \"{name}\" is already declared.");
 
         _values[name] = value;
     }
@@ -45,7 +45,7 @@ public class FishboneEnvironment
             return;
         }
 
-        throw new Exception($"Undefined variable \"{name}\".");
+        throw new FishboneRuntimeException($"Undefined variable \"{name}\".");
     }
 
     public bool IsDefined(string name) =>
@@ -71,6 +71,6 @@ public class FishboneEnvironment
             return builtin;
         if (_parent != null)
             return _parent.GetValue(name);
-        throw new Exception($"Undefined variable \"{name}\".");
+        throw new FishboneRuntimeException($"Undefined variable \"{name}\".");
     }
 }

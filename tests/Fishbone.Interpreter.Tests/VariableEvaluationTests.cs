@@ -1,3 +1,5 @@
+using Fishbone.Core;
+
 namespace Fishbone.Interpreter.Tests;
 
 public class VariableEvaluationTests
@@ -73,7 +75,7 @@ let outer = 1;
 """);
 
         Assert.Equal(3, env.GetValue("outer"));
-        Assert.Throws<Exception>(() => env.GetValue("inner"));
+        Assert.Throws<FishboneRuntimeException>(() => env.GetValue("inner"));
     }
 
     [Fact]

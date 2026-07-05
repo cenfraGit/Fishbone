@@ -166,7 +166,8 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
     {
         AstNode assignmentTarget = Visit(context.expr(0));
         if (assignmentTarget is not IndexingNode indexingNode)
-            throw new InvalidOperationException($"Indexed assignment requires an indexed target, but found {assignmentTarget.GetType().Name}.");
+            throw new FishboneParseException([new ParseError(context.Start.Line, context.Start.Column + 1,
+                $"Indexed assignment requires an indexed target, but found {assignmentTarget.GetType().Name}.", context.expr(0).GetText())]);
 
         AstNode value = Visit(context.expr(1));
         return new IndexedAssignmentNode(indexingNode.Target, indexingNode.Index, value) { Line = context.Start.Line, Column = context.Start.Column + 1 };
@@ -197,7 +198,8 @@ public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
                 return new IndexedAssignmentNode(indexing.Target, indexing.Index, combinedIndexedValue) { Line = line, Column = column };
 
             default:
-                throw new InvalidOperationException($"Compound assignment requires a variable or indexed target, but found {target.GetType().Name}.");
+                throw new FishboneParseException([new ParseError(line, column,
+                    $"Compound assignment requires a variable or indexed target, but found {target.GetType().Name}.", context.expr(0).GetText())]);
         }
     }
 

@@ -62,7 +62,8 @@ fail();
 
         var ex = Assert.Throws<FishboneRuntimeException>(() => interpreter.Evaluate(new FishboneEnvironment(), ast));
         Assert.Equal($"Undefined variable \"missing\".", ex.Message);
-        Assert.NotNull(ex.InnerException);
+        // language-diagnosed errors carry no inner exception; only failed .NET calls do
+        Assert.Null(ex.InnerException);
     }
 
     [Fact]

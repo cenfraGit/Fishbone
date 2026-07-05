@@ -1,3 +1,5 @@
+using Fishbone.Core;
+
 namespace Fishbone.Interpreter.Tests;
 
 public class FunctionEvaluationTests
@@ -17,7 +19,7 @@ let finalAnswer = calculatePower(10, 3);
 """);
 
         Assert.Equal(35, env.GetValue("finalAnswer"));
-        Assert.Throws<Exception>(() => env.GetValue("result"));
+        Assert.Throws<FishboneRuntimeException>(() => env.GetValue("result"));
     }
 
     [Fact]

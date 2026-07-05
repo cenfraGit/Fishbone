@@ -19,7 +19,7 @@ public class FishboneEnvironmentTests
         var env = new FishboneEnvironment();
         env.Declare("answer", 42);
 
-        Assert.Throws<Exception>(() => env.Declare("answer", 43));
+        Assert.Throws<FishboneRuntimeException>(() => env.Declare("answer", 43));
     }
 
     [Fact]
@@ -61,7 +61,7 @@ public class FishboneEnvironmentTests
     {
         var env = new FishboneEnvironment();
 
-        Assert.Throws<Exception>(() => env.GetValue("missing"));
+        Assert.Throws<FishboneRuntimeException>(() => env.GetValue("missing"));
     }
 
     [Fact]
@@ -69,6 +69,6 @@ public class FishboneEnvironmentTests
     {
         var env = new FishboneEnvironment();
 
-        Assert.Throws<Exception>(() => env.Assign("missing", 1));
+        Assert.Throws<FishboneRuntimeException>(() => env.Assign("missing", 1));
     }
 }

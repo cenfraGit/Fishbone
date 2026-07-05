@@ -1,3 +1,5 @@
+using Fishbone.Core;
+
 namespace Fishbone.Interpreter.Tests;
 
 public class ControlFlowEvaluationTests
@@ -240,7 +242,7 @@ foreach (value in [1])
 }
 """);
 
-        Assert.Throws<Exception>(() => env.GetValue("value"));
+        Assert.Throws<FishboneRuntimeException>(() => env.GetValue("value"));
     }
 
     [Fact]
@@ -362,7 +364,7 @@ for (i in 0, 1)
 }
 """);
 
-        Assert.Throws<Exception>(() => env.GetValue("i"));
+        Assert.Throws<FishboneRuntimeException>(() => env.GetValue("i"));
     }
 
     [Fact]
