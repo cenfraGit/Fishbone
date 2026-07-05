@@ -69,7 +69,8 @@ public sealed class FishboneProgram
             envRoot.Declare(value.Key, value.Value);
 
         var activeDebugger = debugger ?? NullFishboneDebugger.Instance;
-        var interpreter = new FishboneInterpreter(cancellationToken, activeDebugger, configuration.TypeConverters);
+        var interpreter = new FishboneInterpreter(
+            cancellationToken, activeDebugger, configuration.TypeConverters, configuration.EnableMemberAccess);
         activeDebugger.OnExecutionStarted(_ast, envRoot);
         try
         {

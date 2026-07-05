@@ -21,14 +21,19 @@ public class FishboneInterpreter
     // exceptions currently bound by enclosing catch blocks; the top is what a bare 'throw;' rethrows
     private readonly Stack<Exception> _activeCatchExceptions = new();
 
+    // when false, the '.' operator is disabled entirely (see FishboneConfiguration.EnableMemberAccess)
+    private readonly bool _enableMemberAccess;
+
     public FishboneInterpreter(
         CancellationToken cancellationToken = default,
         IFishboneDebugger? debugger = null,
-        IReadOnlyDictionary<Type, FishboneTypeConverter>? typeConverters = null)
+        IReadOnlyDictionary<Type, FishboneTypeConverter>? typeConverters = null,
+        bool enableMemberAccess = true)
     {
         _cancellationToken = cancellationToken;
         _debugger = debugger ?? NullFishboneDebugger.Instance;
         _typeConverters = typeConverters ?? new Dictionary<Type, FishboneTypeConverter>();
+        _enableMemberAccess = enableMemberAccess;
     }
 
     /// <summary>
@@ -226,15 +231,16 @@ public class FishboneInterpreter
 
         static object Divide(dynamic left, dynamic right)
         {
-            if (left is int intLeft && right is int intRight)
-                return intLeft / (double)intRight;
+            // '/' is always true division, whatever the integer widths involved
+            if (left is int or long && right is int or long)
+                return Convert.ToDouble(left) / Convert.ToDouble(right);
             return left / right;
         }
 
         // equality never throws on mismatched types. numbers compare by value
         static bool AreEqual(object? left, object? right)
         {
-            if (left is int or double && right is int or double)
+            if (left is int or long or double && right is int or long or double)
                 return Convert.ToDouble(left) == Convert.ToDouble(right);
             return Equals(left, right);
         }
@@ -1080,6 +1086,10 @@ public class FishboneInterpreter
 
     internal object EvaluateMemberAccessNode(FishboneEnvironment env,  MemberAccessNode node)
     {
+        if (!_enableMemberAccess)
+            throw new FishboneRuntimeException(
+                $"Member access (\".{node.MemberName}\") is disabled by the host configuration.");
+
         var target = Evaluate(env, node.Target);
         if (target is null)
             throw new FishboneRuntimeException($"Cannot access member \"{node.MemberName}\" on null.");
@@ -1199,6 +1209,7 @@ public class FishboneInterpreter
         null => false,
         bool b => b,
         int i => i != 0,
+        long l => l != 0,
         double d => d != 0.0,
         string s => !string.IsNullOrEmpty(s),
         _ => true

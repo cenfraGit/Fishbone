@@ -6,6 +6,15 @@ namespace Fishbone.Engine;
 public class FishboneConfiguration
 {
     /// <summary>
+    /// When false, scripts cannot use the <c>.</c> operator at all: no property/field reads and
+    /// no method calls on any object, which closes the reflection surface (<c>GetType()</c>,
+    /// <c>Assembly</c>, ...) that member access otherwise exposes. Scripts are then limited to
+    /// host-registered functions, operators, control flow, and list/dictionary indexing. Intended
+    /// for hosts that run scripts from untrusted authors; defaults to true.
+    /// </summary>
+    public bool EnableMemberAccess { get; set; } = true;
+
+    /// <summary>
     /// Ambient names available to every script — functions, types, and constants. These are not
     /// shown in the debugger's variables view.
     /// </summary>
@@ -91,7 +100,10 @@ public class FishboneConfiguration
     /// </summary>
     public FishboneConfiguration Clone()
     {
-        var clone = new FishboneConfiguration(injectDefaults: false);
+        var clone = new FishboneConfiguration(injectDefaults: false)
+        {
+            EnableMemberAccess = EnableMemberAccess
+        };
         foreach (var builtIn in BuiltIns)
             clone.BuiltIns[builtIn.Key] = builtIn.Value;
         foreach (var value in Values)
