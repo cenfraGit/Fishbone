@@ -20,7 +20,9 @@ public class DebugSnapshotHandlesTests
         handles.SetSnapshot(snapshot);
         var frame = Assert.Single(handles.GetFrames());
         var scopes = handles.GetScopes(frame.Id);
-        var visible = scopes.Single(scope => scope.Name == "Visible Variables");
+        // at global scope "Visible Variables" adds nothing over "Locals", so it is deduplicated away
+        Assert.DoesNotContain(scopes, scope => scope.Name == "Visible Variables");
+        var visible = scopes.Single(scope => scope.Name == "Locals");
         var variable = Assert.Single(handles.GetVariables(visible.VariablesReference));
         var entry = Assert.Single(handles.GetVariables(variable.VariablesReference));
         var children = handles.GetVariables(entry.VariablesReference);

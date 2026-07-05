@@ -49,8 +49,9 @@ public class TcpDapIntegrationTests
         JsonElement stack = await dap.RequestAsync("stackTrace", new { threadId = 1 });
         long frameId = stack.GetProperty("body").GetProperty("stackFrames")[0].GetProperty("id").GetInt64();
         JsonElement scopes = await dap.RequestAsync("scopes", new { frameId });
+        // the breakpoint is at global scope, where "Visible Variables" deduplicates into "Locals"
         long visibleReference = scopes.GetProperty("body").GetProperty("scopes")
-            .EnumerateArray().Single(scope => scope.GetProperty("name").GetString() == "Visible Variables")
+            .EnumerateArray().Single(scope => scope.GetProperty("name").GetString() == "Locals")
             .GetProperty("variablesReference").GetInt64();
         JsonElement variables = await dap.RequestAsync("variables", new { variablesReference = visibleReference });
         JsonElement x = variables.GetProperty("body").GetProperty("variables")

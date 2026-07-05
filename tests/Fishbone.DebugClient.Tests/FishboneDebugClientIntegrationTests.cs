@@ -27,7 +27,7 @@ public class FishboneDebugClientIntegrationTests
         await session.StartAsync([2], timeout.Token);
         FishbonePauseSnapshot snapshot = await paused.Task.WaitAsync(timeout.Token);
 
-        FishboneDebugScope visible = snapshot.Frames[0].Scopes.Single(scope => scope.Name == "Visible Variables");
+        FishboneDebugScope visible = snapshot.Frames[0].Scopes.Single(scope => scope.Name == "Locals"); // at global scope "Visible Variables" dedupes into "Locals"
         Assert.Contains(visible.Variables, variable => variable.Name == "x" && variable.Value == "1");
         await session.ContinueAsync(timeout.Token);
         await terminated.Task.WaitAsync(timeout.Token);
@@ -64,7 +64,7 @@ public class FishboneDebugClientIntegrationTests
         await client.SetBreakpointsAsync([2], timeout.Token);
         await client.ContinueAsync(timeout.Token);
         FishbonePauseSnapshot breakpoint = await pauses.Reader.ReadAsync(timeout.Token);
-        FishboneDebugScope visible = breakpoint.Frames[0].Scopes.Single(scope => scope.Name == "Visible Variables");
+        FishboneDebugScope visible = breakpoint.Frames[0].Scopes.Single(scope => scope.Name == "Locals"); // at global scope "Visible Variables" dedupes into "Locals"
         Assert.Contains(visible.Variables, variable => variable.Name == "x" && variable.Value == "1");
 
         await client.DisconnectAsync(timeout.Token);

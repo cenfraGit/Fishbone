@@ -3,6 +3,7 @@ using Avalonia.Platform.Storage;
 using Dock.Model.Controls;
 using Dock.Model.Core;
 using Fishbone.DebugClient;
+using SpineIDE.Models;
 using SpineIDE.Panels;
 using SpineIDE.Services;
 using SpineIDE.Views.Editor;
@@ -164,5 +165,6 @@ public class RemoteAttachTests
         public Task ShowVariableDetailsAsync(string name, object? value) => Task.CompletedTask;
         public Task<string> ShowScriptInputAsync(CancellationToken cancellationToken) => Task.FromResult(string.Empty);
         public Task<RemoteAttachEndpoint?> ShowRemoteAttachAsync() => Task.FromResult<RemoteAttachEndpoint?>(null);
+        public Task<SaveConfirmationResult> ShowSaveConfirmationAsync(string fileName) => Task.FromResult(SaveConfirmationResult.Discard);
     }
 }

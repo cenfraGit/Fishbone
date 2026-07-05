@@ -4,6 +4,7 @@ using Avalonia.Platform.Storage;
 using Dock.Model.Controls;
 using Dock.Model.Core;
 using Fishbone.Engine;
+using SpineIDE.Models;
 using SpineIDE.Panels;
 using SpineIDE.Services;
 using SpineIDE.Views.Editor;
@@ -119,5 +120,6 @@ public class SampleCatalogTests
 
         public Task<RemoteAttachEndpoint?> ShowRemoteAttachAsync() =>
             Task.FromResult<RemoteAttachEndpoint?>(null);
+        public Task<SaveConfirmationResult> ShowSaveConfirmationAsync(string fileName) => Task.FromResult(SaveConfirmationResult.Discard);
     }
 }

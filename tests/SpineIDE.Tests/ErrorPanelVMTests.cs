@@ -59,18 +59,24 @@ public class ErrorPanelVMTests
     }
 
     [Fact]
-    public void CreateLayout_PlacesOutputAndErrorsInCollapsedBottomToolDock()
+    public void CreateLayout_StartsWithPanelsHidden_AndShowToolAttachesBottomDock()
     {
         var output = new OutputPanelVM();
         var errors = new ErrorPanelVM(new ErrorService());
-        var layout = new DockFactory(output, errors).CreateLayout();
+        var factory = new DockFactory(output, errors);
+        var layout = factory.CreateLayout();
+
+        // panels start hidden: the bottom tool dock is not part of the visible tree
+        Assert.Null(FindDockContaining(layout, errors));
+        Assert.False(factory.IsToolVisible(output));
+        Assert.False(factory.IsToolVisible(errors));
+
+        factory.ShowTool(errors);
 
         var bottomDock = FindDockContaining(layout, errors);
-
         Assert.NotNull(bottomDock);
-        Assert.Same(output, bottomDock.ActiveDockable);
-        Assert.Equal(new IDockable[] { output, errors }, bottomDock.VisibleDockables);
-        Assert.False(bottomDock.IsExpanded);
+        Assert.Same(errors, bottomDock.ActiveDockable);
+        Assert.True(factory.IsToolVisible(errors));
     }
 
     private static IToolDock? FindDockContaining(IDockable dockable, IDockable target)

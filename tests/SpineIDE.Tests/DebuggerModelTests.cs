@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using Fishbone.DebugClient;
+using SpineIDE.Models;
 using SpineIDE.Models.Messages;
 using SpineIDE.Panels;
 using SpineIDE.Services;
@@ -100,7 +101,8 @@ public class DebuggerModelTests
         explorer.Receive(new MessageDebugPaused(snapshot, session));
         VariableItem item = explorer.Variables[0].Children[0];
 
-        await item.ToggleExpandedCommand.ExecuteAsync(null);
+        // the native expander TwoWay-binds IsExpanded; setting it triggers the lazy child load
+        item.IsExpanded = true;
 
         Assert.Equal(1, session.VariableRequests);
         Assert.Equal("[0]", Assert.Single(item.Children).Name);
@@ -156,5 +158,6 @@ public class DebuggerModelTests
         public Task ShowVariableDetailsAsync(string name, object? value) => Task.CompletedTask;
         public Task<string> ShowScriptInputAsync(CancellationToken cancellationToken) => Task.FromResult(string.Empty);
         public Task<RemoteAttachEndpoint?> ShowRemoteAttachAsync() => Task.FromResult<RemoteAttachEndpoint?>(null);
+        public Task<SaveConfirmationResult> ShowSaveConfirmationAsync(string fileName) => Task.FromResult(SaveConfirmationResult.Discard);
     }
 }
