@@ -1,5 +1,7 @@
 # Fishbone
 
+[![CI](https://github.com/cenfraGit/Fishbone/actions/workflows/ci.yml/badge.svg)](https://github.com/cenfraGit/Fishbone/actions/workflows/ci.yml)
+
 **A small, debuggable scripting language designed for native .NET interop.**
 
 Fishbone is a small scripting language that can interface with your
@@ -129,7 +131,11 @@ by hand, so a plugin can do anything the host can: `AddType`,
 
 **Installing a plugin.** Build the class library (make sure you
 PUBLISH it so all its dependencies are also packaged in the `publish/`
-folder) and drop its output into a subfolder of the plugins directory:
+folder) and drop its output into a subfolder of the plugins directory.
+For plugins with native dependencies (like Fishbone.Plugins.OpenCv),
+publish for the target platform (`dotnet publish -r win-x64` or
+`-r linux-x64`) so the right native libraries land next to the
+plugin assembly:
 
 ```
 ~/.fishbone/plugins/
