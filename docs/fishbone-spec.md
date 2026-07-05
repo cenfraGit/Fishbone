@@ -11,9 +11,10 @@ recompilation. Fundamentally, the Fishbone runtime is just plain .NET
 with little to no runtime behavior variations.
 
 Fishbone doesn't necessarily need to interface with .NET types, as it
-can be used to add a simple, sandboxed scripting layer to existing
-.NET applications. But even in those cases, the runtime behavior of
-Fishbone is mostly defined by the .NET runtime.
+can be used to add a simple scripting layer to existing .NET
+applications. But even in those cases, the runtime behavior of
+Fishbone is mostly defined by the .NET runtime. Note that Fishbone is
+**not a sandbox** — see the [Security](#security) section.
 
 ### What Fishbone is not
 
@@ -72,14 +73,18 @@ which include:
 - `true`
 - `false`
 - `if`
-- `else if`
 - `else`
 - `while`
 - `foreach`
 - `for`
 - `break`
 - `continue`
+- `try`
+- `catch`
+- `finally`
+- `throw`
 - `in`
+- `as`
 - `func`
 - `return`
 - `and`
@@ -123,6 +128,10 @@ are removed by the parser). Here are some examples of valid integers:
 // 1_000_000
 ```
 
+Like C#, an integer literal has the smallest integer type that fits
+its value: `int` (32-bit), then `long` (64-bit). A literal too large
+for a `long` is a parse error.
+
 ### Double literals
 
 A double literal consists of an integer part, a decimal point, and a
@@ -139,7 +148,38 @@ point is always required. Here are some examples:
 ### String literals
 
 String literals are enclosed in double quotes. Escape sequences follow
-C# conventions (`\n`, `\r`, `\t`, `\\`, `\"`, etc.).
+C# conventions. The supported set is `\"`, `\'`, `\\`, `\0`, `\a`,
+`\b`, `\f`, `\n`, `\r`, `\t`, `\v`, and `\uXXXX` (four hexadecimal
+digits). Any other character after a backslash is a parse error, as is
+a literal (unescaped) line break inside a string.
+
+#### Raw (verbatim) strings
+
+A string prefixed with `@` is taken verbatim: backslashes are ordinary
+characters, a doubled quote (`""`) produces one literal quote, and the
+string may span multiple lines.
+
+```csharp
+let path = @"C:\Users\me\file.txt";
+let quoted = @"she said ""hi""";
+```
+
+#### Interpolated strings
+
+A string prefixed with `$` may embed expressions in `{ }` holes. Each
+hole holds a full Fishbone expression; `{{` and `}}` produce literal
+braces. Escape sequences work as in regular strings.
+
+```csharp
+let msg = $"hello {name}, next year you are {age + 1}";
+let entry = $"value: {d["key"]}";
+let braces = $"{{literal braces}}";
+```
+
+Hole values are converted to text with the invariant culture; `null`
+produces an empty string. Unlike C#, format specifiers and alignment
+(`{x:F2}`, `{x,10}`) are not supported (a hole is always a plain
+expression) and the combined `$@"..."` form is not available.
 
 ```csharp
 // "hello"
@@ -163,6 +203,7 @@ Fishbone is dynamically typed. Every value is one of the following:
 | Type         | Examples                | Notes                                                 |
 |--------------|-------------------------|-------------------------------------------------------|
 | `int`        | `42`, `-1`, `1_000_000` | 32-bit signed integer (wraps on overflow)             |
+| `long`       | `999_999_999_999`       | 64-bit signed integer; literals too large for `int` promote to `long` |
 | `double`     | `3.14`, `.5`, `-2.0`    | 64-bit double-precision float                         |
 | `string`     | `"hello"`, `""`         | Unicode text                                          |
 | `bool`       | `true`, `false`         |                                                       |
@@ -221,6 +262,7 @@ Fishbone supports the following expression forms:
 | Unary          | `- expr`, `not expr`                                         | Numeric negation, boolean negation                 |
 | Multiplicative | `expr * expr`, `expr / expr`, `expr % expr`                  | `int / int` returns `double`; `%` is the remainder |
 | Additive       | `expr + expr`, `expr - expr`                                 | `+` also concatenates strings                      |
+| Cast           | `expr as identifier`                                         | Safe conversion; `null` when not convertible       |
 | Comparison     | `expr < expr`, `expr > expr`, `expr <= expr`, `expr >= expr` | Returns `bool`                                     |
 | Equality       | `expr == expr`, `expr != expr`                               | Returns `bool`                                     |
 | Boolean        | `expr and expr`, `expr or expr`, `expr xor expr`             | Short-circuiting `and`/`or`                        |
@@ -235,9 +277,10 @@ Operator precedence, from highest to lowest:
 1. Unary (`-`, `not`)
 2. Multiplicative (`*`, `/`, `%`)
 3. Additive (`+`, `-`)
-4. Comparison (`<`, `>`, `<=`, `>=`)
-5. Equality (`==`, `!=`)
-6. Boolean (`and`, `or`, `xor`)
+4. Cast (`as`)
+5. Comparison (`<`, `>`, `<=`, `>=`)
+6. Equality (`==`, `!=`)
+7. Boolean (`and`, `or`, `xor`)
 
 ### Arithmetic semantics
 
@@ -270,6 +313,44 @@ Operator precedence, from highest to lowest:
   relationship — for example a number and a string — raises an error
   rather than returning a result, because there is no meaningful
   answer.
+
+### Cast expressions (`as`)
+
+`expr as TypeName` is a **safe cast**: it evaluates to the value
+converted to the named type, or `null` when the conversion is not
+possible. It never raises an error for a failed conversion (only for
+an unknown type name).
+
+```csharp
+let n = "42" as int;       // 42
+let bad = "oops" as int;   // null
+let p = value as Point;    // the same instance if value is a Point, else null
+let x = null as int;       // null
+```
+
+The type name is resolved at runtime, in order:
+
+1. A registered type — anything the host exposed through
+   `AddType<T>()` (or any environment value that is a .NET
+   `System.Type`).
+2. The built-in primitive names `int`, `double`, `string`, `bool`.
+   (These names normally resolve to the conversion *functions*, so
+   they are special-cased as cast targets.)
+
+If the name matches neither, the cast raises a runtime error.
+
+Conversion uses the same rules as .NET method-argument interop: if
+the value is already an instance of the target type it is returned
+unchanged; otherwise a host-registered `TypeConverter` for the target
+type is tried, then enum conversion, then `Convert.ChangeType` (with
+the invariant culture) for `IConvertible` values. Note that numeric
+conversion follows .NET rounding (`3.7 as int` is `4`), unlike a C#
+cast which truncates.
+
+`as` differs from the conversion builtins (`int(x)`, `double(x)`,
+`string(x)`) in its failure mode: the builtins return a default value
+(`0`, `0.0`, `""`) when the conversion fails, while `as` returns
+`null` so the failure is observable.
 
 ## Statements
 
@@ -334,6 +415,21 @@ assignment.
 println("hello");
 ```
 
+### Statement bodies
+
+The body of an `if`, `else`, `while`, `foreach`, or `for` is a single
+statement. That statement is usually a `{ }` block, but the braces may
+be omitted when the body is one statement:
+
+```csharp
+if (x > 0)
+    println("positive");
+```
+
+A single-statement body behaves exactly like a one-statement block: a
+`let` inside it is scoped to the body. An `else` binds to the nearest
+unmatched `if`.
+
 ### If
 
 ```csharp
@@ -341,6 +437,8 @@ if (expr) { }
 if (expr) { } else { }
 if (expr) { } else if (expr) { } else { }
 ```
+
+(`else if` is simply an `else` whose statement is another `if`.)
 
 ### While
 
@@ -391,6 +489,64 @@ return expr1, expr2;
 
 Exits the current Fishbone function. Single return yields the
 value. Returning multiple values yields a list of values.
+
+### Try / Catch / Finally / Throw
+
+```csharp
+try { } catch { }
+try { } catch (e) { }
+try { } finally { }
+try { } catch (e) { } finally { }
+throw expr;
+throw;      // rethrow, only valid inside a catch block
+```
+
+A `try` statement requires at least one of `catch`/`finally`, and the
+blocks require braces. There is a single, untyped `catch` clause; the
+optional `(name)` binds the exception for the catch block's scope.
+
+Because the Fishbone runtime is .NET's, the caught value **is the
+actual .NET exception object**, inspect it with ordinary member
+access (`e.Message`, `e.GetType().Name`, `e.InnerException`, ...).
+There are no typed catch clauses or filters; a script that needs to
+discriminate checks the exception itself.
+
+`throw expr` throws the value: if it already is a .NET `Exception` it
+is thrown as-is, otherwise it is wrapped in a `FishboneScriptException`
+whose `Message` is the value's text and whose `Value` property holds
+the original value. A bare `throw;` rethrows the exception bound by
+the nearest enclosing catch.
+
+Not catchable by a script: host cancellation and the internal
+control-flow signals — `return`, `break`, and `continue` inside a
+`try` behave normally (and still trigger `finally`) rather than being
+intercepted by `catch`.
+
+Debugger note: an exception raised inside a `try` is not reported as
+an unhandled runtime error; if the `try` has no `catch`, it is
+reported once it escapes the statement ("break on unhandled"
+semantics).
+
+### Error types
+
+Every Fishbone error is one of three exception types:
+
+- `FishboneParseException`: the script could not be parsed. Carries
+  the list of syntax errors with line/column positions.
+- `FishboneRuntimeException`: any error while the script runs,
+  carrying the `Line`/`Column` of the failing statement or
+  expression. Its `InnerException` tells the two cases apart: **null**
+  means the language itself diagnosed the error (undefined variable,
+  indexing null, an impossible conversion, ...); **non-null** means a
+  .NET call made by the script threw, and the inner exception is that
+  original exception. This is the type an embedding host catches.
+- `FishboneScriptException`: a script `throw` of a non-exception
+  value (see above).
+
+Inside a script `catch (e)`, the binding follows the same split: for
+a language-diagnosed error `e` is the `FishboneRuntimeException`
+itself (with `Line`/`Column`); for a failed .NET call `e` is the
+original exception the call threw.
 
 ## Functions
 
@@ -584,3 +740,38 @@ keyword rules as above apply.
 External .NET assemblies implementing `IFishbonePlugin` can be loaded
 to register custom builtins. Plugins are loaded from the
 `.fishbone/plugins/` directory at the user's home directory.
+## Security
+
+Fishbone scripts execute **with the full trust of the host process**.
+This is a deliberate consequence of the design: because member access
+uses reflection on real .NET objects, a script can reach anything the
+host itself can reach (from any object, `GetType()` leads to `Type`,
+`Assembly`, and the rest of the reflection API). There is no in-process
+sandbox, and Fishbone does not claim to provide one. Treat script
+authors as having the same privileges as code contributors, and only
+run scripts you trust.
+
+For hosts that must run scripts from untrusted authors, the
+configuration offers a coarse but effective switch:
+
+```csharp
+var config = new FishboneConfiguration { EnableMemberAccess = false };
+```
+
+With member access disabled, the `.` operator is rejected at runtime
+entirely (no property or field reads and no method calls on any
+object) which closes the reflection surface. Scripts are then limited
+to host-registered functions, operators, control flow, and
+list/dictionary indexing, so the host curates the entire API surface
+through `AddFunction`/`AddBuiltIn`. When designing for this mode,
+expose helpers for anything scripts would otherwise reach through
+members (e.g. a `count(xs)` function instead of `xs.Count`).
+
+Even with member access disabled, remember that every injected
+function runs with full host privileges (the security of this mode is
+exactly the security of the API you register). Also consider the other
+denial-of-service axes for untrusted scripts: pass a
+`CancellationToken` with a timeout to bound runaway loops, and be
+aware that scripts can allocate (e.g. by growing lists) like any other
+code in your process. For true isolation, run scripts in a separate
+process.
