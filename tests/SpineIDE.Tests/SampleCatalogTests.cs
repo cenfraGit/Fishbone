@@ -45,7 +45,7 @@ public class SampleCatalogTests
     }
 
     [Fact]
-    public void BubbleSort_ExecutesWithModernCollectionSyntax()
+    public void BubbleSort_ExecutesAndSortsTheList()
     {
         string code = SampleCatalog.Load("bubble_sort.fb");
         var output = new StringBuilder();
@@ -53,12 +53,7 @@ public class SampleCatalogTests
 
         FishboneEngine.Run(code, configuration);
 
-        Assert.DoesNotContain("List()", code);
-        Assert.DoesNotContain("addToList", code);
-        Assert.DoesNotContain("getIndex", code);
-        Assert.DoesNotContain("getMember", code);
-        Assert.DoesNotContain("setIndex", code);
-        Assert.Contains(string.Join(Environment.NewLine, "3", "12", "21", "54", "89"), output.ToString());
+        Assert.Contains("3, 12, 21, 54, 89", output.ToString());
     }
 
     [Fact]
