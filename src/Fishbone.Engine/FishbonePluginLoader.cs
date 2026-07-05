@@ -25,24 +25,41 @@ public static class FishbonePluginLoader
         {
             foreach (var dll in Directory.EnumerateFiles(dir, "*.dll"))
             {
+                Type[] exportedTypes;
                 try
                 {
-                    var assembly = Assembly.LoadFrom(dll);
-                    foreach (var type in assembly.GetExportedTypes())
-                    {
-                        if (!type.IsClass || type.IsAbstract || !typeof(IFishbonePlugin).IsAssignableFrom(type))
-                            continue;
+                    exportedTypes = Assembly.LoadFrom(dll).GetExportedTypes();
+                }
+                catch (Exception ex)
+                {
+                    // a DLL that can't be loaded or whose types can't be resolved (missing dependency,
+                    // wrong architecture, etc.) is skipped whole rather than taking the loader down
+                    Console.Error.WriteLine($"Failed to load plugin assembly {dll}: {ex.Message}");
+                    continue;
+                }
 
+                foreach (var type in exportedTypes)
+                {
+                    if (!type.IsClass || type.IsAbstract || !typeof(IFishbonePlugin).IsAssignableFrom(type))
+                        continue;
+
+                    // folder-loaded plugins must be constructible with no arguments. A plugin type that
+                    // needs constructor arguments is meant to be created directly by a host
+                    if (type.GetConstructor(Type.EmptyTypes) is null)
+                        continue;
+
+                    try
+                    {
                         if (Activator.CreateInstance(type) is IFishbonePlugin plugin)
                         {
                             plugin.Register(config);
                             loaded.Add($"{plugin.GetType().Name} ({dll})");
                         }
                     }
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine($"Failed to load plugin from {dll}: {ex.Message}");
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine($"Failed to initialize plugin {type.FullName} from {dll}: {ex.Message}");
+                    }
                 }
             }
         }
