@@ -4,6 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:dock="clr-namespace:Dock.Avalonia.Controls;assembly=Dock.Avalonia"
         xmlns:vm="clr-namespace:SpineIDE.Views.Main"
+        xmlns:services="clr-namespace:SpineIDE.Services"
         xmlns:panels="clr-namespace:SpineIDE.Panels"
         xmlns:editor="clr-namespace:SpineIDE.Views.Editor"
         xmlns:variables="clr-namespace:SpineIDE.Views.Variables"
@@ -108,19 +109,18 @@
             </MenuItem>
 
             <MenuItem Header="_Help">
-                <MenuItem Header="_Samples">
-                    <MenuItem Header="Area of a Circle"
-                              Command="{Binding OpenSampleCommand}"
-                              CommandParameter="area_circle.fb" />
-                    <MenuItem Header="Bubble Sort"
-                              Command="{Binding OpenSampleCommand}"
-                              CommandParameter="bubble_sort.fb" />
-                    <MenuItem Header="Riemann Sum"
-                              Command="{Binding OpenSampleCommand}"
-                              CommandParameter="riemann_sum.fb" />
-                    <MenuItem Header="OpenCV Edge Detection"
-                              Command="{Binding OpenSampleCommand}"
-                              CommandParameter="edge_detect.fb" />
+                <!-- populated from the embedded samples; drop a file into samples/ and rebuild -->
+                <MenuItem Header="_Samples" ItemsSource="{Binding Samples}">
+                    <MenuItem.ItemContainerTheme>
+                        <ControlTheme TargetType="MenuItem"
+                                      BasedOn="{StaticResource {x:Type MenuItem}}"
+                                      x:DataType="services:SampleDefinition">
+                            <Setter Property="Header" Value="{Binding DisplayName}" />
+                            <Setter Property="Command"
+                                    Value="{Binding $parent[Window].((vm:MainWindowVM)DataContext).OpenSampleCommand}" />
+                            <Setter Property="CommandParameter" Value="{Binding FileName}" />
+                        </ControlTheme>
+                    </MenuItem.ItemContainerTheme>
                 </MenuItem>
                 <Separator />
                 <MenuItem Header="_About" />

@@ -749,6 +749,9 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
             scriptsDock!.VisibleDockables!.Remove(initialBlank);
     }
 
+    /// <summary>The discovered sample scripts, bound by the Help > Samples menu.</summary>
+    public IReadOnlyList<SampleDefinition> Samples => SampleCatalog.Samples;
+
     [RelayCommand]
     private void OpenSample(string? fileName)
     {

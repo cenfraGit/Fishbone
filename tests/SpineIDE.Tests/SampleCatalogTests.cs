@@ -14,14 +14,28 @@ namespace SpineIDE.Tests;
 
 public class SampleCatalogTests
 {
-    [Theory]
-    [InlineData("area_circle.fb")]
-    [InlineData("bubble_sort.fb")]
-    public void Load_KnownSample_ReturnsFishboneCode(string fileName)
+    [Fact]
+    public void Samples_AreDiscoveredFromEmbeddedResources()
     {
-        string code = SampleCatalog.Load(fileName);
+        Assert.NotEmpty(SampleCatalog.Samples);
+        // display name derived from the file name
+        Assert.Contains(SampleCatalog.Samples,
+            sample => sample.FileName == "bubble_sort.fb" && sample.DisplayName == "Bubble Sort");
+        // display name from the sample's "// title:" header
+        Assert.Contains(SampleCatalog.Samples,
+            sample => sample.FileName == "edge_detect.fb" && sample.DisplayName == "OpenCV Edge Detection");
+    }
 
-        Assert.False(string.IsNullOrWhiteSpace(code));
+    [Fact]
+    public void EveryDiscoveredSample_LoadsAndParses()
+    {
+        foreach (SampleDefinition sample in SampleCatalog.Samples)
+        {
+            Assert.False(string.IsNullOrWhiteSpace(sample.DisplayName));
+            string code = SampleCatalog.Load(sample.FileName);
+            Assert.False(string.IsNullOrWhiteSpace(code));
+            FishboneProgram.ParseSource(code); // throws if a sample has syntax-rotted
+        }
     }
 
     [Fact]

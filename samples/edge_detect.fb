@@ -1,3 +1,4 @@
+// title: OpenCV Edge Detection
 // note: requires the Fishbone.Plugins.OpenCv plugin already installed in ~/.fishbone/plugins
 // replace "input.png" with an existing image
 // "edges.png" will be saved in the same location that this script is saved in
