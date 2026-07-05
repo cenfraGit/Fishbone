@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/cenfraGit/Fishbone/actions/workflows/ci.yml/badge.svg)](https://github.com/cenfraGit/Fishbone/actions/workflows/ci.yml)
 
-**A small, debuggable scripting language designed for native .NET interop.**
+**A small, debuggable scripting language designed for native .NET interop**
 
 Fishbone is a small scripting language that can interface with your
 .NET types and objects. You can:
@@ -10,16 +10,61 @@ Fishbone is a small scripting language that can interface with your
 - Instantiate new objects via constructor call
 - Call methods from those objects
 - Call C# delegates as if they were simple functions
-- Create Fishbone functions, loops, and more within the script
+- Create functions, loops, and more within the script
 
 All Fishbone variables are underlying .NET objects and types by
 design.
 
-![Image of IDE running Fishbone script](docs/images/Image1.png)
-*(The included SpineIDE, which can be used to run and debug Fishbone scripts)*
+## Quick look at the language
 
-Just inject existing objects or methods and call them naturally within
-the script's environment:
+```csharp
+// sample.fb
+
+let name = "Fishbone";
+let area = PI * pow(3, 2);
+let path = @"C:\raw\strings\too";
+
+println($"hello from {name}, area is {area}");
+
+func add(a, b)
+{
+    return a + b;
+}
+
+for (i in 0, 5) // 0, 1, 2, 3, 4
+{
+    if (i % 2 == 0)
+        println(i);
+}
+
+// using lists (underneath uses a List<object>)
+let xs = [3, 1, 2];
+foreach (x in xs) { println(x); }
+
+// using dictionaries (underneath uses a Dictionary<object, object>)
+let user = {"name": "Ada", "id": 7};
+println(user["name"]);
+
+// everything is a C#/.NET object, so you can access members directly
+let count = xs.Count;
+```
+
+A handful of built-ins come preconfigured: constants (`PI`, `E`), I/O
+(`print`, `println`, `input`), math (`abs`, `round`, `min`, `max`,
+`pow`, `sqrt`), and conversions (`int`, `double`, `string`). See the
+[language specification](docs/fishbone-spec.md) for the full grammar
+and semantics, and [samples/](samples/) for sample programs.
+
+The cross-platform [SpineIDE](ide/SpineIDE/) allows you to write, run and debug
+Fishbone programs more easily:
+
+![Image of IDE running Fishbone script](docs/images/Image1.png)
+
+## Brief overview on how to embed
+
+1. Parse the source code (or source file) to create a program
+2. Create a `FishboneConfiguration` object, injecting your C# types, objects and delegates
+3. Run!
 
 ```csharp
 // parse the script once (can be reused, cache invalidation is yours to handle)
@@ -45,21 +90,22 @@ var env = program.Run(config);
 Then you can use these within a Fishbone script:
 
 ```csharp
-// sample.fb
+// sample2.fb
+
 let p = Point(3, 4);          // constructs a Point object
 camera.Focus();               // calls a method from the built-in camera object
 log("focused at " + p.X);     // calls the registered function
 let w = image.Width;          // access fields/properties from objects
 ```
 
-You can either run headless:
+Then you can either run headless:
 
 ```csharp
 var env = program.Run(config);   // returns the environment directly
 ```
 
-or step through the code with SpineIDE (or any debug client that
-supports DAP):
+or run the debug server so you can step through the code with SpineIDE
+(or any debug client that supports DAP):
 
 ```csharp
 var result = await program.RunDebuggableAsync(config, new FishboneDebugOptions
@@ -162,46 +208,6 @@ var loaded = FishbonePluginLoader.LoadPlugins(
 > You could take a look at
 > [Fishbone.Plugins.OpenCv](plugins/Fishbone.Plugins.OpenCv) for an
 > example, it exposes a `Mat` type and image operations.
-
----
-
-## Quick look at the syntax
-
-```csharp
-// variables, arithmetic, string interpolation
-let name = "Fishbone";
-let area = PI * pow(3, 2);
-println($"hello from {name}, area is {area}");
-let path = @"C:\raw\strings\too";
-
-func add(a, b)
-{
-    return a + b;
-}
-
-for (i in 0, 5) // 0, 1, 2, 3, 4
-{
-    if (i % 2 == 0)
-        println(i);
-}
-
-// using lists
-let xs = [3, 1, 2];
-foreach (x in xs) { println(x); }
-
-// using maps
-let user = {"name": "Ada", "id": 7};
-println(user["name"]);
-
-// everything is a C#/.NET object, so you can interface directly
-let count = xs.Count;
-```
-
-A handful of built-ins come preconfigured: constants (`PI`, `E`), I/O
-(`print`, `println`, `input`), math (`abs`, `round`, `min`, `max`,
-`pow`, `sqrt`), and conversions (`int`, `double`, `string`). See the
-[language specification](docs/fishbone-spec.md) for the full grammar
-and semantics, and [samples/](samples/) for sample programs.
 
 ---
 

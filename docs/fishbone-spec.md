@@ -667,11 +667,11 @@ objects. This lets a wrapped type be passed and received with ordinary
 script values:
 
 ```csharp
-// host: config.AddTypeConverter(typeof(HTuple),
-//           toNet:   v => HalconTypeConverter.ToHTuple(v),
-//           fromNet: v => HalconTypeConverter.FromHTuple((HTuple)v));
-threshold(image, out region, 10, 255);      // 10 and 255 convert to HTuple on the way in
-area_center(region, out area, out row, out col);  // out HTuple values come back as numbers
+// host: config.AddTypeConverter(typeof(MyType),
+//           toNet:   v => MyLibraryTypeConverter.ToMyType(v),
+//           fromNet: v => MyLibraryTypeConverter.FromMyType((MyType)v));
+my_func(some_input, out some_output, 10, 255);        // 10 and 255 convert to MyType on the way in
+some_other_func(some_output, out some_other_output);  // out MyType values come back as numbers
 ```
 
 **Construction** — A host can register a .NET type with
@@ -720,15 +720,11 @@ expose a callable that is not a .NET method but still declares a typed
 .NET type, and direction). The interpreter binds arguments
 positionally, converts inputs through the same registered-converter
 logic as a .NET call, invokes the host's implementation, and writes
-`out`/`ref` results back into the script's variables — so the call
-site looks identical to an operator or method call. This is how
-runtime-defined operations that have no backing .NET method, such as
-HDevelop procedures, are called:
+`out`/`ref` results back into the script's variables. This is how
+runtime-defined operations that have no backing .NET method are called:
 
 ```csharp
-// a host-registered procedure exposed as an INativeCallable with signature
-//   (HObject image in, HObject region out, HTuple area out)
-my_procedure(image, out region, out area);   // inputs convert in; outputs come back as script values
+my_callable(image, out output1, out output2);  // inputs convert in; outputs come back as script values
 ```
 
 Because there is a single fixed signature there is no overload
