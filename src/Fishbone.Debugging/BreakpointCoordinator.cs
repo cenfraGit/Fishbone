@@ -217,7 +217,33 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
 
     public void OnExecutionCompleted(FishboneEnvironment environment)
     {
-        DebugStateChangedEventArgs? stateChange;
+        DebugPauseSnapshot? finalSnapshot = null;
+        DebugStateChangedEventArgs? stateChange = null;
+
+        lock (_sync)
+        {
+            if (!_stopRequested && _stepMode != StepMode.None && _state == DebugSessionState.Running)
+            {
+                _stepMode = StepMode.None;
+                _pauseRequested = false;
+                var location = (_frames.Count > 0 ? _frames[^1].Location : null)
+                    ?? new DebugSourceLocation(SourceId, 1, 1);
+                finalSnapshot = CreateSnapshotLocked(location, environment, DebugPauseReason.Completed, null);
+                _threadGate.Reset();
+                stateChange = SetStateLocked(DebugSessionState.Paused);
+            }
+        }
+
+        if (finalSnapshot is not null)
+        {
+            PublishStateChange(stateChange);
+            Paused?.Invoke(this, new DebugPausedEventArgs(finalSnapshot));
+            // block until the client resumes/disconnects; a stop during this final pause just means
+            // "finish now", so swallow the cancellation and fall through to completion
+            try { WaitForResume(); }
+            catch (OperationCanceledException) { }
+        }
+
         lock (_sync)
         {
             _threadGate.Set();
@@ -280,6 +306,13 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
         AstNode node,
         FishboneEnvironment environment,
         DebugPauseReason reason,
+        Exception? exception) =>
+        CreateSnapshotLocked(new DebugSourceLocation(SourceId, node.Line, node.Column), environment, reason, exception);
+
+    private DebugPauseSnapshot CreateSnapshotLocked(
+        DebugSourceLocation location,
+        FishboneEnvironment environment,
+        DebugPauseReason reason,
         Exception? exception)
     {
         var visible = new Dictionary<string, object?>();
@@ -296,7 +329,7 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
             .Reverse()
             .Select(frame => new DebugCallFrameSnapshot(
                 frame.Name,
-                frame.Location ?? new DebugSourceLocation(SourceId, node.Line, node.Column),
+                frame.Location ?? location,
                 frame.Environment.LocalValues
                     .OrderBy(pair => pair.Key, StringComparer.Ordinal)
                     .Select(pair => new DebugVariableSnapshot(pair.Key, pair.Value))
@@ -304,7 +337,7 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
             .ToImmutableArray();
 
         return new DebugPauseSnapshot(
-            new DebugSourceLocation(SourceId, node.Line, node.Column),
+            location,
             reason,
             variables,
             frames,
