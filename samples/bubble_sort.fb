@@ -1,8 +1,11 @@
+// title: Bubble Sort
+
 println("Bubble Sort\n");
 
-func bubble_sort(arr, size)
+func bubble_sort(arr)
 {
     let i = 0;
+    let size = arr.Count;
     while (i < size)
     {
         let j = 0;
@@ -23,23 +26,28 @@ func bubble_sort(arr, size)
     }
 }
 
-// create list
+func print_list(list)
+{
+    let concatString = "";
+    let first = true;
+    foreach (item in list)
+    {
+        if (not first)
+            concatString += ", ";
+
+        concatString += item.ToString();
+        first = false;
+    }
+    
+    println(concatString);
+}
+
 let numbers = [54, 12, 89, 3, 21];
-let total_elements = numbers.Count;
 
-println("Before sorting:");
-println(numbers[0]);
-println(numbers[1]);
-println(numbers[2]);
-println(numbers[3]);
-println(numbers[4]);
+print("Before sorting: ");
+print_list(numbers);
 
-// sort
-bubble_sort(numbers, total_elements);
+bubble_sort(numbers);
 
-println("\nAfter sorting:");
-println(numbers[0]);
-println(numbers[1]);
-println(numbers[2]);
-println(numbers[3]);
-println(numbers[4]);
+print("\nAfter sorting:");
+print_list(numbers);
