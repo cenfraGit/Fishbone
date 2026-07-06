@@ -61,13 +61,15 @@ expr
     | expr '(' (argument (COMMA argument)*)? ')'  #CallExpr
     | expr '.' ID                             #MemberAccessExpr
     | expr '[' expr ']'                       #IndexingExpr
-    | (MINUS|NOT) expr                        #UnaryExpr
+    | MINUS expr                              #UnaryExpr
     | expr (MUL|DIV|MOD) expr                 #BinaryExpr
     | expr (PLUS|MINUS) expr                  #BinaryExpr
     | expr AS ID                              #CastExpr
     | expr (GE|LE|GT|LT) expr                 #BinaryExpr
     | expr (EQ|NEQ) expr                      #BinaryExpr
-    | expr (AND|OR|XOR) expr                  #BoolOperatorExpr
+    | NOT expr                                #UnaryExpr
+    | expr AND expr                           #BoolOperatorExpr
+    | expr (OR|XOR) expr                      #BoolOperatorExpr
     | NULL                                    #NullExpr
     | ID                                      #IdExpr
     | INT                                     #IntExpr

@@ -330,4 +330,55 @@ let result = 2 + 17 % 5 * 2;
         // Modulo and multiplication bind tighter than addition: 2 + ((17 % 5) * 2) = 2 + 4 = 6
         Assert.Equal(6, env.GetValue("result"));
     }
+
+    [Fact]
+    public void Evaluate_Not_BindsLooserThanComparisons()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let value = 5;
+let result = not value == 1;
+""");
+
+        // 'not' binds looser than '==': not (value == 1) = not (5 == 1) = not false = true
+        Assert.Equal(true, env.GetValue("result"));
+    }
+
+    [Fact]
+    public void Evaluate_Not_StillBindsTighterThanAndOr()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let a = not false and false;
+let b = not true or true;
+""");
+
+        // 'not' still binds tighter than 'and'/'or': (not false) and false = true and false = false
+        Assert.Equal(false, env.GetValue("a"));
+        // (not true) or true = false or true = true
+        Assert.Equal(true, env.GetValue("b"));
+    }
+
+    [Fact]
+    public void Evaluate_And_BindsTighterThanOr()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let a = false or true and false;
+let b = true and false or true;
+""");
+
+        // 'and' binds tighter than 'or': false or (true and false) = false or false = false
+        Assert.Equal(false, env.GetValue("a"));
+        // (true and false) or true = false or true = true
+        Assert.Equal(true, env.GetValue("b"));
+    }
+
+    [Fact]
+    public void Evaluate_Xor_HasSamePrecedenceAsOr()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let a = true and false xor true;
+""");
+
+        // 'xor' shares 'or''s precedence, looser than 'and': (true and false) xor true = false xor true = true
+        Assert.Equal(true, env.GetValue("a"));
+    }
 }

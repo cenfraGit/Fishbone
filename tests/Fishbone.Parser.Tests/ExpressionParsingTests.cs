@@ -105,6 +105,68 @@ let boolValue = true;
     }
 
     [Fact]
+    public void Parse_UnaryNot_BindsLooserThanComparisons()
+    {
+        var ast = ParserTestHelpers.ParseProgram("let result = not value == 1;");
+
+        // 'not' applies to the whole comparison: not (value == 1), not (not value) == 1
+        var expectedAst = new ProgramNode(new List<AstNode>
+        {
+            new DeclarationNode(
+                ["result"],
+                new UnaryOpNode(
+                    "not",
+                    new BinaryOpNode("==", new IdentifierNode("value"), new LiteralNode(1))
+                )
+            )
+        });
+
+        Assert.Equal(expectedAst, ast);
+    }
+
+    [Fact]
+    public void Parse_UnaryNot_BindsTighterThanAndOr()
+    {
+        var ast = ParserTestHelpers.ParseProgram("let result = not left and right;");
+
+        // 'not' applies only to the left operand: (not left) and right
+        var expectedAst = new ProgramNode(new List<AstNode>
+        {
+            new DeclarationNode(
+                ["result"],
+                new BinaryOpNode(
+                    "and",
+                    new UnaryOpNode("not", new IdentifierNode("left")),
+                    new IdentifierNode("right")
+                )
+            )
+        });
+
+        Assert.Equal(expectedAst, ast);
+    }
+
+    [Fact]
+    public void Parse_And_BindsTighterThanOr()
+    {
+        var ast = ParserTestHelpers.ParseProgram("let result = a or b and c;");
+
+        // 'and' applies to the right operand pair first: a or (b and c)
+        var expectedAst = new ProgramNode(new List<AstNode>
+        {
+            new DeclarationNode(
+                ["result"],
+                new BinaryOpNode(
+                    "or",
+                    new IdentifierNode("a"),
+                    new BinaryOpNode("and", new IdentifierNode("b"), new IdentifierNode("c"))
+                )
+            )
+        });
+
+        Assert.Equal(expectedAst, ast);
+    }
+
+    [Fact]
     public void Parse_BooleanOperators_ReturnsBinaryOperatorNodes()
     {
         var ast = ParserTestHelpers.ParseProgram("""
