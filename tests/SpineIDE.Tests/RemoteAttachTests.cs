@@ -67,6 +67,27 @@ public class RemoteAttachTests
     }
 
     [Fact]
+    public async Task RemoteAttachOpensVariablesAndErrorsPanels()
+    {
+        var errors = new ErrorService();
+        var session = new StubAttachedSession();
+        var viewModel = new MainWindowVM(
+            new StubDialogService(),
+            errors,
+            new OutputPanelVM(),
+            new ErrorPanelVM(errors),
+            new StubSessionFactory(session));
+
+        Assert.False(viewModel.IsVariableExplorerVisible);
+        Assert.False(viewModel.IsErrorsVisible);
+
+        await viewModel.AttachRemoteAsync("127.0.0.1", 4711);
+
+        Assert.True(viewModel.IsVariableExplorerVisible);
+        Assert.True(viewModel.IsErrorsVisible);
+    }
+
+    [Fact]
     public void RemoteBreakpointsAreEnabledOnlyDuringActiveSession()
     {
         var editor = new ScriptEditorVM(

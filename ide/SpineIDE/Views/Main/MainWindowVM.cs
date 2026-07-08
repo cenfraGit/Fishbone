@@ -668,6 +668,9 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
 
     public async Task AttachRemoteAsync(string host, int port)
     {
+        IsVariableExplorerVisible = true;
+        IsErrorsVisible = true;
+
         Interlocked.Increment(ref _executionVersion);
         _scriptCTS?.Cancel();
         await _executionGate.WaitAsync();
