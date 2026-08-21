@@ -227,7 +227,7 @@ public class AstNodeEqualityTests
         var right = new LiteralNode(1) { Line = 2, Column = 1 };
 
         Assert.Equal(left, right);
-        Assert.False(AstNode.ReferenceComparer.Equals(left, right));
-        Assert.True(AstNode.ReferenceComparer.Equals(left, left));
+        Assert.False(ReferenceEqualityComparer.Instance.Equals(left, right));
+        Assert.True(ReferenceEqualityComparer.Instance.Equals(left, left));
     }
 }

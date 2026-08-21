@@ -7,7 +7,6 @@ public abstract record AstNode
     // Source positions are 1-based; zero indicates an unknown or synthetic location.
     public int Line { get; init; }
     public int Column { get; init; }
-    public static IEqualityComparer<AstNode> ReferenceComparer { get; } = ReferenceEqualityComparer.Instance;
 
     public virtual bool Equals(AstNode? other)
     {
