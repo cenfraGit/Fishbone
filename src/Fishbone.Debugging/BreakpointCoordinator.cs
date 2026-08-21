@@ -317,7 +317,7 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
     {
         var visible = new Dictionary<string, object?>();
         for (var scope = environment; scope is not null; scope = scope.Parent)
-            foreach (var pair in scope.LocalValues)
+            foreach (var pair in scope.Values)
                 visible.TryAdd(pair.Key, pair.Value);
 
         var variables = visible
@@ -330,7 +330,7 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
             .Select(frame => new DebugCallFrameSnapshot(
                 frame.Name,
                 frame.Location ?? location,
-                frame.Environment.LocalValues
+                frame.Environment.Values
                     .OrderBy(pair => pair.Key, StringComparer.Ordinal)
                     .Select(pair => new DebugVariableSnapshot(pair.Key, pair.Value))
                     .ToImmutableArray()))
