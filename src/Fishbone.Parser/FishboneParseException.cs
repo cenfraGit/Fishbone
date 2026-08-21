@@ -1,3 +1,16 @@
+// --------------------------------------------------------------------------------
+// FishboneParseException.cs
+//
+// this one exception is used in the ASTParser only.
+//
+// var parseTree = parser.program();
+// if (errorListener.Errors.Count > 0)
+//     throw new FishboneParseException(errorListener.Errors);
+//
+// so if there's any errors during parsing, ASTParser throws that list
+// to whoever called it so that they can report errors to the user.
+// --------------------------------------------------------------------------------
+
 namespace Fishbone.Parser;
 
 public class FishboneParseException : Exception
