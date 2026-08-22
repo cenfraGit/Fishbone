@@ -568,6 +568,55 @@ a language-diagnosed error `e` is the `FishboneRuntimeException`
 itself (with `Line`/`Column`); for a failed .NET call `e` is the
 original exception the call threw.
 
+### Reporting errors to a client
+
+The exception types above are the transport. `FishboneDiagnostic` is
+the shape a client renders, and `FishboneDiagnostics.From(exception)`
+is the one call that produces it:
+
+```csharp
+try
+{
+    FishboneEngine.Run(source, config);
+}
+catch (Exception exception)
+{
+    foreach (var diagnostic in FishboneDiagnostics.From(exception))
+        Show(diagnostic.Message, diagnostic.Span);
+}
+```
+
+`From` accepts any exception, so a client never tests for an exception
+type itself. A parse failure yields one diagnostic per syntax error; a
+runtime failure yields one; a .NET exception that escaped a host call
+yields one with an unknown location.
+
+Each diagnostic carries:
+
+| Member | Meaning |
+| --- | --- |
+| `Stage` | `Lex`, `Parse`, `Runtime`, or `Configuration` |
+| `Severity` | `Error` or `Warning` |
+| `Message` | the text to show the user |
+| `Span` | where it happened, or `SourceSpan.None` |
+| `OffendingText` | the source text at fault, when known |
+| `RawMessage` | the underlying tool's wording, when `Message` is a rewrite |
+
+`SourceSpan` is 1-based, and `EndColumn` is exclusive, so a
+single-line span's length is `EndColumn - Column`. Check `IsKnown`
+before using a position, and `IsSingleLine` before sizing an
+underline: some diagnostics know only where they start.
+
+Syntax error messages are rewritten from ANTLR's own wording so that
+grammar token names never reach the user. `RawMessage` holds the
+original when this happened.
+
+Host setup failures are diagnostics too. `FishbonePluginLoader.Load`
+returns the plugins that loaded alongside `Configuration` diagnostics
+for those that did not, which a host without a console should render
+itself. `LoadPlugins` is the console convenience that writes them to
+`Console.Error` instead.
+
 ## Functions
 
 ### Function declaration
