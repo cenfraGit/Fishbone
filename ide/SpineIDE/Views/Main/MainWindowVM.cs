@@ -174,6 +174,7 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
             CancellationToken localToken = currentCTS.Token;
 
             this.ErrorService.ClearErrors();
+            ClearAllEditorDiagnostics();
             _outputPanel.Clear();
 
             string currentDirectory = Directory.GetCurrentDirectory();
@@ -196,7 +197,7 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
                     : await ExecuteScriptAsync(executionMessage, executionVersion, localToken);
                 if (result.Error is not null)
                 {
-                    await ReportScriptErrorAsync(result.Error);
+                    await ReportScriptErrorAsync(result.Error, executionMessage.Script.SourceId);
                     return;
                 }
 
@@ -212,7 +213,7 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
             catch (Exception ex)
             {
                 if (executionVersion == Volatile.Read(ref _executionVersion))
-                    await ReportScriptErrorAsync(ex);
+                    await ReportScriptErrorAsync(ex, m.Script.SourceId);
             }
             finally
             {
@@ -229,28 +230,36 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
 
     // one path for syntax errors, runtime errors and anything foreign, instead of
     // testing for each exception type here
-    private Task ReportScriptErrorAsync(Exception exception) =>
-        ReportDiagnosticsAsync(FishboneDiagnostics.From(exception));
+    private Task ReportScriptErrorAsync(Exception exception, string? sourceId = null) =>
+        ReportDiagnosticsAsync(FishboneDiagnostics.From(exception), sourceId);
 
-    private async Task ReportDiagnosticsAsync(IReadOnlyList<FishboneDiagnostic> diagnostics)
+    // sourceId names the script these diagnostics came from, so its editor can underline them.
+    // null means they are not attributable to a tab (a plugin that failed to load, a remote
+    // attach) and belong in the panel only
+    private async Task ReportDiagnosticsAsync(
+        IReadOnlyList<FishboneDiagnostic> diagnostics,
+        string? sourceId = null)
     {
         foreach (var diagnostic in diagnostics)
-            await AddErrorAsync(
-                diagnostic.Message,
-                diagnostic.Span.IsKnown ? diagnostic.Span.Line : null,
-                diagnostic.Span.IsKnown ? diagnostic.Span.Column : null);
+            await AddErrorAsync(diagnostic);
 
-        async Task AddErrorAsync(string message, int? line, int? column)
+        if (sourceId is not null)
+            await PostAsync(() => WeakReferenceMessenger.Default.Send(
+                new MessageDiagnostics(sourceId, diagnostics)));
+
+        Task AddErrorAsync(FishboneDiagnostic diagnostic) =>
+            PostAsync(() => ErrorService.AddError(new ScriptExecutionError(diagnostic, sourceId)));
+
+        // the editor's diagnostic state is UI state, so both the panel write and the message that
+        // drives the underlines have to land on the UI thread
+        static async Task PostAsync(Action action)
         {
             if (Avalonia.Application.Current is null || Dispatcher.UIThread.CheckAccess())
             {
-                ErrorService.AddError(new ScriptExecutionError(message, line, column));
+                action();
                 return;
             }
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                ErrorService.AddError(new ScriptExecutionError(message, line, column));
-            });
+            await Dispatcher.UIThread.InvokeAsync(action);
         }
     }
 
@@ -556,6 +565,15 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
             .FirstOrDefault(candidate => candidate.SourceId == sourceId);
         if (scriptsDock is not null && editor is not null)
             scriptsDock.ActiveDockable = editor;
+    }
+
+    // a new run invalidates every tab's underlines, not just the one being run, so the panel and
+    // the editors never disagree about which run they are describing
+    private void ClearAllEditorDiagnostics()
+    {
+        foreach (var editor in GetScriptsDock(Layout)?.VisibleDockables?.OfType<ScriptEditorVM>()
+                               ?? Enumerable.Empty<ScriptEditorVM>())
+            editor.ClearRuntimeDiagnostics();
     }
 
     private ScriptEditorVM? FindEditor(string sourceId) => GetScriptsDock(Layout)?.VisibleDockables?

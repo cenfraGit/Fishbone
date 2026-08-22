@@ -27,6 +27,11 @@ public record MessageDebugContinued;
 public record MessageDebugLocationChanged(string SourceId, int? Line);
 public record MessageDebugEditingChanged(string SourceId, bool IsDebugging);
 
+// diagnostics from a run, routed to the tab the script came from so its editor can underline
+// them. sent per run, not per keystroke; live syntax diagnostics never travel this way because
+// the editor's own validation produces them locally
+public record MessageDiagnostics(string SourceId, IReadOnlyList<FishboneDiagnostic> Diagnostics);
+
 public enum EditorAction { Cut, Copy, Paste, Undo, Redo, AddLineComment, RemoveLineComment }
 public record MessageEditorAction(EditorAction Action);
 public record MessageInsertSnippet(string Text);
