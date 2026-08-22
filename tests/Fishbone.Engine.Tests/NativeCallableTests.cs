@@ -3,14 +3,14 @@ using Fishbone.Interpreter;
 namespace Fishbone.Engine.Tests;
 
 /// <summary>
-/// Covers <see cref="INativeCallable"/>: a host can expose a callable that declares an in/out/ref
+/// Covers <see cref="IManualCallable"/>: a host can expose a callable that declares an in/out/ref
 /// signature without being a reflected .NET method, and the interpreter binds inputs, converts them
 /// through the registered-converter logic, and writes out/ref results back into script variables.
 /// </summary>
 public class NativeCallableTests
 {
     // a flexible fake driven by a delegate so each test supplies its own signature and body
-    private sealed class FakeNativeCallable : INativeCallable
+    private sealed class FakeNativeCallable : IManualCallable
     {
         private readonly Func<object?[], object?> _invoke;
 

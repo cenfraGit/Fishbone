@@ -493,8 +493,8 @@ public class FishboneInterpreter
         if (callee is BoundMethod boundMethod)
             return InvokeBoundMethod(env, boundMethod, argumentNodes);
 
-        if (callee is INativeCallable nativeCallable)
-            return InvokeNativeCallable(env, nativeCallable, argumentNodes);
+        if (callee is IManualCallable manualCallable)
+            return InvokeManualCallable(env, manualCallable, argumentNodes);
 
         if (callee is RegisteredType registeredType)
             return InvokeConstructorOverload(env, registeredType, argumentNodes);
@@ -521,14 +521,14 @@ public class FishboneInterpreter
     }
 
     /// <summary>
-    /// Invokes a host-supplied <see cref="INativeCallable"/>. Unlike the reflection path there is a
+    /// Invokes a host-supplied <see cref="IManualCallable"/>. Unlike the reflection path there is a
     /// single fixed signature, so no overload resolution is needed; arguments are bound positionally,
     /// converted through the same registered-converter logic as .NET calls, and out/ref results are
     /// written back via the shared <see cref="WriteBackByRefArguments"/> helper.
     /// </summary>
-    internal object InvokeNativeCallable(
+    internal object InvokeManualCallable(
         FishboneEnvironment env,
-        INativeCallable callable,
+        IManualCallable callable,
         IReadOnlyList<ArgumentNode> argumentNodes)
     {
         var parameters = callable.Parameters;

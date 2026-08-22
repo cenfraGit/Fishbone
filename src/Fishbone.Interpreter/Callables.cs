@@ -22,7 +22,7 @@
 //               name as long as there are no overloads for the method (in that
 //               case you'd have to wrap it in Func<> or something).
 //
-// - INativeCallable: this callable is built by hand by the host, not a real .net
+// - IManualCallable: this callable is built by hand by the host, not a real .net
 //                    delegate. its an option because delegates like Func<> can't have
 //                    out/ref parameters. the host can describe the parameters
 //                    using CallableParameter, ParameterDirection to define the
@@ -87,10 +87,10 @@ internal class FishboneFunction
 }
 
 // --------------------------------------------------------------------------------
-// INativeCallable
+// IManualCallable
 // --------------------------------------------------------------------------------
 
-/// <summary>Direction of a single <see cref="INativeCallable"/> parameter.</summary>
+/// <summary>Direction of a single <see cref="IManualCallable"/> parameter.</summary>
 public enum ParameterDirection
 {
     /// <summary>A by-value input; the argument is read and converted before the call.</summary>
@@ -101,9 +101,8 @@ public enum ParameterDirection
     Ref
 }
 
-/// <summary>One parameter of an <see cref="INativeCallable"/> signature.</summary>
+/// <summary>One parameter of an <see cref="IManualCallable"/> signature.</summary>
 public sealed record CallableParameter(string Name, Type Type, ParameterDirection Direction);
-
 
 /// <summary>
 /// A host-supplied callable that declares a typed in/out/ref signature without being a reflected
@@ -113,7 +112,7 @@ public sealed record CallableParameter(string Name, Type Type, ParameterDirectio
 /// callables that participate in native <c>out</c>/<c>ref</c> syntax even though they are not .NET
 /// methods.
 /// </summary>
-public interface INativeCallable
+public interface IManualCallable
 {
     /// <summary>The parameters, in call-site order.</summary>
     IReadOnlyList<CallableParameter> Parameters { get; }
