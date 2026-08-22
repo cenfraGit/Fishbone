@@ -19,6 +19,24 @@ let notEqual = arithmetic != 0;
     }
 
     [Fact]
+    public void Evaluate_ScientificNotationLiterals_AreDoubles()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let big = 1e10;
+let small = 2.5e-3;
+let avogadro = 6.022e23;
+let sum = 1e3 + 1;
+""");
+
+        Assert.Equal(1e10, env.GetValue("big"));
+        Assert.IsType<double>(env.GetValue("big"));
+        Assert.Equal(2.5e-3, env.GetValue("small"));
+        Assert.Equal(6.022e23, env.GetValue("avogadro"));
+        // double + int promotes to double, same as any other double literal
+        Assert.Equal(1001.0, env.GetValue("sum"));
+    }
+
+    [Fact]
     public void Evaluate_Equality_ComparesNumbersByValueAcrossIntAndDouble()
     {
         var env = InterpreterTestHelpers.Run("""

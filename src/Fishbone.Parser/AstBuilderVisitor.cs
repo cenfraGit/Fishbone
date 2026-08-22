@@ -317,7 +317,21 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
 
     public override AstNode VisitDoubleExpr(FishboneParser.DoubleExprContext context)
     {
-        return new LiteralNode(double.Parse(context.DOUBLE().GetText(), CultureInfo.InvariantCulture)) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        var text = context.DOUBLE().GetText();
+        var line = context.Start.Line;
+        var column = context.Start.Column + 1;
+
+        // NumberStyles.Float allows the decimal point and the exponent. an out-of-range
+        // literal may either fail to parse or come back as infinity depending on the
+        // runtime, so both outcomes are rejected to keep the behavior deterministic
+        if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
+            || double.IsInfinity(value) || double.IsNaN(value))
+        {
+            throw new FishboneParseException([new ParseError(line, column,
+                $"Double literal '{text}' is too large for a 64-bit double.", text)]);
+        }
+
+        return new LiteralNode(value) { Line = line, Column = column };
     }
 
     public override AstNode VisitStringExpr(FishboneParser.StringExprContext context)

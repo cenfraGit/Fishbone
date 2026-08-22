@@ -132,18 +132,37 @@ Like C#, an integer literal has the smallest integer type that fits
 its value: `int` (32-bit), then `long` (64-bit). A literal too large
 for a `long` is a parse error.
 
+Exponent notation always produces a `double`, never an integer, even
+when the value is mathematically integral. See Double literals.
+
 ### Double literals
 
-A double literal consists of an integer part, a decimal point, and a
-fractional part. The integer part can be omitted, but the decimal
-point is always required. Here are some examples:
+A double literal has an optional integer part, an optional fractional
+part introduced by a decimal point, and an optional exponent
+introduced by `e` or `E`. At least one of the fractional part or the
+exponent must be present, and when a decimal point is written, at
+least one digit must follow it.
+
+The exponent may carry an explicit `+` or `-` sign, and must be
+followed by at least one digit, so `1e` and `1e+` are parse errors.
+Unlike integer literals, double literals do not permit underscore
+separators. Here are some examples:
 
 ```csharp
 // 1.0
 // 714.000
 // 3.141592
 // .5
+// 1e10
+// 2.5e-3
+// 1.5E+7
+// 6.022e23
+// .5e3
 ```
+
+A literal whose magnitude exceeds the range of a 64-bit double, such
+as `1e400`, is a parse error. A literal that underflows, such as
+`1e-400`, evaluates to `0`.
 
 ### String literals
 
@@ -204,7 +223,7 @@ Fishbone is dynamically typed. Every value is one of the following:
 |--------------|-------------------------|-------------------------------------------------------|
 | `int`        | `42`, `-1`, `1_000_000` | 32-bit signed integer (wraps on overflow)             |
 | `long`       | `999_999_999_999`       | 64-bit signed integer; literals too large for `int` promote to `long` |
-| `double`     | `3.14`, `.5`, `-2.0`    | 64-bit double-precision float                         |
+| `double`     | `3.14`, `.5`, `1e10`, `2.5e-3` | 64-bit double-precision float                  |
 | `string`     | `"hello"`, `""`         | Unicode text                                          |
 | `bool`       | `true`, `false`         |                                                       |
 | `null`       | `null`                  | Represents the absence of a value                     |
