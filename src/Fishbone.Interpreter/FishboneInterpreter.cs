@@ -470,7 +470,7 @@ public class FishboneInterpreter
 
     internal object EvaluateCall(FishboneEnvironment env, object callee, IReadOnlyList<ArgumentNode> argumentNodes)
     {
-        if (callee is ICallable fishboneFunction)
+        if (callee is FishboneFunction fishboneFunction)
         {
             if (argumentNodes.Count != fishboneFunction.Arity)
                 throw new FishboneRuntimeException($"Expected {fishboneFunction.Arity} args but got {argumentNodes.Count}.");

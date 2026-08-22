@@ -40,14 +40,8 @@ namespace Fishbone.Interpreter;
 // FishboneFunction
 // --------------------------------------------------------------------------------
 
-public interface ICallable
-{
-    int Arity { get; }
-    object Call(FishboneInterpreter interpreter, List<object> arguments);
-}
-
 // callable for pure fishbone script-defined functions.
-internal class FishboneFunction : ICallable
+internal class FishboneFunction
 {
     private readonly FunctionDefinitionNode _definition;
     private readonly FishboneEnvironment _closure;
