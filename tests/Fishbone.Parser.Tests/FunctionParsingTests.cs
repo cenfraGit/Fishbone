@@ -43,6 +43,7 @@ func add(left, right)
 
         Assert.Equal("add", definition.Name);
         Assert.Equal(["left", "right"], definition.Parameters.ToArray());
+        Assert.All(definition.Parameters, p => Assert.Equal(ArgumentModifier.None, p.Modifier));
         Assert.Equal(
             new BlockNode(new List<AstNode>
             {
@@ -69,5 +70,35 @@ record(1, value);
         });
 
         Assert.Equal(expectedAst, ast);
+    }
+
+    [Fact]
+    public void Parse_FunctionDefinitionWithOutAndRefParameters_CapturesDirections()
+    {
+        var ast = ParserTestHelpers.ParseProgram("""
+func divide(numerator, denominator, out quotient, ref remainder)
+{
+    quotient = 0;
+}
+""");
+
+        var definition = Assert.IsType<FunctionDefinitionNode>(Assert.Single(ast.Statements));
+
+        Assert.Equal("divide", definition.Name);
+        Assert.Equal(
+            [new ParameterNode(ArgumentModifier.None, "numerator"),
+             new ParameterNode(ArgumentModifier.None, "denominator"),
+             new ParameterNode(ArgumentModifier.Out, "quotient"),
+             new ParameterNode(ArgumentModifier.Ref, "remainder")],
+            definition.Parameters.ToArray());
+    }
+
+    [Theory]
+    [InlineData("func f(out) { }")]
+    [InlineData("func f(a, out, b) { }")]
+    [InlineData("func f(ref) { }")]
+    public void Parse_ParameterKeywordWithoutName_ThrowsParseException(string code)
+    {
+        Assert.Throws<FishboneParseException>(() => ASTParser.Parse(code));
     }
 }

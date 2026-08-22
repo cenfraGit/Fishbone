@@ -66,13 +66,29 @@ let echoed = sample.Echo(out value);
         Assert.Contains("value", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    // a Fishbone function may declare out/ref parameters, but passing a keyword to a
+    // by-value parameter is still a mismatch
     [Fact]
-    public void Run_ByRefKeyword_OnFishboneFunction_Throws()
+    public void Run_OutKeyword_OnByValueFishboneParameter_Throws()
     {
-        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("""
+        var exception = Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("""
 func identity(a) { return a; }
 let result = identity(out x);
 """, Config()));
+
+        Assert.Contains("passed by value", exception.Message);
+    }
+
+    [Fact]
+    public void Run_FishboneFunction_ForwardsOutParameterToNetMethod()
+    {
+        var env = FishboneEngine.Run("""
+func lookup(key, out value) { return sample.TryGet(key, out value); }
+let ok = lookup("answer", out answer);
+""", Config());
+
+        Assert.Equal(true, env.GetValue("ok"));
+        Assert.Equal(42, env.GetValue("answer"));
     }
 
     private sealed class ByRefSample

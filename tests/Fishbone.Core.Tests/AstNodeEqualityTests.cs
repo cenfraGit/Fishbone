@@ -89,6 +89,17 @@ public class AstNodeEqualityTests
     }
 
     [Fact]
+    public void FunctionDefinitionNode_ParameterDirectionAffectsEquality()
+    {
+        var byValue = new FunctionDefinitionNode("f",
+            [new ParameterNode(ArgumentModifier.None, "a")], new BlockNode([]));
+        var byOut = new FunctionDefinitionNode("f",
+            [new ParameterNode(ArgumentModifier.Out, "a")], new BlockNode([]));
+
+        Assert.NotEqual(byValue, byOut);
+    }
+
+    [Fact]
     public void ListNode_UsesStructuralElementEquality()
     {
         var left = new ListNode([new LiteralNode(1), new IdentifierNode("x")]);
