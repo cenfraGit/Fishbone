@@ -2,8 +2,6 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
     <!-- build as a self-contained, loadable plugin: copies OpenCvSharp (managed + native) -->
     <EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>

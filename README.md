@@ -216,10 +216,21 @@ var loaded = FishbonePluginLoader.LoadPlugins(
 | Package | Reference it for |
 |---------|------------------|
 | `Fishbone.Engine` | Parsing and running scripts, exposing your objects (minimal headless embedding surface) |
+| `Fishbone.Hosting` | Discovering plugins from a folder. Only needed by a standalone host; an embedded one registers plugins with `AddPlugin` instead. |
 | `Fishbone.DebugAdapter` | `RunDebuggableAsync` and the DAP server for attaching a debugger. |
 
 The remaining projects `Fishbone.Core`, `Fishbone.Parser`,
 `Fishbone.Interpreter`, `Fishbone.Debugging` are just internal layers.
+
+### A note on the parser's public types
+
+`Fishbone.Parser` ships the classes ANTLR generates from the grammar:
+`FishboneParser`, `FishboneLexer`, and a context class per grammar rule. They
+are public because the generator makes them public, not because they are API.
+They are implementation detail, they change whenever the grammar changes, and
+those changes are not treated as breaking. The same goes for the transitive
+`Antlr4.Runtime.Standard` dependency. Build against `Fishbone.Engine` and the
+AST types in `Fishbone.Core`.
 
 ---
 

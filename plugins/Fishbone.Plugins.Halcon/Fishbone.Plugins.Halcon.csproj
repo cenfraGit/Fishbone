@@ -2,8 +2,6 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
     <!-- build as a self-contained, loadable plugin: copies HalconDotNet next to the plugin dll -->
     <EnableDynamicLoading>true</EnableDynamicLoading>
     <!-- Fishbone.Engine pulls Core/Interpreter/Debugging/Parser in behind it, and marking the

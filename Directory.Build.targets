@@ -1,0 +1,25 @@
+<Project>
+
+  <!-- ================================================================================
+       everything here depends on IsPackable, which is why it cannot live in
+       Directory.Build.props.
+
+       msbuild imports .props before the project body and .targets after it, so a project
+       setting IsPackable in its own PropertyGroup is invisible to a condition in .props
+       (which would always see the repo default of false) and visible to one here.
+
+       this works for items pack reads, and does NOT work for properties the sdk targets
+       have already consumed by this point. GenerateDocumentationFile is one of those and
+       lives in Directory.Build.props for that reason.
+       ================================================================================ -->
+
+  <!-- PackageReadmeFile in Directory.Build.props names the file; nuget still needs it
+       packed. one readme at the repo root serves every package -->
+  <ItemGroup Condition="'$(IsPackable)' == 'true'">
+    <None Include="$(MSBuildThisFileDirectory)README.md"
+          Pack="true"
+          PackagePath="\"
+          Visible="false" />
+  </ItemGroup>
+
+</Project>
