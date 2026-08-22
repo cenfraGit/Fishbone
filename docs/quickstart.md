@@ -35,7 +35,7 @@ and the difference is visible in the debugger:
 |-------------------------------|-------------------|---------------------------|-----------------------------------------|
 | `AddValue(name, obj)`         | script variables  | yes                       | injected data the script reads/inspects |
 | `AddBuiltIn(name, obj)`       | built-ins         | no                        | services / constants                    |
-| `AddType<T>()`                | built-ins         | no                        | types the script can construct          |
+| `AddType<T>()`                | built-ins         | no                        | types to construct, and their statics   |
 | `AddFunction(name, delegate)` | ambient built-ins | no                        | callable C# functions                   |
 
 ```csharp
@@ -184,7 +184,7 @@ public sealed class InspectionScripting
     {
         var config = new FishboneConfiguration();
         config.AddValue("image", image);        // injected value (visible in the debugger)
-        config.AddType<Measurement>();          // a type scripts can construct
+        config.AddType<Measurement>();          // construct it, and reach its statics
 
         FishboneEnvironment env = debug
             ? _program
@@ -217,5 +217,5 @@ public sealed class InspectionScripting
 | `FishboneRunResult`                               | Unified debug-run result (in `Fishbone.DebugAdapter`)                                                            |
 | `config.AddValue(name, obj)`                      | Inject a script variable (visible in the debugger)                                                               |
 | `config.AddBuiltIn(name, obj)`                    | Inject a built-in object/delegate                                                                                |
-| `config.AddType<T>()`                             | Make a type constructable                                                                                        |
+| `config.AddType<T>()`                             | Make a type constructable, and expose its statics                                                                                       |
 | `config.AddFunction(name, delegate)`              | Bind a callable function                                                                                         |

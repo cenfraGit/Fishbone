@@ -746,6 +746,30 @@ let p = Point(3, 4);   // invokes the Point(int, int) constructor
 let sum = p.X + p.Y;   // instances are ordinary .NET objects
 ```
 
+**Static members**: A registered type is also a static scope, the way
+a type name is in C#. The same registration that allows construction
+also exposes the type's public static methods, properties and fields
+through the `.` operator:
+
+```csharp
+// host: config.AddType<Point>();
+let d = Point.Distance(a, b);   // a public static method
+
+// host: config.AddType(typeof(MathUtils), "mu");
+let r = mu.Clamp(value, 0, 10);
+```
+
+A type with no public constructor is still worth registering for its
+statics alone. Note that a static class cannot be a generic type
+argument in C#, so it must be registered through the non-generic
+`AddType(Type, string?)` overload.
+
+Static members are read-only from a script: assigning to a member
+(`Type.Member = value`) is not supported, for statics or instances.
+Methods that the interop path can never invoke (open generic
+definitions and anything taking a pointer) are not exposed, so naming
+one reports it as absent rather than failing inside reflection.
+
 Constructor overloads are resolved with the same best-match rules as
 method calls. Calling a registered type with no matching constructor,
 or registering a type that exposes no public constructor, is an error.

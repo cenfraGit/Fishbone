@@ -95,6 +95,11 @@ public class FishboneConfiguration
     public FishboneConfiguration AddType<T>(string? name = null) =>
         AddType(typeof(T), name);
 
+    /// <summary>
+    /// Non-generic <see cref="AddType{T}"/>. Required for a static class, which C# cannot accept
+    /// as a generic type argument: <c>config.AddType(typeof(MathUtils), "mu");</c>. Such a type has
+    /// no constructor to call, but its statics are still reachable.
+    /// </summary>
     public FishboneConfiguration AddType(Type type, string? name = null)
     {
         BuiltIns[name ?? type.Name] = new RegisteredType(type);

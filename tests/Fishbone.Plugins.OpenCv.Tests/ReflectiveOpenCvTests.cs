@@ -22,7 +22,7 @@ public class ReflectiveOpenCvTests
 
         var env = FishboneEngine.Run("""
 let dst = Mat();
-cv_cvt_color(src, dst, "BGR2GRAY");
+cv.CvtColor(src, dst, "BGR2GRAY");
 """, config);
 
         var dst = Assert.IsType<Mat>(env.GetValue("dst"));
@@ -41,7 +41,7 @@ cv_cvt_color(src, dst, "BGR2GRAY");
 
         var env = FishboneEngine.Run("""
 let dst = Mat();
-cv_resize(src, dst, [3, 2]);
+cv.Resize(src, dst, [3, 2]);
 """, config);
 
         var dst = Assert.IsType<Mat>(env.GetValue("dst"));
@@ -52,12 +52,68 @@ cv_resize(src, dst, [3, 2]);
     [Fact]
     public void ReturnValueOperation_FlowsBackToScript()
     {
-        // cv_count_non_zero returns an int directly (no output Mat), proving return-style ops bind too
+        // cv.CountNonZero returns an int directly (no output Mat), proving return-style ops bind too
         using var src = new Mat(rows: 2, cols: 2, type: MatType.CV_8UC1, s: Scalar.All(255));
         var config = ConfigWithOpenCv(src);
 
-        var env = FishboneEngine.Run("let n = cv_count_non_zero(src);", config);
+        var env = FishboneEngine.Run("let n = cv.CountNonZero(src);", config);
 
         Assert.Equal(4, Convert.ToInt32(env.GetValue("n")));
+    }
+
+    [Fact]
+    public void StaticConstants_AreReadable()
+    {
+        using var src = new Mat(rows: 1, cols: 1, type: MatType.CV_8UC1, s: Scalar.All(0));
+
+        var env = FishboneEngine.Run("""
+let filled = cv.FILLED;
+let pi = cv.PI;
+""", ConfigWithOpenCv(src));
+
+        Assert.Equal(-1, Convert.ToInt32(env.GetValue("filled")));
+        Assert.Equal(Math.PI, Convert.ToDouble(env.GetValue("pi")), 10);
+    }
+
+    [Fact]
+    public void MatStaticFactory_IsReachable()
+    {
+        using var src = new Mat(rows: 1, cols: 1, type: MatType.CV_8UC1, s: Scalar.All(0));
+
+        var env = FishboneEngine.Run("""
+let zeros = Mat.Zeros(4, 6, MatType.CV_8UC1).ToMat();
+""", ConfigWithOpenCv(src));
+
+        var zeros = Assert.IsType<Mat>(env.GetValue("zeros"));
+        Assert.Equal(4, zeros.Rows);
+        Assert.Equal(6, zeros.Cols);
+    }
+
+    [Fact]
+    public void GenericStaticFactory_ReportsAsMissingMember()
+    {
+        using var src = new Mat(rows: 1, cols: 1, type: MatType.CV_8UC1, s: Scalar.All(0));
+
+        var exception = Assert.ThrowsAny<Exception>(() => FishboneEngine.Run(
+            "let m = Mat.FromArray([1, 2, 3]);", ConfigWithOpenCv(src)));
+
+        Assert.Contains("does not have a public member named 'FromArray'", exception.Message);
+    }
+
+    [Fact]
+    public void EdgeDetectSampleCallNames_AllResolve()
+    {
+        using var src = new Mat(rows: 8, cols: 8, type: MatType.CV_8UC1, s: Scalar.All(128));
+
+        var env = FishboneEngine.Run("""
+let blurred = Mat();
+cv.GaussianBlur(src, blurred, [5, 5], 0);
+let edges = Mat();
+cv.Canny(blurred, edges, 50, 150);
+let width = src.Width;
+""", ConfigWithOpenCv(src));
+
+        Assert.False(Assert.IsType<Mat>(env.GetValue("edges")).Empty());
+        Assert.Equal(8, Convert.ToInt32(env.GetValue("width")));
     }
 }

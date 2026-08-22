@@ -26,13 +26,15 @@ namespace Fishbone.Interpreter;
 internal static class ReflectionCache
 {
     private const BindingFlags InstanceMembers = BindingFlags.Public | BindingFlags.Instance;
+    private const BindingFlags StaticMembers = BindingFlags.Public | BindingFlags.Static;
 
     private static readonly ConcurrentDictionary<MethodBase, ParameterInfo[]> Parameters = new();
     private static readonly ConcurrentDictionary<MethodInfo, MethodInvoker> Invokers = new();
     private static readonly ConcurrentDictionary<ConstructorInfo, ConstructorInvoker> ConstructorInvokers = new();
     private static readonly ConcurrentDictionary<Type, ConstructorInfo[]> Constructors = new();
     private static readonly ConcurrentDictionary<Type, PropertyInfo[]> SingleParameterIndexers = new();
-    private static readonly ConcurrentDictionary<(Type Type, string Name), MemberLookup> Members = new();
+
+    private static readonly ConcurrentDictionary<(Type Type, string Name, bool Static), MemberLookup> Members = new();
 
     public static ParameterInfo[] GetParameters(MethodBase method) =>
         Parameters.GetOrAdd(method, static m => m.GetParameters());
@@ -54,28 +56,31 @@ internal static class ReflectionCache
 
     /// <summary>
     /// Resolves a member name against a type, preserving the interpreter's existing resolution
-    /// order: a non-indexed property, then a field, then a method group.
+    /// order: a non-indexed property, then a field, then a method group. Pass
+    /// <paramref name="isStatic"/> to look up static members instead of instance members.
     /// </summary>
-    public static MemberLookup ResolveMember(Type type, string name) =>
-        Members.GetOrAdd((type, name), static key => ComputeMember(key.Type, key.Name));
+    public static MemberLookup ResolveMember(Type type, string name, bool isStatic = false) =>
+        Members.GetOrAdd((type, name, isStatic), static key => ComputeMember(key.Type, key.Name, key.Static));
 
-    private static MemberLookup ComputeMember(Type type, string name)
+    private static MemberLookup ComputeMember(Type type, string name, bool isStatic)
     {
+        var flags = isStatic ? StaticMembers : InstanceMembers;
+
         var property = type
-            .GetProperties(InstanceMembers)
+            .GetProperties(flags)
             .FirstOrDefault(prop => prop.Name == name && prop.GetIndexParameters().Length == 0);
         if (property is not null)
             return new MemberLookup { Property = property };
 
         var field = type
-            .GetFields(InstanceMembers)
+            .GetFields(flags)
             .FirstOrDefault(fieldInfo => fieldInfo.Name == name);
         if (field is not null)
             return new MemberLookup { Field = field };
 
         var methods = type
-            .GetMethods(InstanceMembers)
-            .Where(method => method.Name == name && !method.IsSpecialName)
+            .GetMethods(flags)
+            .Where(method => method.Name == name && !method.IsSpecialName && IsInvocable(method))
             // a 'new'-style redeclaration (e.g. Exception.GetType hiding Object.GetType) surfaces
             // as two identical signatures; keep only the most-derived one so overload resolution
             // doesn't consider the call ambiguous
@@ -86,6 +91,24 @@ internal static class ReflectionCache
             return new MemberLookup { Methods = methods };
 
         return MemberLookup.None;
+    }
+
+    // skips methods the interop path can never call, so they don't win overload resolution and
+    // then fail with an opaque reflection error. MethodInvoker.Create throws on an open generic
+    // definition, and a pointer cannot come from the object[] argument path
+    private static bool IsInvocable(MethodInfo method)
+    {
+        if (method.IsGenericMethodDefinition)
+            return false;
+
+        foreach (var parameter in method.GetParameters())
+        {
+            var type = parameter.ParameterType;
+            if (type.IsPointer || (type.IsByRef && type.GetElementType()!.IsPointer))
+                return false;
+        }
+
+        return true;
     }
 
     private static string SignatureKey(MethodInfo method) =>
