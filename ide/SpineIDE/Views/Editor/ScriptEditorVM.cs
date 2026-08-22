@@ -40,10 +40,10 @@ public partial class ScriptEditorVM : Document
     private readonly Dictionary<int, FishboneBreakpointResult> _breakpointResults = [];
 
     // two buckets with different lifetimes: syntax diagnostics are replaced on every typing
-    // pause, runtime ones survive until the next edit or run. kept apart so neither clears the
+    // pause, run diagnostics survive until the next edit or run. kept apart so neither clears the
     // other, and resolved into DiagnosticSegments once per change rather than once per paint
     private IReadOnlyList<FishboneDiagnostic> _syntaxDiagnostics = [];
-    private IReadOnlyList<FishboneDiagnostic> _runtimeDiagnostics = [];
+    private IReadOnlyList<FishboneDiagnostic> _runDiagnostics = [];
     private IReadOnlyList<DiagnosticSegment> _diagnosticSegments = [];
 
     /// <summary>Raised whenever the underlines need repainting.</summary>
@@ -88,7 +88,7 @@ public partial class ScriptEditorVM : Document
         WeakReferenceMessenger.Default.Register<MessageDiagnostics>(this, (recipient, message) =>
         {
             if (message.SourceId == SourceId)
-                SetRuntimeDiagnostics(message.Diagnostics);
+                SetRunDiagnostics(message.Diagnostics);
         });
     }
 
@@ -104,7 +104,7 @@ public partial class ScriptEditorVM : Document
         value.TextChanged += OnDocumentTextChanged;
 
         // offsets from the previous document mean nothing in this one
-        _runtimeDiagnostics = [];
+        _runDiagnostics = [];
         RebuildDiagnosticSegments();
     }
 
@@ -112,12 +112,12 @@ public partial class ScriptEditorVM : Document
     {
         IsDirty = true;
 
-        // a runtime error describes a program that no longer exists, so the first edit after a
-        // run retires it rather than letting the mark drift onto whatever now sits at that
-        // offset. guarded by the emptiness check so typing costs nothing once they are gone
-        if (_runtimeDiagnostics.Count > 0)
+        // a run's errors describe a program that no longer exists, so the first edit after a run
+        // retires them rather than letting the marks drift onto whatever now sits at that offset.
+        // guarded by the emptiness check so typing costs nothing once they are gone
+        if (_runDiagnostics.Count > 0)
         {
-            _runtimeDiagnostics = [];
+            _runDiagnostics = [];
             RebuildDiagnosticSegments();
         }
     }
@@ -127,24 +127,26 @@ public partial class ScriptEditorVM : Document
     // --------------------------------------------------------------------------------
 
     /// <summary>
-    /// Replaces the diagnostics produced by running this script. Cleared by the next edit and by
-    /// the next run.
+    /// Replaces everything the last run of this script reported, whether it failed to parse or
+    /// failed while executing. Cleared by the next edit and by the next run.
     /// </summary>
-    public void SetRuntimeDiagnostics(IReadOnlyList<FishboneDiagnostic> diagnostics)
+    public void SetRunDiagnostics(IReadOnlyList<FishboneDiagnostic> diagnostics)
     {
-        // only Runtime diagnostics are underlined here: a run that failed to parse reported the
-        // same syntax errors the editor already shows, and marking both would double up
-        _runtimeDiagnostics = [.. diagnostics.Where(d => d.Stage == DiagnosticStage.Runtime)];
+        // deliberately not filtered by stage. a run is the only source of diagnostics until live
+        // parsing exists, so dropping the syntax ones here would leave a syntax error with no mark
+        // at all. double-marking is prevented by the suppression rule in RebuildDiagnosticSegments
+        // rather than by filtering, so this stays correct once live parsing does arrive
+        _runDiagnostics = diagnostics;
         RebuildDiagnosticSegments();
     }
 
     /// <summary>Drops the diagnostics from the last run, without touching syntax diagnostics.</summary>
-    public void ClearRuntimeDiagnostics()
+    public void ClearRunDiagnostics()
     {
-        if (_runtimeDiagnostics.Count == 0)
+        if (_runDiagnostics.Count == 0)
             return;
 
-        _runtimeDiagnostics = [];
+        _runDiagnostics = [];
         RebuildDiagnosticSegments();
     }
 
@@ -164,9 +166,10 @@ public partial class ScriptEditorVM : Document
         Add(_syntaxDiagnostics);
 
         // a file that no longer parses makes the last run's errors stale by definition, so the
-        // syntax bucket suppresses the runtime one rather than sitting alongside it
+        // syntax bucket suppresses the run bucket rather than sitting alongside it. this is also
+        // what stops a run's syntax errors being marked twice once live parsing finds them too
         if (_syntaxDiagnostics.Count == 0)
-            Add(_runtimeDiagnostics);
+            Add(_runDiagnostics);
 
         _diagnosticSegments = segments;
 

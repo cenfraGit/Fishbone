@@ -112,10 +112,13 @@ internal sealed class DiagnosticSquiggleRenderer : IBackgroundRenderer
     private static readonly IBrush FallbackErrorBrush = new SolidColorBrush(Color.Parse("#E06C75"));
     private static readonly IBrush FallbackWarningBrush = new SolidColorBrush(Color.Parse("#D19A66"));
 
-    // wave shape, in device-independent pixels. a short period reads as a squiggle rather than
-    // a zigzag, and an amplitude of 2 keeps the whole wave inside the line box
-    private const double WavePeriod = 4.0;
-    private const double WaveAmplitude = 2.0;
+    // wave shape, in device-independent pixels, tuned by eye against the editor's font. these
+    // were originally half as large and the result was invisible: a 1px antialiased diagonal
+    // spreads its colour over neighbouring pixels, so a thin shallow wave washes out into a faint
+    // smudge rather than reading as an underline. the amplitude still keeps it inside the line box
+    private const double WavePeriod = 6.0;
+    private const double WaveAmplitude = 2.5;
+    private const double WaveThickness = 1.4;
 
     // a cascade of parse errors can produce a lot of diagnostics at once, and each one costs a
     // geometry build. the cap bounds a single paint rather than trusting the producer
@@ -176,8 +179,10 @@ internal sealed class DiagnosticSquiggleRenderer : IBackgroundRenderer
     }
 
     private static Pen BuildPen(IBrush brush) =>
-        new(brush, 1.0) { LineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round };
+        new(brush, WaveThickness) { LineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round };
 
+    // the zig-zag runs along the bottom of the rect. not unit-testable: StreamGeometry.Open needs
+    // a platform render interface, so this is verified by rendering the editor and looking at it
     private static void DrawWave(DrawingContext drawingContext, Rect rect, Pen pen, double scale)
     {
         // put the 1px pen on a pixel centre so the wave stays crisp; only the vertical needs it

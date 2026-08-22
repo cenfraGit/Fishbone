@@ -573,7 +573,7 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
     {
         foreach (var editor in GetScriptsDock(Layout)?.VisibleDockables?.OfType<ScriptEditorVM>()
                                ?? Enumerable.Empty<ScriptEditorVM>())
-            editor.ClearRuntimeDiagnostics();
+            editor.ClearRunDiagnostics();
     }
 
     private ScriptEditorVM? FindEditor(string sourceId) => GetScriptsDock(Layout)?.VisibleDockables?

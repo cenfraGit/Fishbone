@@ -26,32 +26,53 @@ public class EditorDiagnosticStateTests
     }
 
     [Fact]
-    public void RuntimeDiagnostics_ProduceASegment()
+    public void RunDiagnostics_ProduceASegment()
     {
         var editor = Editor();
-        editor.SetRuntimeDiagnostics([Runtime(1, 9, 16)]);
+        editor.SetRunDiagnostics([Runtime(1, 9, 16)]);
 
         var segment = Assert.Single(editor.DiagnosticSegments);
         Assert.Equal(7, segment.Length);   // "missing"
     }
 
     [Fact]
-    public void RunChannel_IgnoresNonRuntimeStages()
+    public void RunChannel_MarksSyntaxErrorsToo()
     {
-        // a run that failed to parse reports the same syntax errors the editor already shows, so
-        // underlining them from both channels would double up
+        // a run is the only source of diagnostics until live parsing exists, so a syntax error
+        // reported by a run has to be marked. filtering it out left it with no mark anywhere
         var editor = Editor();
-        editor.SetRuntimeDiagnostics([Parse(1, 1, 4), Runtime(1, 9, 16)]);
+        editor.SetRunDiagnostics([Parse(1, 1, 4)]);
 
         Assert.Single(editor.DiagnosticSegments);
     }
 
     [Fact]
-    public void FirstEdit_RetiresRuntimeDiagnostics()
+    public void RunChannel_MarksEveryStageItIsGiven()
+    {
+        var editor = Editor();
+        editor.SetRunDiagnostics([Parse(1, 1, 4), Runtime(1, 9, 16)]);
+
+        Assert.Equal(2, editor.DiagnosticSegments.Count);
+    }
+
+    [Fact]
+    public void LiveSyntaxDiagnostics_SuppressTheRunsCopyRatherThanDoublingUp()
+    {
+        // the guard against marking the same syntax error twice is the suppression rule, not a
+        // stage filter, so it keeps working once live parsing starts producing these
+        var editor = Editor();
+        editor.SetRunDiagnostics([Parse(1, 1, 4)]);
+        editor.SetSyntaxDiagnostics([Parse(1, 1, 4)]);
+
+        Assert.Single(editor.DiagnosticSegments);
+    }
+
+    [Fact]
+    public void FirstEdit_RetiresRunDiagnostics()
     {
         // the error describes a program that no longer exists, so it goes rather than drifting
         var editor = Editor();
-        editor.SetRuntimeDiagnostics([Runtime(1, 9, 16)]);
+        editor.SetRunDiagnostics([Runtime(1, 9, 16)]);
         Assert.NotEmpty(editor.DiagnosticSegments);
 
         editor.ScriptDocument.Insert(0, "// a comment\n");
@@ -72,11 +93,11 @@ public class EditorDiagnosticStateTests
     }
 
     [Fact]
-    public void SyntaxDiagnostics_SuppressRuntimeOnes()
+    public void SyntaxDiagnostics_SuppressRunOnes()
     {
         // if the file no longer parses, the last run's errors are stale by definition
         var editor = Editor();
-        editor.SetRuntimeDiagnostics([Runtime(1, 9, 16)]);
+        editor.SetRunDiagnostics([Runtime(1, 9, 16)]);
         editor.SetSyntaxDiagnostics([Parse(1, 1, 4)]);
 
         var segment = Assert.Single(editor.DiagnosticSegments);
@@ -84,10 +105,10 @@ public class EditorDiagnosticStateTests
     }
 
     [Fact]
-    public void ClearingSyntaxDiagnostics_BringsRuntimeOnesBack()
+    public void ClearingSyntaxDiagnostics_BringsRunOnesBack()
     {
         var editor = Editor();
-        editor.SetRuntimeDiagnostics([Runtime(1, 9, 16)]);
+        editor.SetRunDiagnostics([Runtime(1, 9, 16)]);
         editor.SetSyntaxDiagnostics([Parse(1, 1, 4)]);
         editor.SetSyntaxDiagnostics([]);
 
@@ -96,13 +117,13 @@ public class EditorDiagnosticStateTests
     }
 
     [Fact]
-    public void ClearRuntimeDiagnostics_LeavesSyntaxAlone()
+    public void ClearRunDiagnostics_LeavesSyntaxAlone()
     {
         var editor = Editor();
         editor.SetSyntaxDiagnostics([Parse(1, 1, 4)]);
-        editor.SetRuntimeDiagnostics([Runtime(1, 9, 16)]);
+        editor.SetRunDiagnostics([Runtime(1, 9, 16)]);
 
-        editor.ClearRuntimeDiagnostics();
+        editor.ClearRunDiagnostics();
 
         Assert.Single(editor.DiagnosticSegments);
     }
@@ -114,18 +135,18 @@ public class EditorDiagnosticStateTests
         int fired = 0;
         editor.DiagnosticsChanged += (_, _) => fired++;
 
-        editor.SetRuntimeDiagnostics([Runtime(1, 9, 16)]);
+        editor.SetRunDiagnostics([Runtime(1, 9, 16)]);
         editor.SetSyntaxDiagnostics([Parse(1, 1, 4)]);
 
         Assert.Equal(2, fired);
     }
 
     [Fact]
-    public void DocumentSwap_DropsRuntimeDiagnostics()
+    public void DocumentSwap_DropsRunDiagnostics()
     {
         // offsets from the old document mean nothing in the new one
         var editor = Editor();
-        editor.SetRuntimeDiagnostics([Runtime(1, 9, 16)]);
+        editor.SetRunDiagnostics([Runtime(1, 9, 16)]);
 
         editor.ScriptDocument = new AvaloniaEdit.Document.TextDocument("let y = 2;");
 
@@ -137,7 +158,7 @@ public class EditorDiagnosticStateTests
     {
         // a plugin-load failure or a foreign exception has nowhere to point
         var editor = Editor();
-        editor.SetRuntimeDiagnostics(
+        editor.SetRunDiagnostics(
             [new FishboneDiagnostic(DiagnosticStage.Runtime, DiagnosticSeverity.Error, "no location", SourceSpan.None)]);
 
         Assert.Empty(editor.DiagnosticSegments);
