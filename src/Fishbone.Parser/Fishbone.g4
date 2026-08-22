@@ -8,10 +8,7 @@ program : statement* EOF ;
 
 statement
     : declarationStat SEMI
-    | assignmentStat SEMI
-    | indexedAssignmentStat SEMI
-    | compoundAssignmentStat SEMI
-    | expr SEMI
+    | exprStatement SEMI
     | functionDefinitionStat
     | ifStat
     | whileStat
@@ -27,10 +24,13 @@ statement
 
 blockStat : '{' statement* '}' ;
 
-declarationStat       : LET ID ASSIGN expr ;
-assignmentStat        : ID ASSIGN expr ;
-indexedAssignmentStat : expr ASSIGN expr ;
-compoundAssignmentStat : expr (PLUS_ASSIGN|MINUS_ASSIGN|MUL_ASSIGN|DIV_ASSIGN|MOD_ASSIGN) expr ;
+declarationStat : LET ID ASSIGN expr ;
+
+// one alternative for every statement that starts with an expression: a bare expression, a
+// plain assignment, and a compound assignment. kept together so the parser can commit to this
+// rule after the first token instead of having to see past the whole expression to find out
+// which of them it is. what the target is allowed to be is checked when building the AST.
+exprStatement : expr ((ASSIGN|PLUS_ASSIGN|MINUS_ASSIGN|MUL_ASSIGN|DIV_ASSIGN|MOD_ASSIGN) expr)? ;
 
 ifStat : IF '(' expr ')' statement (ELSE statement)? ;
 

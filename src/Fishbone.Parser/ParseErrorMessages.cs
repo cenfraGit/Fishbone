@@ -9,9 +9,11 @@
 //   mismatched input '<EOF>' expecting {'{', '(', '[', INT, DOUBLE, STRING,
 //   RAW_STRING, INTERP_STRING, '-', 'null', 'not', 'true', 'false', ID}
 //
-// nobody writing a script knows what INTERP_STRING is. so a large expecting set is
-// dropped entirely, while a set of one is kept, because "expecting ';'" is the most
-// useful thing the parser can say.
+// nobody writing a script knows what INTERP_STRING is. so a set is kept only when it is
+// short and every item is a concrete token: "expected ']' or ','" is the most useful thing
+// the parser can say about an unclosed list, while a set naming grammar rules is dropped.
+// listing only the literals from a mixed set would mislead, since the names it omits are
+// usually the likely intent (an identifier where a parameter belongs, say).
 //
 // anything not recognised here falls through unchanged, so a grammar change that
 // produces a new message shape degrades to antlr's wording rather than to nothing.
@@ -43,10 +45,11 @@ internal static partial class ParseErrorMessages
     private static partial Regex NoViableAlternative();
 
     /// <summary>
-    /// Rewrites an ANTLR message, or returns null when the shape is not recognised and the
-    /// caller should keep ANTLR's own wording.
+    /// Rewrites an ANTLR message, or returns null when the shape is not recognised and the caller
+    /// should keep ANTLR's own wording. <paramref name="offendingText"/> is the token the parser
+    /// choked on, when one is known; some ANTLR messages quote something far less useful.
     /// </summary>
-    public static string? Rewrite(string message)
+    public static string? Rewrite(string message, string? offendingText = null, string? expectedSet = null)
     {
         if (string.IsNullOrEmpty(message))
             return null;
@@ -76,10 +79,17 @@ internal static partial class ParseErrorMessages
         var noViable = NoViableAlternative().Match(message);
         if (noViable.Success)
         {
-            var text = Condense(noViable.Groups["text"].Value);
-            return text.Length == 0
-                ? "This is not valid Fishbone syntax."
-                : $"'{text}' is not valid Fishbone syntax.";
+            // antlr quotes everything it consumed since the rule started, as concatenated token
+            // text with the whitespace gone. echoing that shows the author a mangled version of
+            // their own line ("a=[1,2,3;"), so prefer the single token that actually failed
+            var token = Condense(offendingText ?? string.Empty);
+            if (token.Length == 0)
+                return "This is not valid Fishbone syntax.";
+
+            // this message shape carries no expecting set of its own, so the caller reads one off
+            // the parser state. that is what turns "';' is not valid here" into the actionable
+            // "expected ']'" for an unclosed list
+            return Unexpected($"'{token}'", expectedSet ?? string.Empty);
         }
 
         return null;
@@ -114,28 +124,47 @@ internal static partial class ParseErrorMessages
         return quote >= 0 && text.IndexOf('"', quote + 1) < 0;
     }
 
-    // an "expecting" set of one is worth reporting; a longer one is a token-name dump
     private static string Unexpected(string found, string expected)
     {
         var subject = IsEof(found) ? "Unexpected end of file" : $"Unexpected {Condense(found)}";
 
-        return IsSingleExpectation(expected)
-            ? $"{subject}, expected {expected.Trim()}."
+        return DescribeExpectation(expected) is { } expectation
+            ? $"{subject}, {expectation}."
             : $"{subject}.";
     }
 
-    // antlr renders a set as {a, b, c} and a lone expectation bare. a braced set holding
-    // exactly one item counts as single too
-    private static bool IsSingleExpectation(string expected)
+    /// <summary>
+    /// Turns ANTLR's "expecting" set into something worth showing, or null to omit it.
+    /// </summary>
+    private static string? DescribeExpectation(string expected)
     {
         var trimmed = expected.Trim();
-        if (!trimmed.StartsWith('{'))
-            return true;
 
-        return !trimmed.Contains(',');
+        // a lone expectation is unbraced, and is the most useful thing the parser can say
+        if (!trimmed.StartsWith('{'))
+            return IsQuotedLiteral(trimmed) ? $"expected {trimmed}" : null;
+
+        var items = trimmed.Trim('{', '}').Split(", ", StringSplitOptions.TrimEntries);
+
+        // a set naming grammar rules rather than literals ('INTERP_STRING', 'ID') is an internal
+        // dump. listing only its literals would also mislead, because the omitted names are
+        // usually the likely intent, so the whole set is dropped unless every item is a literal
+        if (items.Length == 0 || items.Length > 3 || !items.All(IsQuotedLiteral))
+            return null;
+
+        return "expected " + items.Length switch
+        {
+            1 => items[0],
+            2 => $"{items[0]} or {items[1]}",
+            _ => $"{string.Join(", ", items[..^1])}, or {items[^1]}"
+        };
     }
 
     private static bool IsEof(string text) => text.Contains(EofText, StringComparison.Ordinal);
+
+    // antlr quotes a concrete token ("';'") but names a grammar rule bare ("ID", "INTERP_STRING")
+    private static bool IsQuotedLiteral(string item) =>
+        item.Length >= 2 && item[0] == '\'' && item[^1] == '\'';
 
     // error text can run to the end of a line and carry the newline with it, which would
     // otherwise show up inside the message

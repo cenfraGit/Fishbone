@@ -8,11 +8,13 @@ using CommunityToolkit.Mvvm.Messaging;
 using Dock.Model.Mvvm.Controls;
 using SpineIDE.Models;
 using SpineIDE.Models.Messages;
+using Fishbone.Core;
+using Fishbone.Engine;
 using Fishbone.DebugClient;
 
 namespace SpineIDE.Views.Editor;
 
-public partial class ScriptEditorVM : Document
+public partial class ScriptEditorVM : Document, IDisposable
 {
     // --------------------------------------------------------------------------------
     // fields and properties
@@ -37,6 +39,21 @@ public partial class ScriptEditorVM : Document
     public event EventHandler? BreakpointsChanged;
     public event EventHandler? BreakpointVisualsChanged;
     private readonly Dictionary<int, FishboneBreakpointResult> _breakpointResults = [];
+
+    // two buckets with different lifetimes: syntax diagnostics are replaced on every typing
+    // pause, run diagnostics survive until the next edit or run. kept apart so neither clears the
+    // other, and resolved into DiagnosticSegments once per change rather than once per paint
+    private IReadOnlyList<FishboneDiagnostic> _syntaxDiagnostics = [];
+    private IReadOnlyList<FishboneDiagnostic> _runDiagnostics = [];
+    private IReadOnlyList<DiagnosticSegment> _diagnosticSegments = [];
+
+    /// <summary>Raised whenever the underlines need repainting.</summary>
+    public event EventHandler? DiagnosticsChanged;
+
+    internal IReadOnlyList<DiagnosticSegment> DiagnosticSegments => _diagnosticSegments;
+
+    // re-parses on a typing pause so syntax errors show without waiting for a run
+    private readonly LiveParseScheduler _liveParse;
 
     public string? ScriptPath { get; set; }
     public string ScriptName
@@ -66,10 +83,26 @@ public partial class ScriptEditorVM : Document
         SourceId = sourceId ?? Guid.NewGuid().ToString("N");
         IsRemote = isRemote;
 
+        // constructed on the ui thread, so the scheduler captures its synchronization context
+        // and can post diagnostics back where the document lives
+        _liveParse = new LiveParseScheduler(
+            FishboneEngine.Validate,
+            SetSyntaxDiagnostics,
+            FishboneEngine.IsTooDeepToValidate);
+
+        // a file gets its squiggles on open, without waiting for a keystroke
+        ScheduleLiveParse();
+
         WeakReferenceMessenger.Default.Register<MessageDebugEditingChanged>(this, (recipient, message) =>
         {
             if (message.SourceId == SourceId)
                 IsDebugging = message.IsDebugging;
+        });
+
+        WeakReferenceMessenger.Default.Register<MessageDiagnostics>(this, (recipient, message) =>
+        {
+            if (message.SourceId == SourceId)
+                SetRunDiagnostics(message.Diagnostics);
         });
     }
 
@@ -83,9 +116,101 @@ public partial class ScriptEditorVM : Document
             _trackedDocument.TextChanged -= OnDocumentTextChanged;
         _trackedDocument = value;
         value.TextChanged += OnDocumentTextChanged;
+
+        // offsets from the previous document mean nothing in this one, and neither do the
+        // diagnostics that produced them
+        _runDiagnostics = [];
+        _syntaxDiagnostics = [];
+        RebuildDiagnosticSegments();
+        ScheduleLiveParse();
     }
 
-    private void OnDocumentTextChanged(object? sender, EventArgs e) => IsDirty = true;
+    private void OnDocumentTextChanged(object? sender, EventArgs e)
+    {
+        IsDirty = true;
+        ScheduleLiveParse();
+
+        // a run's errors describe a program that no longer exists, so the first edit after a run
+        // retires them rather than letting the marks drift onto whatever now sits at that offset.
+        // guarded by the emptiness check so typing costs nothing once they are gone
+        if (_runDiagnostics.Count > 0)
+        {
+            _runDiagnostics = [];
+            RebuildDiagnosticSegments();
+        }
+    }
+
+    // --------------------------------------------------------------------------------
+    // diagnostics
+    // --------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Replaces everything the last run of this script reported, whether it failed to parse or
+    /// failed while executing. Cleared by the next edit and by the next run.
+    /// </summary>
+    public void SetRunDiagnostics(IReadOnlyList<FishboneDiagnostic> diagnostics)
+    {
+        // deliberately not filtered by stage. a run is the only source of diagnostics until live
+        // parsing exists, so dropping the syntax ones here would leave a syntax error with no mark
+        // at all. double-marking is prevented by the suppression rule in RebuildDiagnosticSegments
+        // rather than by filtering, so this stays correct once live parsing does arrive
+        _runDiagnostics = diagnostics;
+        RebuildDiagnosticSegments();
+    }
+
+    /// <summary>Drops the diagnostics from the last run, without touching syntax diagnostics.</summary>
+    public void ClearRunDiagnostics()
+    {
+        if (_runDiagnostics.Count == 0)
+            return;
+
+        _runDiagnostics = [];
+        RebuildDiagnosticSegments();
+    }
+
+    // the snapshot has to be taken here on the ui thread: TextDocument is not thread safe, and
+    // CreateSnapshot hands the worker an immutable rope-backed view without copying the text
+    private void ScheduleLiveParse()
+    {
+        // the ScriptDocument setter in the constructor reaches here through
+        // OnScriptDocumentChanged before the scheduler has been built
+        if (_liveParse is null)
+            return;
+
+        _liveParse.Schedule(ScriptDocument.CreateSnapshot());
+    }
+
+    /// <summary>Replaces the syntax diagnostics, which a live parse produces on every typing pause.</summary>
+    public void SetSyntaxDiagnostics(IReadOnlyList<FishboneDiagnostic> diagnostics)
+    {
+        _syntaxDiagnostics = diagnostics;
+        RebuildDiagnosticSegments();
+    }
+
+    // resolves both buckets against the current document once, so the renderer does no offset
+    // arithmetic per paint
+    private void RebuildDiagnosticSegments()
+    {
+        var segments = new List<DiagnosticSegment>();
+
+        Add(_syntaxDiagnostics);
+
+        // a file that no longer parses makes the last run's errors stale by definition, so the
+        // syntax bucket suppresses the run bucket rather than sitting alongside it. this is also
+        // what stops a run's syntax errors being marked twice once live parsing finds them too
+        if (_syntaxDiagnostics.Count == 0)
+            Add(_runDiagnostics);
+
+        _diagnosticSegments = segments;
+
+        void Add(IReadOnlyList<FishboneDiagnostic> diagnostics)
+        {
+            foreach (FishboneDiagnostic diagnostic in diagnostics)
+                if (DiagnosticSpans.TryResolve(ScriptDocument, diagnostic.Span, out int start, out int length))
+                    segments.Add(new DiagnosticSegment(start, length, diagnostic.Severity));
+        }
+        DiagnosticsChanged?.Invoke(this, EventArgs.Empty);
+    }
 
     public IReadOnlyList<int> BreakpointLines => _breakpoints
         .Where(anchor => !anchor.IsDeleted)
@@ -129,5 +254,20 @@ public partial class ScriptEditorVM : Document
         _breakpoints.Add(anchor);
         _breakpointResults.Remove(line);
         BreakpointsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Stops the background parsing and lets go of the document. Called when the tab closes; a
+    /// tab that is only being deactivated keeps working, so this must not run then.
+    /// </summary>
+    public void Dispose()
+    {
+        _liveParse.Dispose();
+        if (_trackedDocument is not null)
+        {
+            _trackedDocument.TextChanged -= OnDocumentTextChanged;
+            _trackedDocument = null;
+        }
+        WeakReferenceMessenger.Default.UnregisterAll(this);
     }
 }

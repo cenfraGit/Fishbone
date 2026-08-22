@@ -84,6 +84,17 @@ getValues()[3] = 40;
     }
 
     [Fact]
+    public void Parse_BareExpressionStatement_IsTheExpressionItself()
+    {
+        // a bare expression shares its whole prefix with an assignment now that both come from
+        // exprStatement, so it needs its own guard: no wrapper node, just the expression
+        var ast = Assert.IsType<ProgramNode>(ParserTestHelpers.ParseProgram("println(1);"));
+
+        var call = Assert.IsType<CallNode>(ast.Statements[0]);
+        Assert.Equal("println", Assert.IsType<IdentifierNode>(call.Callee).Name);
+    }
+
+    [Fact]
     public void Parse_NonIndexedExpressionAssignment_Throws()
     {
         Assert.ThrowsAny<Exception>(() => ParserTestHelpers.ParseProgram("(a + b) = 10;"));

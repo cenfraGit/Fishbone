@@ -168,54 +168,52 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         return new DeclarationNode(name, value) { Span = context.Span() };
     }
 
-    public override AstNode VisitAssignmentStat(FishboneParser.AssignmentStatContext context)
+    // every statement that begins with an expression arrives here: a bare expression, a plain
+    // assignment, and a compound assignment. the grammar keeps them together so it can commit
+    // early; deciding which one this is, and whether the target can be assigned to, is this
+    // method's job
+    public override AstNode VisitExprStatement(FishboneParser.ExprStatementContext context)
     {
-        var name = context.ID().GetText();
-        AstNode value = Visit(context.expr());
-        return new AssignmentNode(name, value) { Span = context.Span() };
-    }
-
-    public override AstNode VisitIndexedAssignmentStat(FishboneParser.IndexedAssignmentStatContext context)
-    {
-        AstNode assignmentTarget = Visit(context.expr(0));
-        if (assignmentTarget is not IndexingNode indexingNode)
-            throw new FishboneParseException([new ParseError(context.Start.Line, context.Start.Column + 1,
-                $"Indexed assignment requires an indexed target, but found {assignmentTarget.GetType().Name}.", context.expr(0).GetText()) { Span = context.Span() }]);
-
-        AstNode value = Visit(context.expr(1));
-        return new IndexedAssignmentNode(indexingNode.Target, indexingNode.Index, value) { Span = context.Span() };
-    }
-
-    public override AstNode VisitCompoundAssignmentStat(FishboneParser.CompoundAssignmentStatContext context)
-    {
+        // visited once. the target's own subexpressions end up inside the node that is built
+        // from it, so they are still evaluated exactly once at run time
         AstNode target = Visit(context.expr(0));
-        AstNode rightValue = Visit(context.expr(1));
-
-        // the compound operator text is "+=" (for example), the underlying binary operator is "+"
-        string compoundOp = context.GetChild(1).GetText();
-        string binaryOp = compoundOp[..^1];
-
-        var line = context.Start.Line;
-        var column = context.Start.Column + 1;
         var span = context.Span();
 
+        // no operator, so the statement is just the expression
+        if (context.expr().Length == 1)
+            return target;
+
+        AstNode rightValue = Visit(context.expr(1));
+        string op = context.GetChild(1).GetText();
+
+        if (op == "=")
+            return target switch
+            {
+                IdentifierNode identifier => new AssignmentNode(identifier.Name, rightValue) { Span = span },
+                IndexingNode indexing =>
+                    new IndexedAssignmentNode(indexing.Target, indexing.Index, rightValue) { Span = span },
+                _ => throw Rejected("Indexed assignment requires an indexed target", target, context, span)
+            };
+
         // "target <op>= right" converts to "target = target <op> right".
-        // plan: combine assignment node with operator node
-        switch (target)
+        string binaryOp = op[..^1];
+        return target switch
         {
-            case IdentifierNode identifier:
-                var combinedValue = new BinaryOpNode(binaryOp, identifier, rightValue) { Span = span };
-                return new AssignmentNode(identifier.Name, combinedValue) { Span = span };
-
-            case IndexingNode indexing:
-                var combinedIndexedValue = new BinaryOpNode(binaryOp, indexing, rightValue) { Span = span };
-                return new IndexedAssignmentNode(indexing.Target, indexing.Index, combinedIndexedValue) { Span = span };
-
-            default:
-                throw new FishboneParseException([new ParseError(line, column,
-                    $"Compound assignment requires a variable or indexed target, but found {target.GetType().Name}.", context.expr(0).GetText()) { Span = span }]);
-        }
+            IdentifierNode identifier => new AssignmentNode(
+                identifier.Name,
+                new BinaryOpNode(binaryOp, identifier, rightValue) { Span = span }) { Span = span },
+            IndexingNode indexing => new IndexedAssignmentNode(
+                indexing.Target,
+                indexing.Index,
+                new BinaryOpNode(binaryOp, indexing, rightValue) { Span = span }) { Span = span },
+            _ => throw Rejected("Compound assignment requires a variable or indexed target", target, context, span)
+        };
     }
+
+    private static FishboneParseException Rejected(
+        string reason, AstNode target, FishboneParser.ExprStatementContext context, SourceSpan span) =>
+        new([new ParseError(span.Line, span.Column,
+            $"{reason}, but found {target.GetType().Name}.", context.expr(0).GetText()) { Span = span }]);
 
     public override AstNode VisitUnaryExpr(FishboneParser.UnaryExprContext context)
     {
@@ -444,9 +442,11 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         if (string.IsNullOrWhiteSpace(holeText))
             throw new FishboneParseException([new ParseError(line, column, "Empty interpolation hole in interpolated string.", null)]);
 
-        // pad the fragment so the sub-parsed expression reports positions in the original script
-        var padded = new string('\n', line - 1) + new string(' ', column - 1) + holeText;
-        return ASTParser.ParseExpression(padded);
+        // the sub-parse is told where the fragment sits, so its spans land in the original script
+        // without the fragment having to be padded out to that position first. padding meant
+        // re-lexing every one of those newlines and spaces per hole, so a hole's cost grew with
+        // how far down the file it was
+        return ASTParser.ParseExpression(holeText, line, column);
     }
 
     // skips a quoted string inside a hole (index is at the opening quote); returns the
