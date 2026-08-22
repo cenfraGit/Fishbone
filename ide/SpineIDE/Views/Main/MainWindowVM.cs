@@ -15,6 +15,7 @@ using Dock.Model.Core;
 using Fishbone.Core;
 using Fishbone.DebugClient;
 using Fishbone.Engine;
+using Fishbone.Hosting;
 using SpineIDE.Models.Layout;
 using SpineIDE.Models.Messages;
 using SpineIDE.Models;

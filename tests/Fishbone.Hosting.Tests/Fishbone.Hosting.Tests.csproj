@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Fishbone.Hosting\Fishbone.Hosting.csproj" />
+    <!-- built but deliberately NOT referenced. if the test assembly bound to it, the fixture
+         would already be loaded in the process and Assembly.LoadFrom would hand back that copy
+         instead of reading the one on disk, so the loader tests would never exercise a real
+         discovery. built here only so the dll exists for them to copy. -->
+    <ProjectReference Include="..\Fishbone.TestPlugin\Fishbone.TestPlugin.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <Private>false</Private>
+    </ProjectReference>
+  </ItemGroup>
+
+  <!-- park the fixture in a subfolder the tests can find, rather than next to the test assembly
+       where the runtime would resolve it without going through the loader -->
+  <Target Name="CopyPluginFixture" AfterTargets="Build">
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\..\Fishbone.TestPlugin\bin\$(Configuration)\net8.0\Fishbone.TestPlugin.dll"
+          DestinationFolder="$(OutDir)fixtures"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

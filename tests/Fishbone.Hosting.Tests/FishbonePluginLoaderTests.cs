@@ -1,4 +1,6 @@
-namespace Fishbone.Engine.Tests;
+using Fishbone.Engine;
+
+namespace Fishbone.Hosting.Tests;
 
 public class FishbonePluginLoaderTests
 {

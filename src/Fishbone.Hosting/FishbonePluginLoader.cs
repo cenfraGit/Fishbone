@@ -3,6 +3,12 @@
 //
 // scans the .fishbone/plugins folder for plugin DLLs and loads them automatically.
 //
+// this lives in Fishbone.Hosting rather than Fishbone.Engine on purpose. discovery is
+// host policy: it names a directory under the user's profile and installs a
+// process-wide AssemblyResolve handler, neither of which an app that merely embeds
+// fishbone should inherit by referencing it. an embedding host calls
+// config.AddPlugin(new SomePlugin()) and never comes near this file.
+//
 // loading is best effort: a plugin that cannot load is skipped rather than taking
 // the whole run down, so the failures have to be reported somehow. this used to be
 // Console.Error.WriteLine straight from the loader, which works for a console host
@@ -15,8 +21,9 @@
 
 using System.Reflection;
 using Fishbone.Core;
+using Fishbone.Engine;
 
-namespace Fishbone.Engine;
+namespace Fishbone.Hosting;
 
 /// <summary>The outcome of a plugin scan: what loaded, and what went wrong doing it.</summary>
 public sealed record PluginLoadResult(
@@ -28,6 +35,10 @@ public static class FishbonePluginLoader
     private static readonly object _sync = new();
     private static readonly List<string> _registeredPluginDirs = [];
     private static bool _resolverRegistered;
+
+    // the engine a discovered plugin has to agree with, read from whichever assembly
+    // IFishbonePlugin actually came from rather than hardcoding a name
+    private static readonly AssemblyName EngineAssembly = typeof(IFishbonePlugin).Assembly.GetName();
 
     public static string DefaultPluginsDirectory =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
@@ -68,15 +79,43 @@ public static class FishbonePluginLoader
         {
             foreach (var dll in Directory.EnumerateFiles(dir, "*.dll"))
             {
-                Type[] exportedTypes;
+                Assembly assembly;
                 try
                 {
-                    exportedTypes = Assembly.LoadFrom(dll).GetExportedTypes();
+                    assembly = Assembly.LoadFrom(dll);
                 }
                 catch (Exception ex)
                 {
-                    // a DLL that can't be loaded or whose types can't be resolved (missing dependency,
-                    // wrong architecture, etc.) is skipped whole rather than taking the loader down
+                    // a DLL that can't be loaded (not managed, wrong architecture, built for a
+                    // newer .NET) is skipped whole rather than taking the loader down
+                    diagnostics.Add(FishboneDiagnostics.Configuration(
+                        $"Failed to load plugin assembly {dll}: {ex.Message}"));
+                    continue;
+                }
+
+                // checked before touching the types: a plugin built against a different major
+                // version of the engine fails with a TypeLoadException naming an internal type,
+                // which tells whoever installed it nothing. GetReferencedAssemblies reads the
+                // metadata without resolving anything, so it is safe this early
+                if (FindEngineReference(assembly) is { } engineReference
+                    && !IsEngineVersionCompatible(engineReference, EngineAssembly))
+                {
+                    diagnostics.Add(FishboneDiagnostics.Configuration(
+                        $"Plugin {Path.GetFileName(dll)} was built against Fishbone " +
+                        $"{engineReference.Version} but this host runs {EngineAssembly.Version}, " +
+                        "and was skipped. Install a build of the plugin that matches."));
+                    continue;
+                }
+
+                Type[] exportedTypes;
+                try
+                {
+                    exportedTypes = assembly.GetExportedTypes();
+                }
+                catch (Exception ex)
+                {
+                    // the assembly loaded but its public types cannot be resolved, which usually
+                    // means a dependency is missing next to it
                     diagnostics.Add(FishboneDiagnostics.Configuration(
                         $"Failed to load plugin assembly {dll}: {ex.Message}"));
                     continue;
@@ -96,7 +135,10 @@ public static class FishbonePluginLoader
                     {
                         if (Activator.CreateInstance(type) is IFishbonePlugin plugin)
                         {
-                            plugin.Register(config);
+                            // through AddPlugin rather than Register directly, so a discovered
+                            // plugin and a referenced one go down exactly one code path. what the
+                            // plugin reports joins the loader's own diagnostics
+                            config.AddPlugin(plugin, diagnostics.Add);
                             loaded.Add($"{plugin.GetType().Name} ({dll})");
                         }
                     }
@@ -110,6 +152,35 @@ public static class FishbonePluginLoader
         }
 
         return new PluginLoadResult(loaded, diagnostics);
+    }
+
+    /// <summary>
+    /// The plugin's reference to the engine assembly, or null when it does not reference it at
+    /// all. A DLL that sits in a plugins folder without referencing the engine is usually a
+    /// dependency rather than a plugin, so there is nothing to check.
+    /// </summary>
+    private static AssemblyName? FindEngineReference(Assembly assembly)
+    {
+        foreach (AssemblyName reference in assembly.GetReferencedAssemblies())
+            if (string.Equals(reference.Name, EngineAssembly.Name, StringComparison.OrdinalIgnoreCase))
+                return reference;
+
+        return null;
+    }
+
+    /// <summary>
+    /// Whether a plugin built against <paramref name="pluginReference"/> can run on
+    /// <paramref name="host"/>. Major version only: that is what semver says may break, and a
+    /// plugin built against an older minor is expected to keep working. Errs towards loading when
+    /// either version is missing, so an unversioned build fails loudly on its own terms rather
+    /// than being refused on a guess.
+    /// </summary>
+    internal static bool IsEngineVersionCompatible(AssemblyName pluginReference, AssemblyName host)
+    {
+        if (pluginReference.Version is null || host.Version is null)
+            return true;
+
+        return pluginReference.Version.Major == host.Version.Major;
     }
 
     private static void EnsureAssemblyResolverRegistered(string pluginsPath)

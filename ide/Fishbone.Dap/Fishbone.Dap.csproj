@@ -14,5 +14,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Fishbone.DebugAdapter\Fishbone.DebugAdapter.csproj" />
     <ProjectReference Include="..\..\src\Fishbone.Engine\Fishbone.Engine.csproj" />
+    <ProjectReference Include="..\..\src\Fishbone.Hosting\Fishbone.Hosting.csproj" />
   </ItemGroup>
 </Project>

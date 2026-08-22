@@ -1,5 +1,6 @@
 using Fishbone.Core;
 using Fishbone.Engine;
+using Fishbone.Hosting;
 using System.CommandLine;
 
 namespace SpineCLI;

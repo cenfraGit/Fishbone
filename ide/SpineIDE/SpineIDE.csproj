@@ -57,6 +57,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Fishbone.DebugClient\Fishbone.DebugClient.csproj" />
     <ProjectReference Include="..\..\src\Fishbone.Engine\Fishbone.Engine.csproj" />
+    <ProjectReference Include="..\..\src\Fishbone.Hosting\Fishbone.Hosting.csproj" />
     <ProjectReference Include="..\Fishbone.Dap\Fishbone.Dap.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
