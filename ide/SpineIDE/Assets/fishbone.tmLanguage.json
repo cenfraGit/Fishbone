@@ -15,7 +15,7 @@
     { "name": "keyword.operator.fb", "match": "\\b(and|or|xor|not)\\b" },
     { "name": "constant.language.fb", "match": "\\b(true|false|null)\\b" },
     { "name": "string.quoted.double.fb", "begin": "[$@]?\"", "end": "\"" },
-    { "name": "constant.numeric.fb", "match": "\\b\\d+(_+\\d+)*(\\.\\d+(_+\\d+)*)?\\b" },
+    { "name": "constant.numeric.fb", "match": "(?<![\\w.])(?:\\d+(?:_+\\d+)*(?:\\.\\d+(?:_+\\d+)*)?|\\.\\d+(?:_+\\d+)*)(?:[eE][+-]?\\d+)?\\b" },
     { "name": "entity.name.function.fb", "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*(?=\\s*\\()" }
   ]
 }
