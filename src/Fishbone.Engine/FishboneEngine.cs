@@ -32,6 +32,19 @@ public static class FishboneEngine
     /// exception per keystroke. Prefer <see cref="FishboneProgram.ParseSource"/> when the parsed
     /// program is actually wanted; this discards it.
     /// </summary>
+    /// <summary>
+    /// True when <paramref name="sourceCode"/> is nested or chained deeply enough that parsing it
+    /// risks a <see cref="StackOverflowException"/>, which cannot be caught and takes the process
+    /// with it. A caller that can defer, such as an editor validating in the background, should
+    /// skip the parse; a caller acting on an explicit request should carry on, since refusing
+    /// would be a worse answer than the risk. Cheap: a single pass over the characters.
+    /// </summary>
+    public static bool IsTooDeepToValidate(string sourceCode)
+    {
+        ArgumentNullException.ThrowIfNull(sourceCode);
+        return ParseDepthGuard.LooksTooDeepToParse(sourceCode);
+    }
+
     public static IReadOnlyList<FishboneDiagnostic> Validate(string sourceCode)
     {
         ArgumentNullException.ThrowIfNull(sourceCode);
