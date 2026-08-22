@@ -5,19 +5,19 @@
 
 println("OpenCV edge detection\n");
 
-// read the source image as grayscale (cv_im_read returns a Mat directly)
-let image = cv_im_read("input.png", "Grayscale");
+// read the source image as grayscale (cv.ImRead returns a Mat directly)
+let image = cv.ImRead("input.png", "Grayscale");
 println("loaded " + image.Width + "x" + image.Height);
 
 // OpenCV writes into a destination Mat you allocate, so create one and read it back afterwards.
 // suppress noise before detecting edges (the kernel size is a [w, h] list -> Size)
 let blurred = Mat();
-cv_gaussian_blur(image, blurred, [5, 5], 0);
+cv.GaussianBlur(image, blurred, [5, 5], 0);
 
 // detect edges (apertureSize and L2gradient are optional and take their defaults)
 let edges = Mat();
-cv_canny(blurred, edges, 50, 150);
+cv.Canny(blurred, edges, 50, 150);
 
 // save the result
-cv_im_write("edges.png", edges);
+cv.ImWrite("edges.png", edges);
 println("wrote edges.png");

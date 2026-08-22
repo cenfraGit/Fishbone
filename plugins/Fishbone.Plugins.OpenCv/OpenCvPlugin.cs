@@ -1,30 +1,30 @@
-using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
-using System.Text.RegularExpressions;
 using Fishbone.Engine;
-using Fishbone.Interpreter;
 using OpenCvSharp;
 
 namespace Fishbone.Plugins.OpenCv;
 
 /// <summary>
-/// Exposes OpenCV's <see cref="Cv2"/> operations to Fishbone by reflection. Each public static
-/// method is bound under a <c>cv_</c>-prefixed snake-case name (for example <c>cv_cvt_color</c>,
-/// <c>cv_gaussian_blur</c>, <c>cv_canny</c>) and called with native syntax. Because OpenCV writes its
-/// output into a destination <c>Mat</c> passed in (rather than returning it), scripts allocate the
-/// destination themselves and read it back afterwards:
+/// Exposes OpenCV to Fishbone by registering <see cref="Cv2"/> as <c>cv</c>, so every public
+/// static member is reachable through the dot operator under its .NET name (for example
+/// <c>cv.CvtColor</c>, <c>cv.GaussianBlur</c>, <c>cv.Canny</c>, and constants like
+/// <c>cv.FILLED</c>). Because OpenCV writes its output into a destination <c>Mat</c> passed in
+/// (rather than returning it), scripts allocate the destination themselves and read it back
+/// afterwards:
 ///
 /// <code>
 /// let dst = Mat();
-/// cv_cvt_color(src, dst, "BGR2GRAY");   // dst is filled in place
+/// cv.CvtColor(src, dst, "BGR2GRAY");   // dst is filled in place
 /// </code>
 ///
-/// The wrapper-type conversions that make this work (<c>Mat</c> to InputArray/OutputArray, lists to
+/// <see cref="Mat"/> is registered too, which makes both <c>Mat()</c> construction and its static
+/// factories (<c>Mat.Zeros</c>, <c>Mat.Ones</c>, <c>Mat.Eye</c>) available. The wrapper-type
+/// conversions that make all this work (<c>Mat</c> to InputArray/OutputArray, lists to
 /// Size/Scalar/Point) are registered as Fishbone type converters; optional OpenCV parameters may be
 /// omitted and take their defaults.
 /// </summary>
-public sealed partial class OpenCvPlugin : IFishbonePlugin
+public sealed class OpenCvPlugin : IFishbonePlugin
 {
     private static int _nativeResolverRegistered;
     private static AssemblyDependencyResolver? _dependencyResolver;
@@ -33,11 +33,17 @@ public sealed partial class OpenCvPlugin : IFishbonePlugin
     {
         EnsureNativeResolver();
 
-        // construct Mats from scripts: 'let dst = Mat();'
+        // construct Mats from scripts ('let dst = Mat();') and reach Mat's static factories
         config.AddType<Mat>();
 
+        // MatType is a struct whose depth/channel combinations are static fields, so registering
+        // it lets scripts name them: 'Mat.Zeros(4, 6, MatType.CV_8UC1);'
+        config.AddType<MatType>();
+
+        // every Cv2 static member under one name: 'cv.GaussianBlur(src, dst, [5, 5], 0);'
+        config.AddType(typeof(Cv2), "cv");
+
         RegisterConverters(config);
-        RegisterCv2Operations(config);
     }
 
     private static void RegisterConverters(FishboneConfiguration config)
@@ -49,51 +55,6 @@ public sealed partial class OpenCvPlugin : IFishbonePlugin
         config.AddTypeConverter(typeof(Point), OpenCvConverters.ToPoint);
         config.AddTypeConverter(typeof(Scalar), OpenCvConverters.ToScalar);
     }
-
-    private static void RegisterCv2Operations(FishboneConfiguration config)
-    {
-        var methods = typeof(Cv2)
-            .GetMethods(BindingFlags.Public | BindingFlags.Static)
-            .Where(IsExposable);
-
-        // group overloads under one name so a call resolves across all of them; prefix with "cv_"
-        // to namespace the operations and avoid colliding with other plugins' built-ins
-        foreach (var overloads in methods.GroupBy(method => "cv_" + ToSnakeCase(method.Name)))
-            config.AddBuiltIn(overloads.Key, new BoundMethod(target: null!, overloads.ToArray()));
-    }
-
-    /// <summary>
-    /// Filters out methods the interop path cannot invoke: generic definitions, operators/accessors,
-    /// and anything taking a pointer. Methods whose parameters reference OpenCV types without a
-    /// registered converter are still bound.
-    /// </summary>
-    private static bool IsExposable(MethodInfo method)
-    {
-        if (method.IsSpecialName || method.IsGenericMethodDefinition)
-            return false;
-
-        foreach (var parameter in method.GetParameters())
-        {
-            var type = parameter.ParameterType;
-            if (type.IsPointer || (type.IsByRef && type.GetElementType()!.IsPointer))
-                return false;
-        }
-
-        return true;
-    }
-
-    public static string ToSnakeCase(string pascal)
-    {
-        var result = AcronymPattern().Replace(pascal, "$1_$2");
-        result = WordBoundaryPattern().Replace(result, "$1_$2");
-        return result.ToLowerInvariant();
-    }
-
-    [GeneratedRegex(@"([A-Z]+)([A-Z][a-z])")]
-    private static partial Regex AcronymPattern();
-
-    [GeneratedRegex(@"([a-z0-9])([A-Z])")]
-    private static partial Regex WordBoundaryPattern();
 
     private static void EnsureNativeResolver()
     {
