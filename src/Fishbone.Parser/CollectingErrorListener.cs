@@ -21,7 +21,7 @@ public readonly record struct ParseError(int Line, int Column, string Message, s
 
 // implement both <IToken> and <int> error listener interfaces so it
 // can be registered on both the lexer and parser
-public sealed class CollectingErrorListener : IAntlrErrorListener<IToken>, IAntlrErrorListener<int>
+internal sealed class CollectingErrorListener : IAntlrErrorListener<IToken>, IAntlrErrorListener<int>
 {
     public List<ParseError> Errors { get; } = [];
 

@@ -10,7 +10,7 @@ using Fishbone.Core;
 
 namespace Fishbone.Parser;
 
-public class ASTParser
+public static class ASTParser
 {
     // used to create an AST for the program in the string
     public static AstNode Parse(string code)
@@ -28,7 +28,7 @@ public class ASTParser
     // used only for interpolated-string holes in expressions (VisitInterpStringExpr)
     // TODO: may need change? reinvokes lex + parse + error collect pipeline
     // for each interp string, which is lexing work from visitor side?
-    public static AstNode ParseExpression(string code)
+    internal static AstNode ParseExpression(string code)
     {
         var parser = CreateParser(code, out var errorListener);
         var parseTree = parser.exprStandalone();
