@@ -181,7 +181,7 @@ alias(out answer);
     [InlineData("func f(out a) { a = 1; } f(out 1 + 2);", "must be a variable")]
     [InlineData("func f(ref a) { a = 1; } f(ref 1 + 2);", "must be a variable")]
     // arity still checked
-    [InlineData("func f(a, out b) { b = 1; } f(1);", "Expected 2 args")]
+    [InlineData("func f(a, out b) { b = 1; } f(1);", "Expected 2 arguments but got 1")]
     public void Evaluate_ModifierMismatch_Throws(string code, string expectedMessage)
     {
         var exception = Assert.ThrowsAny<Exception>(() => InterpreterTestHelpers.Run(code));

@@ -172,7 +172,7 @@ public class FishboneInterpreter
         {
             "-" => -right,
             "not" => !IsTruthy(right),
-            _ => throw new FishboneRuntimeException($"Unknown unary operator: {node.Operator}")
+            _ => throw new FishboneRuntimeException($"Unknown unary operator '{node.Operator}'.")
         };
     }
 
@@ -221,7 +221,7 @@ public class FishboneInterpreter
             ">"  => left > right,
             "<=" => left <= right,
             ">=" => left >= right,
-            _ => throw new FishboneRuntimeException($"Unknown binary operator: {node.Operator}")
+            _ => throw new FishboneRuntimeException($"Unknown binary operator '{node.Operator}'.")
         };
     }
 
@@ -392,7 +392,7 @@ public class FishboneInterpreter
         if (start == end) return null!;
 
         if (step == 0.0)
-            throw new FishboneRuntimeException("For: step can't be zero.");
+            throw new FishboneRuntimeException("For loop step cannot be zero.");
 
         // true if start is less than end
         // false if start is more than end
@@ -577,7 +577,7 @@ public class FishboneInterpreter
     {
         var parameters = function.Parameters;
         if (argumentNodes.Count != parameters.Count)
-            throw new FishboneRuntimeException($"Expected {parameters.Count} args but got {argumentNodes.Count}.");
+            throw new FishboneRuntimeException(InterpreterMessages.ArgumentCountMismatch(parameters.Count, argumentNodes.Count));
 
         var args = new object?[parameters.Count];
         var writeBacks = new List<(string Name, int Index, bool IsOut)>();
@@ -591,9 +591,9 @@ public class FishboneInterpreter
             {
                 case ArgumentModifier.Out:
                     if (argument.Modifier != ArgumentModifier.Out)
-                        throw new FishboneRuntimeException($"Parameter '{parameter.Name}' is an out parameter; pass the argument with 'out'.");
+                        throw new FishboneRuntimeException(InterpreterMessages.ModifierRequired(parameter.Name, ArgumentModifier.Out));
                     if (argument.Value is not IdentifierNode outTarget)
-                        throw new FishboneRuntimeException($"Out argument '{parameter.Name}' must be a variable.");
+                        throw new FishboneRuntimeException(InterpreterMessages.ModifierTargetMustBeVariable(parameter.Name, ArgumentModifier.Out));
                     // an out parameter starts as null in the callee; the caller's value is not read
                     args[i] = null;
                     writeBacks.Add((outTarget.Name, i, true));
@@ -601,9 +601,9 @@ public class FishboneInterpreter
 
                 case ArgumentModifier.Ref:
                     if (argument.Modifier != ArgumentModifier.Ref)
-                        throw new FishboneRuntimeException($"Parameter '{parameter.Name}' is a ref parameter; pass the argument with 'ref'.");
+                        throw new FishboneRuntimeException(InterpreterMessages.ModifierRequired(parameter.Name, ArgumentModifier.Ref));
                     if (argument.Value is not IdentifierNode refTarget)
-                        throw new FishboneRuntimeException($"Ref argument '{parameter.Name}' must be a variable.");
+                        throw new FishboneRuntimeException(InterpreterMessages.ModifierTargetMustBeVariable(parameter.Name, ArgumentModifier.Ref));
                     // evaluating the identifier also enforces that the caller's variable exists
                     args[i] = Evaluate(env, argument.Value);
                     writeBacks.Add((refTarget.Name, i, false));
@@ -611,7 +611,7 @@ public class FishboneInterpreter
 
                 default: // by value
                     if (argument.Modifier != ArgumentModifier.None)
-                        throw new FishboneRuntimeException($"Parameter '{parameter.Name}' is passed by value; remove '{argument.Modifier.ToString().ToLowerInvariant()}'.");
+                        throw new FishboneRuntimeException(InterpreterMessages.ModifierNotAllowed(parameter.Name, argument.Modifier));
                     args[i] = Evaluate(env, argument.Value);
                     break;
             }
@@ -636,7 +636,7 @@ public class FishboneInterpreter
     {
         var parameters = callable.Parameters;
         if (argumentNodes.Count != parameters.Count)
-            throw new FishboneRuntimeException($"Expected {parameters.Count} argument(s) but got {argumentNodes.Count}.");
+            throw new FishboneRuntimeException(InterpreterMessages.ArgumentCountMismatch(parameters.Count, argumentNodes.Count));
 
         var args = new object?[parameters.Count];
         var writeBacks = new List<(string Name, int Index, bool IsOut)>();
@@ -650,9 +650,9 @@ public class FishboneInterpreter
             {
                 case ParameterDirection.Out:
                     if (argument.Modifier != ArgumentModifier.Out)
-                        throw new FishboneRuntimeException($"Parameter '{parameter.Name}' is an out parameter; pass the argument with 'out'.");
+                        throw new FishboneRuntimeException(InterpreterMessages.ModifierRequired(parameter.Name, ArgumentModifier.Out));
                     if (argument.Value is not IdentifierNode outTarget)
-                        throw new FishboneRuntimeException($"Out argument '{parameter.Name}' must be a variable.");
+                        throw new FishboneRuntimeException(InterpreterMessages.ModifierTargetMustBeVariable(parameter.Name, ArgumentModifier.Out));
                     // an out parameter introduces or overwrites the variable; pass a default placeholder
                     args[i] = GetDefaultValue(parameter.Type);
                     writeBacks.Add((outTarget.Name, i, true));
@@ -660,9 +660,9 @@ public class FishboneInterpreter
 
                 case ParameterDirection.Ref:
                     if (argument.Modifier != ArgumentModifier.Ref)
-                        throw new FishboneRuntimeException($"Parameter '{parameter.Name}' is a ref parameter; pass the argument with 'ref'.");
+                        throw new FishboneRuntimeException(InterpreterMessages.ModifierRequired(parameter.Name, ArgumentModifier.Ref));
                     if (argument.Value is not IdentifierNode)
-                        throw new FishboneRuntimeException($"Ref argument '{parameter.Name}' must be a variable.");
+                        throw new FishboneRuntimeException(InterpreterMessages.ModifierTargetMustBeVariable(parameter.Name, ArgumentModifier.Ref));
                     var refRaw = Evaluate(env, argument.Value);
                     if (ConvertArgument(refRaw, parameter.Type, out var refConverted) == ArgumentMatch.None)
                         throw new FishboneRuntimeException(DescribeConversionFailure(i, refRaw, parameter.Name, parameter.Type));
@@ -672,7 +672,7 @@ public class FishboneInterpreter
 
                 default: // In
                     if (argument.Modifier != ArgumentModifier.None)
-                        throw new FishboneRuntimeException($"Parameter '{parameter.Name}' is passed by value; remove '{argument.Modifier.ToString().ToLowerInvariant()}'.");
+                        throw new FishboneRuntimeException(InterpreterMessages.ModifierNotAllowed(parameter.Name, argument.Modifier));
                     var raw = Evaluate(env, argument.Value);
                     if (ConvertArgument(raw, parameter.Type, out var converted) == ArgumentMatch.None)
                         throw new FishboneRuntimeException(DescribeConversionFailure(i, raw, parameter.Name, parameter.Type));
@@ -878,13 +878,13 @@ public class FishboneInterpreter
             {
                 if (argument.Modifier != ArgumentModifier.Out)
                 {
-                    diagnostic = $"Parameter '{parameter.Name}' is an out parameter; pass the argument with 'out'.";
+                    diagnostic = InterpreterMessages.ModifierRequired(parameter.Name, ArgumentModifier.Out);
                     return false;
                 }
 
                 if (argument.Value is not IdentifierNode outTarget)
                 {
-                    diagnostic = $"Out argument '{parameter.Name}' must be a variable.";
+                    diagnostic = InterpreterMessages.ModifierTargetMustBeVariable(parameter.Name, ArgumentModifier.Out);
                     return false;
                 }
 
@@ -899,13 +899,13 @@ public class FishboneInterpreter
             {
                 if (argument.Modifier != ArgumentModifier.Ref)
                 {
-                    diagnostic = $"Parameter '{parameter.Name}' is a ref parameter; pass the argument with 'ref'.";
+                    diagnostic = InterpreterMessages.ModifierRequired(parameter.Name, ArgumentModifier.Ref);
                     return false;
                 }
 
                 if (argument.Value is not IdentifierNode refTarget)
                 {
-                    diagnostic = $"Ref argument '{parameter.Name}' must be a variable.";
+                    diagnostic = InterpreterMessages.ModifierTargetMustBeVariable(parameter.Name, ArgumentModifier.Ref);
                     return false;
                 }
 
@@ -924,7 +924,7 @@ public class FishboneInterpreter
 
             if (argument.Modifier != ArgumentModifier.None)
             {
-                diagnostic = $"Parameter '{parameter.Name}' is passed by value; remove '{argument.Modifier.ToString().ToLowerInvariant()}'.";
+                diagnostic = InterpreterMessages.ModifierNotAllowed(parameter.Name, argument.Modifier);
                 return false;
             }
 
