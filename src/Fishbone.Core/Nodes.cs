@@ -21,10 +21,15 @@ namespace Fishbone.Core;
 // base node for all fishbone nodes.
 public abstract record AstNode
 {
+    // where this node came from in the source. Line/Column below read off it, so
+    // existing consumers keep working while a client that wants to underline the
+    // node has the end available too
+    public SourceSpan Span { get; init; }
+
     // the values start at 1 (where 1 is the first row/col in the
     // source file). zero means unknown
-    public int Line { get; init; }
-    public int Column { get; init; }
+    public int Line => Span.Line;
+    public int Column => Span.Column;
 
     public virtual bool Equals(AstNode? other)
     {

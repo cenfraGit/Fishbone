@@ -18,8 +18,8 @@ public static class ASTParser
         var parser = CreateParser(code, out var errorListener);
         var parseTree = parser.program();
 
-        if (errorListener.Errors.Count > 0)
-            throw new FishboneParseException(errorListener.Errors);
+        if (errorListener.Diagnostics.Count > 0)
+            throw new FishboneParseException(errorListener.Diagnostics);
 
         var visitor = new AstBuilderVisitor();
         return visitor.Visit(parseTree);
@@ -33,8 +33,8 @@ public static class ASTParser
         var parser = CreateParser(code, out var errorListener);
         var parseTree = parser.exprStandalone();
 
-        if (errorListener.Errors.Count > 0)
-            throw new FishboneParseException(errorListener.Errors);
+        if (errorListener.Diagnostics.Count > 0)
+            throw new FishboneParseException(errorListener.Diagnostics);
 
         var visitor = new AstBuilderVisitor();
         return visitor.Visit(parseTree.expr());

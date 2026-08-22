@@ -204,8 +204,8 @@ public class AstNodeEqualityTests
     [Fact]
     public void AstNode_ReferenceComparer_DistinguishesStructurallyEqualNodes()
     {
-        var left = new LiteralNode(1) { Line = 1, Column = 1 };
-        var right = new LiteralNode(1) { Line = 2, Column = 1 };
+        var left = new LiteralNode(1) { Span = new SourceSpan(1, 1) };
+        var right = new LiteralNode(1) { Span = new SourceSpan(2, 1) };
 
         Assert.Equal(left, right);
         Assert.False(ReferenceEqualityComparer.Instance.Equals(left, right));

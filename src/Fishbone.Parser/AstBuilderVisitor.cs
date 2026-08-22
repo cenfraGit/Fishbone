@@ -22,7 +22,7 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         foreach (var statement in context.statement())
             statements.Add(Visit(statement));
 
-        return new ProgramNode(statements) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new ProgramNode(statements) { Span = context.Span() };
     }
 
     public override AstNode VisitBlockStat(FishboneParser.BlockStatContext context)
@@ -32,7 +32,7 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         foreach (var statement in context.statement())
             statements.Add(Visit(statement));
 
-        return new BlockNode(statements) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new BlockNode(statements) { Span = context.Span() };
     }
 
     public override AstNode VisitFunctionDefinitionStat(FishboneParser.FunctionDefinitionStatContext context)
@@ -51,7 +51,7 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
             funcParams.Add(new ParameterNode(modifier, parameter.ID().GetText()));
         }
 
-        return new FunctionDefinitionNode(funcName, funcParams.ToImmutableArray(), (BlockNode)block) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new FunctionDefinitionNode(funcName, funcParams.ToImmutableArray(), (BlockNode)block) { Span = context.Span() };
     }
 
     public override AstNode VisitCallExpr(FishboneParser.CallExprContext context)
@@ -68,49 +68,50 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
             funcArgs.Add(new ArgumentNode(modifier, Visit(argument.expr())));
         }
 
-        return new CallNode(callee, funcArgs.ToImmutableArray()) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new CallNode(callee, funcArgs.ToImmutableArray()) { Span = context.Span() };
     }
 
     public override AstNode VisitReturnStat(FishboneParser.ReturnStatContext context)
     {
         // a bare "return;" carries no expression
         var value = context.expr() is null ? null : Visit(context.expr());
-        return new ReturnNode(value) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new ReturnNode(value) { Span = context.Span() };
     }
 
     public override AstNode VisitTryStat(FishboneParser.TryStatContext context)
     {
         var line = context.Start.Line;
         var column = context.Start.Column + 1;
+        var span = context.Span();
 
         var catchClause = context.catchClause();
         var finallyClause = context.finallyClause();
         if (catchClause is null && finallyClause is null)
             throw new FishboneParseException([new ParseError(line, column,
-                "A 'try' statement requires a 'catch' or a 'finally' clause.", "try")]);
+                "A 'try' statement requires a 'catch' or a 'finally' clause.", "try") { Span = span }]);
 
         var tryBlock = (BlockNode)Visit(context.blockStat());
         string? exceptionName = catchClause?.ID()?.GetText();
         var catchBlock = catchClause is null ? null : (BlockNode)Visit(catchClause.blockStat());
         var finallyBlock = finallyClause is null ? null : (BlockNode)Visit(finallyClause.blockStat());
 
-        return new TryNode(tryBlock, exceptionName, catchBlock, finallyBlock) { Line = line, Column = column };
+        return new TryNode(tryBlock, exceptionName, catchBlock, finallyBlock) { Span = span };
     }
 
     public override AstNode VisitThrowStat(FishboneParser.ThrowStatContext context)
     {
         var value = context.expr() is null ? null : Visit(context.expr());
-        return new ThrowNode(value) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new ThrowNode(value) { Span = context.Span() };
     }
 
     public override AstNode VisitBreakStat(FishboneParser.BreakStatContext context)
     {
-        return new BreakNode() { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new BreakNode() { Span = context.Span() };
     }
 
     public override AstNode VisitContinueStat(FishboneParser.ContinueStatContext context)
     {
-        return new ContinueNode() { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new ContinueNode() { Span = context.Span() };
     }
 
     public override AstNode VisitStatement(FishboneParser.StatementContext context)
@@ -130,7 +131,7 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         for (int i = 0; i < context.expr().Length; i++)
             elements.Add(Visit(context.expr(i)));
 
-        return new ListNode(elements.ToImmutableArray()) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new ListNode(elements.ToImmutableArray()) { Span = context.Span() };
     }
 
     public override AstNode VisitDictionaryExpr(FishboneParser.DictionaryExprContext context)
@@ -141,37 +142,37 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
             var dictPair = context.dictPair(i);
             var key = Visit(dictPair.expr(0));
             var value = Visit(dictPair.expr(1));
-            keyValuePairs.Add(new KeyValuePairNode(key, value) { Line = dictPair.Start.Line, Column = dictPair.Start.Column + 1 });
+            keyValuePairs.Add(new KeyValuePairNode(key, value) { Span = dictPair.Span() });
         }
-        return new DictionaryNode(keyValuePairs.ToImmutableArray()) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new DictionaryNode(keyValuePairs.ToImmutableArray()) { Span = context.Span() };
     }
 
     public override AstNode VisitIndexingExpr(FishboneParser.IndexingExprContext context)
     {
         var target = Visit(context.expr(0));
         var index = Visit(context.expr(1));
-        return new IndexingNode(target, index) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new IndexingNode(target, index) { Span = context.Span() };
     }
 
     public override AstNode VisitMemberAccessExpr(FishboneParser.MemberAccessExprContext context)
     {
         var target = Visit(context.expr());
         var id = context.ID().GetText();
-        return new MemberAccessNode(target, id) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new MemberAccessNode(target, id) { Span = context.Span() };
     }
 
     public override AstNode VisitDeclarationStat(FishboneParser.DeclarationStatContext context)
     {
         var name = context.ID().GetText();
         AstNode value = Visit(context.expr());
-        return new DeclarationNode(name, value) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new DeclarationNode(name, value) { Span = context.Span() };
     }
 
     public override AstNode VisitAssignmentStat(FishboneParser.AssignmentStatContext context)
     {
         var name = context.ID().GetText();
         AstNode value = Visit(context.expr());
-        return new AssignmentNode(name, value) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new AssignmentNode(name, value) { Span = context.Span() };
     }
 
     public override AstNode VisitIndexedAssignmentStat(FishboneParser.IndexedAssignmentStatContext context)
@@ -179,10 +180,10 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         AstNode assignmentTarget = Visit(context.expr(0));
         if (assignmentTarget is not IndexingNode indexingNode)
             throw new FishboneParseException([new ParseError(context.Start.Line, context.Start.Column + 1,
-                $"Indexed assignment requires an indexed target, but found {assignmentTarget.GetType().Name}.", context.expr(0).GetText())]);
+                $"Indexed assignment requires an indexed target, but found {assignmentTarget.GetType().Name}.", context.expr(0).GetText()) { Span = context.Span() }]);
 
         AstNode value = Visit(context.expr(1));
-        return new IndexedAssignmentNode(indexingNode.Target, indexingNode.Index, value) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new IndexedAssignmentNode(indexingNode.Target, indexingNode.Index, value) { Span = context.Span() };
     }
 
     public override AstNode VisitCompoundAssignmentStat(FishboneParser.CompoundAssignmentStatContext context)
@@ -196,22 +197,23 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
 
         var line = context.Start.Line;
         var column = context.Start.Column + 1;
+        var span = context.Span();
 
         // "target <op>= right" converts to "target = target <op> right".
         // plan: combine assignment node with operator node
         switch (target)
         {
             case IdentifierNode identifier:
-                var combinedValue = new BinaryOpNode(binaryOp, identifier, rightValue) { Line = line, Column = column };
-                return new AssignmentNode(identifier.Name, combinedValue) { Line = line, Column = column };
+                var combinedValue = new BinaryOpNode(binaryOp, identifier, rightValue) { Span = span };
+                return new AssignmentNode(identifier.Name, combinedValue) { Span = span };
 
             case IndexingNode indexing:
-                var combinedIndexedValue = new BinaryOpNode(binaryOp, indexing, rightValue) { Line = line, Column = column };
-                return new IndexedAssignmentNode(indexing.Target, indexing.Index, combinedIndexedValue) { Line = line, Column = column };
+                var combinedIndexedValue = new BinaryOpNode(binaryOp, indexing, rightValue) { Span = span };
+                return new IndexedAssignmentNode(indexing.Target, indexing.Index, combinedIndexedValue) { Span = span };
 
             default:
                 throw new FishboneParseException([new ParseError(line, column,
-                    $"Compound assignment requires a variable or indexed target, but found {target.GetType().Name}.", context.expr(0).GetText())]);
+                    $"Compound assignment requires a variable or indexed target, but found {target.GetType().Name}.", context.expr(0).GetText()) { Span = span }]);
         }
     }
 
@@ -219,7 +221,7 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
     {
         string op = context.GetChild(0).GetText();
         AstNode right = Visit(context.expr());
-        return new UnaryOpNode(op, right) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new UnaryOpNode(op, right) { Span = context.Span() };
     }
 
     public override AstNode VisitBinaryExpr(FishboneParser.BinaryExprContext context)
@@ -227,7 +229,7 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         AstNode left = Visit(context.expr(0));
         AstNode right = Visit(context.expr(1));
         string op = context.GetChild(1).GetText();
-        return new BinaryOpNode(op, left, right) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new BinaryOpNode(op, left, right) { Span = context.Span() };
     }
 
     public override AstNode VisitBoolOperatorExpr(FishboneParser.BoolOperatorExprContext context)
@@ -235,7 +237,7 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         AstNode left = Visit(context.expr(0));
         AstNode right = Visit(context.expr(1));
         string op = context.GetChild(1).GetText();
-        return new BinaryOpNode(op, left, right) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new BinaryOpNode(op, left, right) { Span = context.Span() };
     }
 
     public override AstNode VisitIfStat(FishboneParser.IfStatContext context)
@@ -252,14 +254,14 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
             elseBranch = elseNode is BlockNode or IfNode ? elseNode : WrapInBlock(elseNode);
         }
 
-        return new IfNode(condition, thenBranch, elseBranch) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new IfNode(condition, thenBranch, elseBranch) { Span = context.Span() };
     }
 
     public override AstNode VisitWhileStat(FishboneParser.WhileStatContext context)
     {
         var condition = Visit(context.expr());
         var body = VisitBody(context.statement());
-        return new WhileNode(condition, body) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new WhileNode(condition, body) { Span = context.Span() };
     }
 
     public override AstNode VisitForeachStat(FishboneParser.ForeachStatContext context)
@@ -267,7 +269,7 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         var iteratorName = context.ID().GetText();
         var iterable = Visit(context.expr());
         var body = VisitBody(context.statement());
-        return new ForeachNode(iteratorName, iterable, body) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new ForeachNode(iteratorName, iterable, body) { Span = context.Span() };
     }
 
     public override AstNode VisitForStat(FishboneParser.ForStatContext context)
@@ -278,7 +280,7 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         var step = (context.expr().Length > 2) ? Visit(context.expr(2)) : null;
         var body = VisitBody(context.statement());
         return new ForNode(iteratorName, start, end, step, body)
-        { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        { Span = context.Span() };
     }
 
     // single-statement bodies get wrapped in a block so they scope and execute
@@ -290,18 +292,18 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
     }
 
     private static BlockNode WrapInBlock(AstNode statement) =>
-        new BlockNode([statement]) { Line = statement.Line, Column = statement.Column };
+        new BlockNode([statement]) { Span = statement.Span };
 
     public override AstNode VisitIdExpr(FishboneParser.IdExprContext context)
     {
-        return new IdentifierNode(context.ID().GetText()) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new IdentifierNode(context.ID().GetText()) { Span = context.Span() };
     }
 
     public override AstNode VisitCastExpr(FishboneParser.CastExprContext context)
     {
         var value = Visit(context.expr());
         var typeName = context.ID().GetText();
-        return new CastNode(value, typeName) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new CastNode(value, typeName) { Span = context.Span() };
     }
 
     public override AstNode VisitIntExpr(FishboneParser.IntExprContext context)
@@ -309,15 +311,16 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         var text = context.INT().GetText().Replace("_", string.Empty);
         var line = context.Start.Line;
         var column = context.Start.Column + 1;
+        var span = context.Span();
 
         // like C#, an integer literal is the smallest type that fits: int, then long
         if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var intValue))
-            return new LiteralNode(intValue) { Line = line, Column = column };
+            return new LiteralNode(intValue) { Span = span };
         if (long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var longValue))
-            return new LiteralNode(longValue) { Line = line, Column = column };
+            return new LiteralNode(longValue) { Span = span };
 
         throw new FishboneParseException([new ParseError(line, column,
-            $"Integer literal '{context.INT().GetText()}' is too large for a 64-bit integer.", context.INT().GetText())]);
+            $"Integer literal '{context.INT().GetText()}' is too large for a 64-bit integer.", context.INT().GetText()) { Span = span }]);
     }
 
     public override AstNode VisitDoubleExpr(FishboneParser.DoubleExprContext context)
@@ -325,6 +328,7 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         var text = context.DOUBLE().GetText();
         var line = context.Start.Line;
         var column = context.Start.Column + 1;
+        var span = context.Span();
 
         // NumberStyles.Float allows the decimal point and the exponent. an out-of-range
         // literal may either fail to parse or come back as infinity depending on the
@@ -333,10 +337,10 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
             || double.IsInfinity(value) || double.IsNaN(value))
         {
             throw new FishboneParseException([new ParseError(line, column,
-                $"Double literal '{text}' is too large for a 64-bit double.", text)]);
+                $"Double literal '{text}' is too large for a 64-bit double.", text) { Span = span }]);
         }
 
-        return new LiteralNode(value) { Line = line, Column = column };
+        return new LiteralNode(value) { Span = span };
     }
 
     public override AstNode VisitStringExpr(FishboneParser.StringExprContext context)
@@ -344,14 +348,14 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         var text = context.STRING().GetText();
         var trimmed = text[1..^1];
         string unescaped = Unescape(trimmed, context.Start.Line, context.Start.Column + 1);
-        return new LiteralNode(unescaped) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new LiteralNode(unescaped) { Span = context.Span() };
     }
 
     public override AstNode VisitRawStringExpr(FishboneParser.RawStringExprContext context)
     {
         var text = context.RAW_STRING().GetText();
         var content = text[2..^1].Replace("\"\"", "\"");
-        return new LiteralNode(content) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new LiteralNode(content) { Span = context.Span() };
     }
 
     public override AstNode VisitInterpStringExpr(FishboneParser.InterpStringExprContext context)
@@ -371,7 +375,7 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
             if (literal.Length == 0)
                 return;
             var unescaped = Unescape(literal.ToString(), litLine, litCol);
-            parts.Add(new LiteralNode(unescaped) { Line = litLine, Column = litCol });
+            parts.Add(new LiteralNode(unescaped) { Span = new SourceSpan(litLine, litCol) });
             literal.Clear();
         }
 
@@ -432,7 +436,7 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         }
         FlushLiteral();
 
-        return new InterpolatedStringNode([.. parts]) { Line = token.Line, Column = token.Column + 1 };
+        return new InterpolatedStringNode([.. parts]) { Span = token.Span() };
     }
 
     private static AstNode ParseHole(string holeText, int line, int column)
@@ -525,11 +529,11 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
 
     public override AstNode VisitBoolExpr(FishboneParser.BoolExprContext context)
     {
-        return (context.TRUE() is not null) ? new LiteralNode(true) { Line = context.Start.Line, Column = context.Start.Column + 1 } : new LiteralNode(false) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return (context.TRUE() is not null) ? new LiteralNode(true) { Span = context.Span() } : new LiteralNode(false) { Span = context.Span() };
     }
 
     public override AstNode VisitNullExpr(FishboneParser.NullExprContext context)
     {
-        return new LiteralNode(null!) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new LiteralNode(null!) { Span = context.Span() };
     }
 }

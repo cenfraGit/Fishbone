@@ -104,18 +104,18 @@ public class FishboneInterpreter
             if (_tryDepth == 0)
                 _debugger.OnRuntimeException(exception, node, env);
 
-            if (exception is FishboneRuntimeException { Line: > 0 })
+            if (exception is FishboneRuntimeException { Span.IsKnown: true })
             {
                 if (_tryDepth == 0)
                     exception.Data[DebuggerReportedKey] = true;
                 throw;
             }
 
-            // attach the failing node's location: language-diagnosed errors are thrown with a
+            // attach the failing node's span: language-diagnosed errors are thrown with a
             // message only (and keep a null inner), while foreign exceptions become the inner
             var wrapped = exception is FishboneRuntimeException unlocated
-                ? new FishboneRuntimeException(unlocated.Message, node.Line, node.Column, unlocated.InnerException)
-                : new FishboneRuntimeException(exception.Message, node.Line, node.Column, exception);
+                ? new FishboneRuntimeException(unlocated.Message, node.Span, unlocated.InnerException)
+                : new FishboneRuntimeException(exception.Message, node.Span, exception);
             if (_tryDepth == 0)
                 wrapped.Data[DebuggerReportedKey] = true;
             throw wrapped;

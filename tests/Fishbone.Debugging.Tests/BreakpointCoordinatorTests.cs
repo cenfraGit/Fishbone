@@ -225,5 +225,5 @@ public class BreakpointCoordinatorTests
         return coordinator;
     }
 
-    private static LiteralNode Node(int line) => new(0) { Line = line, Column = 1 };
+    private static LiteralNode Node(int line) => new(0) { Span = new SourceSpan(line, 1) };
 }
