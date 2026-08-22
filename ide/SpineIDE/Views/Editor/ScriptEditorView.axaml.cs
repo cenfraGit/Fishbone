@@ -26,6 +26,7 @@ public partial class ScriptEditorView : UserControl
     private bool _isMessengerRegistered;
     private BreakpointMargin? _breakpointMargin;
     private PausedLineRenderer? _pausedLineRenderer;
+    private DiagnosticSquiggleRenderer? _squiggleRenderer;
     private ScriptEditorVM? _subscribedViewModel;
     private ScriptEditorVM? _documentViewModel;
     private FoldingManager? _foldingManager;
@@ -103,6 +104,11 @@ public partial class ScriptEditorView : UserControl
             // build the global catalog off-thread so the first keystroke doesn't pay the plugin-load cost
             Task.Run(() => _ = FishboneCompletionCatalog.Shared);
             AttachDebugAdornments(editor);
+            // the squiggle renderer resolves its view model per paint, so unlike the debug
+            // adornments it needs no rebinding when the DataContext changes and can be installed
+            // once here alongside the rest of the one-time setup
+            _squiggleRenderer = new DiagnosticSquiggleRenderer(() => DataContext as ScriptEditorVM);
+            editor.TextArea.TextView.BackgroundRenderers.Add(_squiggleRenderer);
             _activeEditor = this;
         }
 
@@ -164,6 +170,7 @@ public partial class ScriptEditorView : UserControl
         if (_documentViewModel is not null)
         {
             _documentViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+            _documentViewModel.DiagnosticsChanged -= OnDiagnosticsChanged;
             _documentViewModel = null;
         }
 
@@ -171,6 +178,7 @@ public partial class ScriptEditorView : UserControl
         {
             _documentViewModel = vm;
             vm.PropertyChanged += OnViewModelPropertyChanged;
+            vm.DiagnosticsChanged += OnDiagnosticsChanged;
             SetDocument(vm.ScriptDocument);
         }
         else
@@ -231,6 +239,7 @@ public partial class ScriptEditorView : UserControl
         if (_documentViewModel is not null)
         {
             _documentViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+            _documentViewModel.DiagnosticsChanged -= OnDiagnosticsChanged;
             _documentViewModel = null;
         }
 
@@ -260,6 +269,11 @@ public partial class ScriptEditorView : UserControl
     }
 
     private void OnBreakpointVisualsChanged(object? sender, EventArgs e) => _breakpointMargin?.InvalidateVisual();
+
+    // a background renderer is repainted by the TextView's own pass, so invalidating the view is
+    // what picks up new underlines
+    private void OnDiagnosticsChanged(object? sender, EventArgs e) =>
+        Editor.TextArea.TextView.InvalidateVisual();
 
     private void RegisterMessengerRecipients()
     {

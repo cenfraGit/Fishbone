@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.Messaging;
 using Dock.Model.Mvvm.Controls;
 using SpineIDE.Models;
 using SpineIDE.Models.Messages;
+using Fishbone.Core;
 using Fishbone.DebugClient;
 
 namespace SpineIDE.Views.Editor;
@@ -37,6 +38,18 @@ public partial class ScriptEditorVM : Document
     public event EventHandler? BreakpointsChanged;
     public event EventHandler? BreakpointVisualsChanged;
     private readonly Dictionary<int, FishboneBreakpointResult> _breakpointResults = [];
+
+    // two buckets with different lifetimes: syntax diagnostics are replaced on every typing
+    // pause, runtime ones survive until the next edit or run. kept apart so neither clears the
+    // other, and resolved into DiagnosticSegments once per change rather than once per paint
+    private IReadOnlyList<FishboneDiagnostic> _syntaxDiagnostics = [];
+    private IReadOnlyList<FishboneDiagnostic> _runtimeDiagnostics = [];
+    private IReadOnlyList<DiagnosticSegment> _diagnosticSegments = [];
+
+    /// <summary>Raised whenever the underlines need repainting.</summary>
+    public event EventHandler? DiagnosticsChanged;
+
+    internal IReadOnlyList<DiagnosticSegment> DiagnosticSegments => _diagnosticSegments;
 
     public string? ScriptPath { get; set; }
     public string ScriptName
@@ -71,6 +84,12 @@ public partial class ScriptEditorVM : Document
             if (message.SourceId == SourceId)
                 IsDebugging = message.IsDebugging;
         });
+
+        WeakReferenceMessenger.Default.Register<MessageDiagnostics>(this, (recipient, message) =>
+        {
+            if (message.SourceId == SourceId)
+                SetRuntimeDiagnostics(message.Diagnostics);
+        });
     }
 
     // --------------------------------------------------------------------------------
@@ -83,9 +102,82 @@ public partial class ScriptEditorVM : Document
             _trackedDocument.TextChanged -= OnDocumentTextChanged;
         _trackedDocument = value;
         value.TextChanged += OnDocumentTextChanged;
+
+        // offsets from the previous document mean nothing in this one
+        _runtimeDiagnostics = [];
+        RebuildDiagnosticSegments();
     }
 
-    private void OnDocumentTextChanged(object? sender, EventArgs e) => IsDirty = true;
+    private void OnDocumentTextChanged(object? sender, EventArgs e)
+    {
+        IsDirty = true;
+
+        // a runtime error describes a program that no longer exists, so the first edit after a
+        // run retires it rather than letting the mark drift onto whatever now sits at that
+        // offset. guarded by the emptiness check so typing costs nothing once they are gone
+        if (_runtimeDiagnostics.Count > 0)
+        {
+            _runtimeDiagnostics = [];
+            RebuildDiagnosticSegments();
+        }
+    }
+
+    // --------------------------------------------------------------------------------
+    // diagnostics
+    // --------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Replaces the diagnostics produced by running this script. Cleared by the next edit and by
+    /// the next run.
+    /// </summary>
+    public void SetRuntimeDiagnostics(IReadOnlyList<FishboneDiagnostic> diagnostics)
+    {
+        // only Runtime diagnostics are underlined here: a run that failed to parse reported the
+        // same syntax errors the editor already shows, and marking both would double up
+        _runtimeDiagnostics = [.. diagnostics.Where(d => d.Stage == DiagnosticStage.Runtime)];
+        RebuildDiagnosticSegments();
+    }
+
+    /// <summary>Drops the diagnostics from the last run, without touching syntax diagnostics.</summary>
+    public void ClearRuntimeDiagnostics()
+    {
+        if (_runtimeDiagnostics.Count == 0)
+            return;
+
+        _runtimeDiagnostics = [];
+        RebuildDiagnosticSegments();
+    }
+
+    /// <summary>Replaces the syntax diagnostics, which a live parse produces on every typing pause.</summary>
+    public void SetSyntaxDiagnostics(IReadOnlyList<FishboneDiagnostic> diagnostics)
+    {
+        _syntaxDiagnostics = diagnostics;
+        RebuildDiagnosticSegments();
+    }
+
+    // resolves both buckets against the current document once, so the renderer does no offset
+    // arithmetic per paint
+    private void RebuildDiagnosticSegments()
+    {
+        var segments = new List<DiagnosticSegment>();
+
+        Add(_syntaxDiagnostics);
+
+        // a file that no longer parses makes the last run's errors stale by definition, so the
+        // syntax bucket suppresses the runtime one rather than sitting alongside it
+        if (_syntaxDiagnostics.Count == 0)
+            Add(_runtimeDiagnostics);
+
+        _diagnosticSegments = segments;
+
+        void Add(IReadOnlyList<FishboneDiagnostic> diagnostics)
+        {
+            foreach (FishboneDiagnostic diagnostic in diagnostics)
+                if (DiagnosticSpans.TryResolve(ScriptDocument, diagnostic.Span, out int start, out int length))
+                    segments.Add(new DiagnosticSegment(start, length, diagnostic.Severity));
+        }
+        DiagnosticsChanged?.Invoke(this, EventArgs.Empty);
+    }
 
     public IReadOnlyList<int> BreakpointLines => _breakpoints
         .Where(anchor => !anchor.IsDeleted)

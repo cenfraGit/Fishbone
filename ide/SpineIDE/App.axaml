@@ -24,6 +24,9 @@
                 <SolidColorBrush x:Key="EditorForegroundBrush" Color="#ABB2BF" />
                 <SolidColorBrush x:Key="EditorGutterBrush" Color="#21252B" />
                 <SolidColorBrush x:Key="PausedLineBrush" Color="#403A2A" />
+                <!-- OneDark diagnostic reds/ambers, used for the editor squiggles -->
+                <SolidColorBrush x:Key="EditorErrorSquiggleBrush" Color="#E06C75" />
+                <SolidColorBrush x:Key="EditorWarningSquiggleBrush" Color="#D19A66" />
                 <SolidColorBrush x:Key="CodeSurfaceBrush" Color="#282C34" />
                 <SolidColorBrush x:Key="CodeSurfaceForegroundBrush" Color="#ABB2BF" />
                 <SolidColorBrush x:Key="PanelHeaderBrush" Color="#21252B" />
@@ -44,6 +47,8 @@
                 <SolidColorBrush x:Key="EditorForegroundBrush" Color="#383A42" />
                 <SolidColorBrush x:Key="EditorGutterBrush" Color="#ECECEC" />
                 <SolidColorBrush x:Key="PausedLineBrush" Color="#FFF3C4" />
+                <SolidColorBrush x:Key="EditorErrorSquiggleBrush" Color="#E45649" />
+                <SolidColorBrush x:Key="EditorWarningSquiggleBrush" Color="#C18401" />
                 <SolidColorBrush x:Key="CodeSurfaceBrush" Color="#F6F6F6" />
                 <SolidColorBrush x:Key="CodeSurfaceForegroundBrush" Color="#383A42" />
                 <SolidColorBrush x:Key="PanelHeaderBrush" Color="#ECECEC" />
