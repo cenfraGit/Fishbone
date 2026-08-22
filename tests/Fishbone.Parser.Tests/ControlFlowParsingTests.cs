@@ -24,11 +24,11 @@ else
                 new BinaryOpNode(">", new IdentifierNode("score"), new LiteralNode(80)),
                 new BlockNode(new List<AstNode>
                 {
-                    new AssignmentNode(["grade"], new LiteralNode(1))
+                    new AssignmentNode("grade", new LiteralNode(1))
                 }),
                 new BlockNode(new List<AstNode>
                 {
-                    new AssignmentNode(["grade"], new LiteralNode(3))
+                    new AssignmentNode("grade", new LiteralNode(3))
                 })
             )
         });
@@ -64,23 +64,23 @@ else
                 new BinaryOpNode(">", new IdentifierNode("score"), new LiteralNode(90)),
                 new BlockNode(new List<AstNode>
                 {
-                    new AssignmentNode(["grade"], new LiteralNode(1))
+                    new AssignmentNode("grade", new LiteralNode(1))
                 }),
                 new IfNode(
                     new BinaryOpNode(">", new IdentifierNode("score"), new LiteralNode(80)),
                     new BlockNode(new List<AstNode>
                     {
-                        new AssignmentNode(["grade"], new LiteralNode(2))
+                        new AssignmentNode("grade", new LiteralNode(2))
                     }),
                     new IfNode(
                         new BinaryOpNode(">", new IdentifierNode("score"), new LiteralNode(70)),
                         new BlockNode(new List<AstNode>
                         {
-                            new AssignmentNode(["grade"], new LiteralNode(3))
+                            new AssignmentNode("grade", new LiteralNode(3))
                         }),
                         new BlockNode(new List<AstNode>
                         {
-                            new AssignmentNode(["grade"], new LiteralNode(4))
+                            new AssignmentNode("grade", new LiteralNode(4))
                         })
                     )
                 )
@@ -107,7 +107,7 @@ while (x < 5)
                 new BlockNode(new List<AstNode>
                 {
                     new AssignmentNode(
-                        ["x"],
+                        "x",
                         new BinaryOpNode("+", new IdentifierNode("x"), new LiteralNode(1))
                     )
                 })
@@ -135,7 +135,7 @@ foreach (value in values)
                 new BlockNode(new List<AstNode>
                 {
                     new AssignmentNode(
-                        ["total"],
+                        "total",
                         new BinaryOpNode("+", new IdentifierNode("total"), new IdentifierNode("value"))
                     )
                 })

@@ -14,9 +14,9 @@ try { x = 1; } catch (e) { y = 2; }
         var expectedAst = new ProgramNode(new List<AstNode>
         {
             new TryNode(
-                new BlockNode(new List<AstNode> { new AssignmentNode(["x"], new LiteralNode(1)) }),
+                new BlockNode(new List<AstNode> { new AssignmentNode("x", new LiteralNode(1)) }),
                 "e",
-                new BlockNode(new List<AstNode> { new AssignmentNode(["y"], new LiteralNode(2)) }),
+                new BlockNode(new List<AstNode> { new AssignmentNode("y", new LiteralNode(2)) }),
                 null)
         });
 

@@ -11,7 +11,6 @@ statement
     | assignmentStat SEMI
     | indexedAssignmentStat SEMI
     | compoundAssignmentStat SEMI
-    | ID (COMMA ID)* ASSIGN expr SEMI
     | expr SEMI
     | functionDefinitionStat
     | ifStat
@@ -28,8 +27,8 @@ statement
 
 blockStat : '{' statement* '}' ;
 
-declarationStat       : LET ID (COMMA ID)* ASSIGN expr ;
-assignmentStat        : ID (COMMA ID)* ASSIGN expr ;
+declarationStat       : LET ID ASSIGN expr ;
+assignmentStat        : ID ASSIGN expr ;
 indexedAssignmentStat : expr ASSIGN expr ;
 compoundAssignmentStat : expr (PLUS_ASSIGN|MINUS_ASSIGN|MUL_ASSIGN|DIV_ASSIGN|MOD_ASSIGN) expr ;
 
@@ -39,7 +38,7 @@ whileStat   : WHILE '(' expr ')' statement ;
 foreachStat : FOREACH '(' ID IN expr ')' statement ;
 forStat     : FOR '(' ID IN expr (COMMA expr (COMMA expr)?)? ')' statement ;
 
-functionDefinitionStat : FUNC ID '(' (ID (COMMA ID)*)? ')' blockStat ;
+functionDefinitionStat : FUNC ID '(' (parameter (COMMA parameter)*)? ')' blockStat ;
 
 // at least one of catchClause/finallyClause is required (enforced when building the AST)
 tryStat       : TRY blockStat catchClause? finallyClause? ;
@@ -48,8 +47,9 @@ finallyClause : FINALLY blockStat ;
 
 throwStat : THROW expr? ; // bare 'throw;' rethrows, only valid inside catch
 
+parameter    : (OUT|REF)? ID ;
 argument     : (OUT|REF)? expr ;
-returnStat   : RETURN (expr (COMMA expr)*)? ;
+returnStat   : RETURN expr? ;
 breakStat    : BREAK ;
 continueStat : CONTINUE ;
 dictPair     : expr COLON expr ;

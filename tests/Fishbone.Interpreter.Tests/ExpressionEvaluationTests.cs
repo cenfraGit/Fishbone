@@ -96,12 +96,7 @@ let nonZeroIsTruthy = not 3;
     public void Evaluate_Truthiness_HandlesNullBooleansNumbersAndStrings()
     {
         var env = InterpreterTestHelpers.Run("""
-func oneValue()
-{
-    return 1;
-}
-
-let value, missing = oneValue();
+let missing = null;
 let nullIsFalsey = not missing;
 let falseIsFalsey = not false;
 let trueIsTruthy = not true;
@@ -203,14 +198,39 @@ let nested = [[1, 2], [3]];
     }
 
     [Fact]
-    public void Evaluate_ListExpressions_CanBeDestructured()
+    public void Evaluate_ReturnedListArrivesIntactAndScalarStaysScalar()
     {
+        // a returned list is not unwrapped: it reaches the caller as the same list.
+        // this used to be indistinguishable from the old multi-value return
         var env = InterpreterTestHelpers.Run("""
-let first, second = [1, 2];
+func pair()
+{
+    return [1, 2];
+}
+
+func single()
+{
+    return [42];
+}
+
+func scalar()
+{
+    return 7;
+}
+
+let twoItems = pair();
+let oneItem = single();
+let justSeven = scalar();
 """);
 
-        Assert.Equal(1, env.GetValue("first"));
-        Assert.Equal(2, env.GetValue("second"));
+        var twoItems = Assert.IsType<List<object>>(env.GetValue("twoItems"));
+        Assert.Equal(new object[] { 1, 2 }, twoItems);
+
+        var oneItem = Assert.IsType<List<object>>(env.GetValue("oneItem"));
+        Assert.Equal(new object[] { 42 }, oneItem);
+
+        Assert.Equal(7, env.GetValue("justSeven"));
+        Assert.IsType<int>(env.GetValue("justSeven"));
     }
 
     [Fact]

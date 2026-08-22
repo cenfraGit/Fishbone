@@ -11,7 +11,7 @@ public class CastParsingTests
 
         var expectedAst = new ProgramNode(new List<AstNode>
         {
-            new DeclarationNode(["n"], new CastNode(new IdentifierNode("value"), "int"))
+            new DeclarationNode("n", new CastNode(new IdentifierNode("value"), "int"))
         });
 
         Assert.Equal(expectedAst, ast);
@@ -24,7 +24,7 @@ public class CastParsingTests
 
         var expectedAst = new ProgramNode(new List<AstNode>
         {
-            new DeclarationNode(["ok"],
+            new DeclarationNode("ok",
                 new BinaryOpNode("<",
                     new CastNode(
                         new BinaryOpNode("+", new IdentifierNode("a"), new IdentifierNode("b")),
@@ -42,7 +42,7 @@ public class CastParsingTests
 
         var expectedAst = new ProgramNode(new List<AstNode>
         {
-            new DeclarationNode(["x"],
+            new DeclarationNode("x",
                 new CastNode(new CastNode(new IdentifierNode("v"), "double"), "string"))
         });
 

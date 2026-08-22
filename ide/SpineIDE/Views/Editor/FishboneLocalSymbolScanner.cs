@@ -15,7 +15,10 @@ public static partial class FishboneLocalSymbolScanner
     [GeneratedRegex(@"\bfunc\s+([A-Za-z_]\w*)\s*\(([^)]*)\)", RegexOptions.Compiled)]
     private static partial Regex FuncDeclaration();
 
-    [GeneratedRegex(@"^([A-Za-z_]\w*)", RegexOptions.Compiled)]
+    // a parameter may be prefixed with 'out'/'ref'; capture the name, not the keyword.
+    // '\s+' rather than '\s*' matters: with '\s*' the input "outer" would match the
+    // optional group as "out" and capture only "er"
+    [GeneratedRegex(@"^(?:(?:out|ref)\s+)?([A-Za-z_]\w*)", RegexOptions.Compiled)]
     private static partial Regex LeadingIdentifier();
 
     public static IEnumerable<FishboneCompletionData> Scan(string textBeforeCaret)

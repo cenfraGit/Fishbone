@@ -37,13 +37,19 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
 
     public override AstNode VisitFunctionDefinitionStat(FishboneParser.FunctionDefinitionStatContext context)
     {
-        var funcName = context.ID(0).GetText();
+        var funcName = context.ID().GetText();
         var block = Visit(context.blockStat());
 
-        // get parameters
-        var funcParams = new List<string>();
-        for (int i = 1; i < context.ID().Length; i++)
-            funcParams.Add(context.ID(i).GetText());
+        // get parameters, each optionally marked 'out' or 'ref'
+        var funcParams = new List<ParameterNode>();
+        foreach (var parameter in context.parameter())
+        {
+            var modifier = parameter.OUT() is not null ? ArgumentModifier.Out
+                : parameter.REF() is not null ? ArgumentModifier.Ref
+                : ArgumentModifier.None;
+
+            funcParams.Add(new ParameterNode(modifier, parameter.ID().GetText()));
+        }
 
         return new FunctionDefinitionNode(funcName, funcParams.ToImmutableArray(), (BlockNode)block) { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }
@@ -67,10 +73,9 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
 
     public override AstNode VisitReturnStat(FishboneParser.ReturnStatContext context)
     {
-        var values = new List<AstNode>();
-        for (int i = 0; i < context.expr().Length; i++)
-            values.Add(Visit(context.expr(i)));
-        return new ReturnNode(values) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        // a bare "return;" carries no expression
+        var value = context.expr() is null ? null : Visit(context.expr());
+        return new ReturnNode(value) { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }
 
     public override AstNode VisitTryStat(FishboneParser.TryStatContext context)
@@ -157,16 +162,16 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
 
     public override AstNode VisitDeclarationStat(FishboneParser.DeclarationStatContext context)
     {
-        var names = context.ID().Select(id => id.GetText()).ToList();
+        var name = context.ID().GetText();
         AstNode value = Visit(context.expr());
-        return new DeclarationNode(names, value) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new DeclarationNode(name, value) { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }
 
     public override AstNode VisitAssignmentStat(FishboneParser.AssignmentStatContext context)
     {
-        var names = context.ID().Select(id => id.GetText()).ToList();
+        var name = context.ID().GetText();
         AstNode value = Visit(context.expr());
-        return new AssignmentNode(names, value) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        return new AssignmentNode(name, value) { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }
 
     public override AstNode VisitIndexedAssignmentStat(FishboneParser.IndexedAssignmentStatContext context)
@@ -198,7 +203,7 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         {
             case IdentifierNode identifier:
                 var combinedValue = new BinaryOpNode(binaryOp, identifier, rightValue) { Line = line, Column = column };
-                return new AssignmentNode([identifier.Name], combinedValue) { Line = line, Column = column };
+                return new AssignmentNode(identifier.Name, combinedValue) { Line = line, Column = column };
 
             case IndexingNode indexing:
                 var combinedIndexedValue = new BinaryOpNode(binaryOp, indexing, rightValue) { Line = line, Column = column };

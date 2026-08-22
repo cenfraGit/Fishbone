@@ -16,54 +16,6 @@ x = x + 7;
     }
 
     [Fact]
-    public void Evaluate_MultipleValueDestructuring_AssignsReturnedValues()
-    {
-        var env = InterpreterTestHelpers.Run("""
-func getCoordinates()
-{
-    return 20, 100;
-}
-
-let x, y = getCoordinates();
-""");
-
-        Assert.Equal(20, env.GetValue("x"));
-        Assert.Equal(100, env.GetValue("y"));
-    }
-
-    [Fact]
-    public void Evaluate_DestructuringWithTooFewValues_AssignsNullToMissingNames()
-    {
-        var env = InterpreterTestHelpers.Run("""
-func oneValue()
-{
-    return 10;
-}
-
-let first, second = oneValue();
-""");
-
-        Assert.Equal(10, env.GetValue("first"));
-        Assert.Null(env.GetValue("second"));
-    }
-
-    [Fact]
-    public void Evaluate_DestructuringWithExtraValues_IgnoresExtraValues()
-    {
-        var env = InterpreterTestHelpers.Run("""
-func threeValues()
-{
-    return 1, 2, 3;
-}
-
-let first, second = threeValues();
-""");
-
-        Assert.Equal(1, env.GetValue("first"));
-        Assert.Equal(2, env.GetValue("second"));
-    }
-
-    [Fact]
     public void Evaluate_BlockScope_HidesLocalDeclarationsButAllowsOuterAssignment()
     {
         var env = InterpreterTestHelpers.Run("""

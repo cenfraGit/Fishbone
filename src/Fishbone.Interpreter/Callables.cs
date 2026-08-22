@@ -54,14 +54,24 @@ internal class FishboneFunction
 
     public int Arity => _definition.Parameters.Length;
 
-    public object Call(FishboneInterpreter interpreter, List<object> arguments)
+    public IReadOnlyList<ParameterNode> Parameters => _definition.Parameters;
+
+    // runs the function body. "args" is indexed parallel to the definition's parameters and
+    // is mutated in place for out/ref parameters, mirroring how a reflected .NET method writes
+    // its by-ref results, so the caller can reuse the same write-back path.
+    public object Call(FishboneInterpreter interpreter, object?[] args)
     {
         // new env for function scope
         var envFunction = new FishboneEnvironment(_closure);
 
-        // bind args to names
+        // bind args to names. an 'out' parameter starts as null: the body is expected to
+        // assign it, but is not required to (an unassigned 'out' just hands back null)
         for (int i = 0; i < _definition.Parameters.Length; i++)
-            envFunction.Declare(_definition.Parameters[i], arguments[i]);
+        {
+            var parameter = _definition.Parameters[i];
+            envFunction.Declare(parameter.Name,
+                parameter.Modifier == ArgumentModifier.Out ? null! : args[i]!);
+        }
 
         interpreter.OnFunctionEnter(_definition.Name, envFunction);
         try
@@ -72,16 +82,31 @@ internal class FishboneFunction
             }
             catch (ReturnException ret)
             {
-                return ret.Values is List<object> list && list.Count == 1
-                    ? list[0]
-                    : ret.Values;
+                HarvestByRefParameters(envFunction, args);
+                return ret.Value!;
             }
 
+            HarvestByRefParameters(envFunction, args);
             return null!;
         }
         finally
         {
             interpreter.OnFunctionExit(_definition.Name);
+        }
+    }
+
+    // copies the final value of each out/ref parameter binding back into the argument buffer,
+    // where the caller's write-back picks it up. deliberately not in a finally: if the body
+    // throws, nothing is written back, same as a throwing .NET method.
+    private void HarvestByRefParameters(FishboneEnvironment envFunction, object?[] args)
+    {
+        for (int i = 0; i < _definition.Parameters.Length; i++)
+        {
+            var parameter = _definition.Parameters[i];
+            if (parameter.Modifier == ArgumentModifier.None)
+                continue;
+
+            args[i] = envFunction.GetValue(parameter.Name);
         }
     }
 }

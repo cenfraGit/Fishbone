@@ -7,11 +7,11 @@ public class AstNodeEqualityTests
     {
         var left = new ProgramNode(new List<AstNode>
         {
-            new DeclarationNode(["x"], new LiteralNode(1))
+            new DeclarationNode("x", new LiteralNode(1))
         });
         var right = new ProgramNode(new List<AstNode>
         {
-            new DeclarationNode(["x"], new LiteralNode(1))
+            new DeclarationNode("x", new LiteralNode(1))
         });
 
         Assert.Equal(left, right);
@@ -23,32 +23,12 @@ public class AstNodeEqualityTests
     {
         var left = new BlockNode(new List<AstNode>
         {
-            new AssignmentNode(["x"], new LiteralNode(2))
+            new AssignmentNode("x", new LiteralNode(2))
         });
         var right = new BlockNode(new List<AstNode>
         {
-            new AssignmentNode(["x"], new LiteralNode(2))
+            new AssignmentNode("x", new LiteralNode(2))
         });
-
-        Assert.Equal(left, right);
-        Assert.Equal(left.GetHashCode(), right.GetHashCode());
-    }
-
-    [Fact]
-    public void DeclarationNode_UsesStructuralNameEquality()
-    {
-        var left = new DeclarationNode(["x", "y"], new IdentifierNode("source"));
-        var right = new DeclarationNode(["x", "y"], new IdentifierNode("source"));
-
-        Assert.Equal(left, right);
-        Assert.Equal(left.GetHashCode(), right.GetHashCode());
-    }
-
-    [Fact]
-    public void AssignmentNode_UsesStructuralNameEquality()
-    {
-        var left = new AssignmentNode(["x", "y"], new IdentifierNode("source"));
-        var right = new AssignmentNode(["x", "y"], new IdentifierNode("source"));
 
         Assert.Equal(left, right);
         Assert.Equal(left.GetHashCode(), right.GetHashCode());
@@ -65,16 +45,6 @@ public class AstNodeEqualityTests
             new IdentifierNode("values"),
             new LiteralNode(1),
             new LiteralNode(42));
-
-        Assert.Equal(left, right);
-        Assert.Equal(left.GetHashCode(), right.GetHashCode());
-    }
-
-    [Fact]
-    public void ReturnNode_UsesStructuralValueEquality()
-    {
-        var left = new ReturnNode([new IdentifierNode("x"), new LiteralNode(1)]);
-        var right = new ReturnNode([new IdentifierNode("x"), new LiteralNode(1)]);
 
         Assert.Equal(left, right);
         Assert.Equal(left.GetHashCode(), right.GetHashCode());
@@ -98,9 +68,9 @@ public class AstNodeEqualityTests
             ["left", "right"],
             new BlockNode(new List<AstNode>
             {
-                new ReturnNode([
+                new ReturnNode(
                     new BinaryOpNode("+", new IdentifierNode("left"), new IdentifierNode("right"))
-                ])
+                )
             })
         );
         var right = new FunctionDefinitionNode(
@@ -108,14 +78,25 @@ public class AstNodeEqualityTests
             ["left", "right"],
             new BlockNode(new List<AstNode>
             {
-                new ReturnNode([
+                new ReturnNode(
                     new BinaryOpNode("+", new IdentifierNode("left"), new IdentifierNode("right"))
-                ])
+                )
             })
         );
 
         Assert.Equal(left, right);
         Assert.Equal(left.GetHashCode(), right.GetHashCode());
+    }
+
+    [Fact]
+    public void FunctionDefinitionNode_ParameterDirectionAffectsEquality()
+    {
+        var byValue = new FunctionDefinitionNode("f",
+            [new ParameterNode(ArgumentModifier.None, "a")], new BlockNode([]));
+        var byOut = new FunctionDefinitionNode("f",
+            [new ParameterNode(ArgumentModifier.Out, "a")], new BlockNode([]));
+
+        Assert.NotEqual(byValue, byOut);
     }
 
     [Fact]
@@ -175,13 +156,13 @@ public class AstNodeEqualityTests
     {
         var left = new ProgramNode(new List<AstNode>
         {
-            new DeclarationNode(["x"], new LiteralNode(1)),
-            new DeclarationNode(["y"], new LiteralNode(2))
+            new DeclarationNode("x", new LiteralNode(1)),
+            new DeclarationNode("y", new LiteralNode(2))
         });
         var right = new ProgramNode(new List<AstNode>
         {
-            new DeclarationNode(["y"], new LiteralNode(2)),
-            new DeclarationNode(["x"], new LiteralNode(1))
+            new DeclarationNode("y", new LiteralNode(2)),
+            new DeclarationNode("x", new LiteralNode(1))
         });
 
         Assert.NotEqual(left, right);

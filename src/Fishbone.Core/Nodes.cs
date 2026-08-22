@@ -144,7 +144,8 @@ public record MemberAccessNode(AstNode Target,
 // calls and args
 // --------------------------------------------------------------------------------
 
-// how a call-site argument is passed
+// how an argument is passed at a call site, and how a parameter is
+// declared at a function definition
 public enum ArgumentModifier
 {
     None, // by value
@@ -156,6 +157,13 @@ public enum ArgumentModifier
 public record ArgumentNode(ArgumentModifier Modifier, AstNode Value)
 {
     public static implicit operator ArgumentNode(AstNode value) => new(ArgumentModifier.None, value);
+}
+
+// single function-definition parameter + its direction. not a node itself,
+// this is the definition-site twin of ArgumentNode above.
+public record ParameterNode(ArgumentModifier Modifier, string Name)
+{
+    public static implicit operator ParameterNode(string name) => new(ArgumentModifier.None, name);
 }
 
 public record CallNode(AstNode Callee, ImmutableArray<ArgumentNode> Arguments) : AstNode
@@ -200,26 +208,9 @@ public record ForNode(string IteratorName,
                       AstNode? Step,
                       AstNode Body) : AstNode;
 
-public record ReturnNode(IReadOnlyList<AstNode> ReturnValues) : AstNode
-{
-    public virtual bool Equals(ReturnNode? other)
-    {
-        if (other is null) return false;
-        if (ReferenceEquals(this, other)) return true;
 
-        return ReturnValues.SequenceEqual(other.ReturnValues);
-    }
+public record ReturnNode(AstNode? Value) : AstNode;
 
-    public override int GetHashCode()
-    {
-        var hash = new HashCode();
-        foreach (var value in ReturnValues)
-        {
-            hash.Add(value);
-        }
-        return hash.ToHashCode();
-    }
-}
 public record BreakNode() : AstNode;
 public record ContinueNode() : AstNode;
 
@@ -280,55 +271,16 @@ public record BlockNode(IReadOnlyList<AstNode> Statements) : AstNode
 // declarations and assignment
 // --------------------------------------------------------------------------------
 
-public record DeclarationNode(IReadOnlyList<string> Names, AstNode Value) : AstNode
-{
-    public virtual bool Equals(DeclarationNode? other)
-    {
-        if (other is null) return false;
-        if (ReferenceEquals(this, other)) return true;
-        return Names.SequenceEqual(other.Names) && Equals(Value, other.Value);
-    }
+public record DeclarationNode(string Name, AstNode Value) : AstNode;
 
-    public override int GetHashCode()
-    {
-        var hash = new HashCode();
-        foreach (var name in Names)
-        {
-            hash.Add(name);
-        }
-        hash.Add(Value);
-        return hash.ToHashCode();
-    }
-}
-
-public record AssignmentNode(IReadOnlyList<string> Names,
-                             AstNode Value) : AstNode
-{
-    public virtual bool Equals(AssignmentNode? other)
-    {
-        if (other is null) return false;
-        if (ReferenceEquals(this, other)) return true;
-        return Names.SequenceEqual(other.Names) && Equals(Value, other.Value);
-    }
-
-    public override int GetHashCode()
-    {
-        var hash = new HashCode();
-        foreach (var name in Names)
-        {
-            hash.Add(name);
-        }
-        hash.Add(Value);
-        return hash.ToHashCode();
-    }
-}
+public record AssignmentNode(string Name, AstNode Value) : AstNode;
 
 public record IndexedAssignmentNode(AstNode Target,
                                     AstNode Index,
                                     AstNode Value) : AstNode;
 
 public record FunctionDefinitionNode(string Name,
-                                     ImmutableArray<string> Parameters,
+                                     ImmutableArray<ParameterNode> Parameters,
                                      BlockNode Body) : AstNode
 {
     public virtual bool Equals(FunctionDefinitionNode? other)
