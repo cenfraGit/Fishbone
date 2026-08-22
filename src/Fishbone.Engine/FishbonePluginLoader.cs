@@ -1,3 +1,9 @@
+// --------------------------------------------------------------------------------
+// FishbonePluginLoader.cs
+//
+// scans the .fishbone/plugins folder for plugin DLLs and loads them automatically.
+// --------------------------------------------------------------------------------
+
 using System.Reflection;
 
 namespace Fishbone.Engine;

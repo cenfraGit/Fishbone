@@ -1,3 +1,9 @@
+// --------------------------------------------------------------------------------
+// FishboneProgram.cs
+//
+// a parsed script that can run multiple times.
+// --------------------------------------------------------------------------------
+
 using System.Security.Cryptography;
 using System.Text;
 using Fishbone.Core;

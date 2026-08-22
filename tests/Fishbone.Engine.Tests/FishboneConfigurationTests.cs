@@ -19,7 +19,7 @@ public class FishboneConfigurationTests
         var config = new FishboneConfiguration();
         Func<int, int> doubleValue = value => value * 2;
 
-        var returned = config.AddFunction("doubleValue", doubleValue);
+        var returned = config.AddBuiltIn("doubleValue", doubleValue);
 
         Assert.Same(config, returned);
         Assert.Same(doubleValue, config.BuiltIns["doubleValue"]);

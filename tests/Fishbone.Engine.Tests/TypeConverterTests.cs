@@ -29,7 +29,7 @@ public class TypeConverterTests
     {
         // 'unwrap' takes a Boxed by value; passing the script int 21 must convert via the registry
         var config = ConfigWithBoxedConverter()
-            .AddFunction("unwrap", new Func<Boxed, int>(box => box.Value * 2));
+            .AddBuiltIn("unwrap", new Func<Boxed, int>(box => box.Value * 2));
 
         var env = FishboneEngine.Run("let result = unwrap(21);", config);
 
@@ -42,7 +42,7 @@ public class TypeConverterTests
         // 'produce' writes a Boxed through an out parameter; the registry's from-direction must turn
         // it back into a plain script value at the write-back boundary
         var config = ConfigWithBoxedConverter()
-            .AddFunction("produce", new ProduceDelegate((int seed, out Boxed result) => result = new Boxed(seed + 1)));
+            .AddBuiltIn("produce", new ProduceDelegate((int seed, out Boxed result) => result = new Boxed(seed + 1)));
 
         var env = FishboneEngine.Run("produce(41, out made);", config);
 
@@ -53,8 +53,8 @@ public class TypeConverterTests
     public void Converter_RoundTrips_ThroughBothDirections()
     {
         var config = ConfigWithBoxedConverter()
-            .AddFunction("produce", new ProduceDelegate((int seed, out Boxed result) => result = new Boxed(seed)))
-            .AddFunction("unwrap", new Func<Boxed, int>(box => box.Value));
+            .AddBuiltIn("produce", new ProduceDelegate((int seed, out Boxed result) => result = new Boxed(seed)))
+            .AddBuiltIn("unwrap", new Func<Boxed, int>(box => box.Value));
 
         // produce(10, out b) -> b is the script int 10 (from-direction); unwrap(b) converts it back
         // to a Boxed (to-direction) and reads it out again
@@ -72,7 +72,7 @@ let result = unwrap(b);
     {
         // same call, but no converter registered: the generic path cannot turn an int into a Boxed
         var config = new FishboneConfiguration()
-            .AddFunction("unwrap", new Func<Boxed, int>(box => box.Value));
+            .AddBuiltIn("unwrap", new Func<Boxed, int>(box => box.Value));
 
         Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("let result = unwrap(21);", config));
     }

@@ -1,3 +1,9 @@
+// --------------------------------------------------------------------------------
+// FishboneConfiguration.cs
+//
+// a configuration object used to set up a fishbone execution environment.
+// --------------------------------------------------------------------------------
+
 using Fishbone.Interpreter;
 using System.Globalization;
 
@@ -5,39 +11,47 @@ namespace Fishbone.Engine;
 
 public class FishboneConfiguration
 {
+    // --------------------------------------------------------------------------------
+    // fields and properties
+    // --------------------------------------------------------------------------------
+
     /// <summary>
-    /// When false, scripts cannot use the <c>.</c> operator at all: no property/field reads and
-    /// no method calls on any object, which closes the reflection surface (<c>GetType()</c>,
-    /// <c>Assembly</c>, ...) that member access otherwise exposes. Scripts are then limited to
-    /// host-registered functions, operators, control flow, and list/dictionary indexing. Intended
-    /// for hosts that run scripts from untrusted authors; defaults to true.
+    /// When false, scripts cannot use the <c>.</c> operator (no property/field/method
+    /// reads or calls). Mostly safety mechanism for simple scripts.
     /// </summary>
     public bool EnableMemberAccess { get; set; } = true;
 
     /// <summary>
-    /// Ambient names available to every script — functions, types, and constants. These are not
-    /// shown in the debugger's variables view.
+    /// Ambient names available to every script (functions, types, constants). Cannot
+    /// be overwritten, although can be shadowed. Not shown in debugger's variable view.
     /// </summary>
     public Dictionary<string, object> BuiltIns { get; } = new(StringComparer.Ordinal);
 
     /// <summary>
-    /// Pre-seeded script variables. Unlike built-ins, these appear in the debugger's variables
-    /// view and behave like ordinary top-level variables (readable and assignable).
+    /// Pre-seeded script variables. These do appear in the debugger's variable view,
+    /// and may be used/mutated at runtime.
     /// </summary>
     public Dictionary<string, object> Values { get; } = new(StringComparer.Ordinal);
 
     /// <summary>
     /// Host-registered conversions between script values and .NET types the generic interop path
-    /// cannot convert on its own (anything not <see cref="IConvertible"/> or an enum), keyed by the
-    /// .NET type. See <see cref="AddTypeConverter(Type, Func{object, object}, Func{object, object}?)"/>.
+    /// cannot convert on its own (anything not <see cref="IConvertible"/> or an enum).
     /// </summary>
     public Dictionary<Type, FishboneTypeConverter> TypeConverters { get; } = [];
+
+    // --------------------------------------------------------------------------------
+    // constructors
+    // --------------------------------------------------------------------------------
 
     public FishboneConfiguration(bool injectDefaults = true)
     {
         if (injectDefaults)
             AddDefaults();
     }
+
+    // --------------------------------------------------------------------------------
+    // setup methods
+    // --------------------------------------------------------------------------------
 
     /// <summary>Binds an ambient built-in (function, value, or registered type) under a name.</summary>
     public FishboneConfiguration AddBuiltIn(string name, object value)
@@ -48,18 +62,11 @@ public class FishboneConfiguration
 
     /// <summary>
     /// Pre-seeds a script variable. The value shows up in the debugger's variables view and the
-    /// script can read or reassign it. Use this for injected data, as opposed to ambient API.
+    /// script can read or reassign it.
     /// </summary>
     public FishboneConfiguration AddValue(string name, object value)
     {
         Values[name] = value;
-        return this;
-    }
-
-    /// <summary>Exposes a .NET delegate as a callable function.</summary>
-    public FishboneConfiguration AddFunction(string name, Delegate csharpMethod)
-    {
-        BuiltIns[name] = csharpMethod;
         return this;
     }
 
@@ -112,6 +119,10 @@ public class FishboneConfiguration
             clone.TypeConverters[converter.Key] = converter.Value;
         return clone;
     }
+
+    // --------------------------------------------------------------------------------
+    // standard functions/constants
+    // --------------------------------------------------------------------------------
 
     private void AddDefaults()
     {
