@@ -4,6 +4,7 @@
 // a configuration object used to set up a fishbone execution environment.
 // --------------------------------------------------------------------------------
 
+using Fishbone.Core;
 using Fishbone.Interpreter;
 using System.Globalization;
 
@@ -103,6 +104,43 @@ public class FishboneConfiguration
     public FishboneConfiguration AddType(Type type, string? name = null)
     {
         BuiltIns[name ?? type.Name] = new RegisteredType(type);
+        return this;
+    }
+
+    /// <summary>
+    /// Registers a plugin directly, which is how an app that references a plugin's package brings
+    /// it in: <c>config.AddPlugin(new OpenCvPlugin())</c>. No discovery and no reflection, so a
+    /// missing plugin is a compile error rather than a silently empty plugins folder.
+    /// <paramref name="onWarning"/> receives anything the plugin reported while registering; pass
+    /// null to ignore it.
+    /// </summary>
+    public FishboneConfiguration AddPlugin(
+        IFishbonePlugin plugin,
+        Action<FishboneDiagnostic>? onWarning = null)
+    {
+        ArgumentNullException.ThrowIfNull(plugin);
+
+        var context = new PluginRegistrationContext(this, plugin.GetType().Name);
+        plugin.Register(context);
+
+        if (onWarning is not null)
+            foreach (FishboneDiagnostic diagnostic in context.Diagnostics)
+                onWarning(diagnostic);
+
+        return this;
+    }
+
+    /// <summary>
+    /// Registers several plugins in order, discarding anything they report. Use
+    /// <see cref="AddPlugin"/> when the warnings matter.
+    /// </summary>
+    public FishboneConfiguration AddPlugins(params IFishbonePlugin[] plugins)
+    {
+        ArgumentNullException.ThrowIfNull(plugins);
+
+        foreach (IFishbonePlugin plugin in plugins)
+            AddPlugin(plugin);
+
         return this;
     }
 

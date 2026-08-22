@@ -9,7 +9,7 @@ public class ReflectiveOpenCvTests
     private static FishboneConfiguration ConfigWithOpenCv(Mat source)
     {
         var config = new FishboneConfiguration();
-        new OpenCvPlugin().Register(config);
+        config.AddPlugin(new OpenCvPlugin());
         config.AddValue("src", source);
         return config;
     }

@@ -29,8 +29,10 @@ public sealed class OpenCvPlugin : IFishbonePlugin
     private static int _nativeResolverRegistered;
     private static AssemblyDependencyResolver? _dependencyResolver;
 
-    public void Register(FishboneConfiguration config)
+    public void Register(PluginRegistrationContext context)
     {
+        FishboneConfiguration config = context.Configuration;
+
         EnsureNativeResolver();
 
         // construct Mats from scripts ('let dst = Mat();') and reach Mat's static factories
