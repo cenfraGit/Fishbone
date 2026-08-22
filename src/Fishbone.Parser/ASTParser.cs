@@ -54,7 +54,7 @@ public static class ASTParser
                 ast = null;
                 diagnostics = [TooDeeplyNested()];
                 return false;
-    }
+            }
 
             // out parameters cannot be captured by the lambda, so the core hands back a tuple
             (bool parsed, AstNode? node, IReadOnlyList<FishboneDiagnostic> found) =
@@ -99,12 +99,14 @@ public static class ASTParser
         return (true, ast, []);
     }
 
-    // used only for interpolated-string holes in expressions (VisitInterpStringExpr)
-    // TODO: may need change? reinvokes lex + parse + error collect pipeline
-    // for each interp string, which is lexing work from visitor side?
-    internal static AstNode ParseExpression(string code)
+    // used only for interpolated-string holes in expressions (VisitInterpStringExpr).
+    // startLine/startColumn place the fragment where it really sits in the enclosing file, so the
+    // spans it produces need no adjustment afterwards. this used to be done by prefixing the
+    // fragment with that many newlines and spaces, which meant lexing the padding on every hole
+    // and made a hole's cost grow with how far down the file it was
+    internal static AstNode ParseExpression(string code, int startLine = 1, int startColumn = 1)
     {
-        var parser = CreateParser(code, out var errorListener);
+        var parser = CreateParser(code, out var errorListener, startLine, startColumn);
         var parseTree = parser.exprStandalone();
 
         if (errorListener.Diagnostics.Count > 0)
@@ -115,11 +117,21 @@ public static class ASTParser
     }
 
     // helper: takes code string and builds char stream/lexer/parser
-    // and sets up error listener. reused in Parse and ParseExpression
-    private static FishboneParser CreateParser(string code, out CollectingErrorListener errorListener)
+    // and sets up error listener. reused in Parse and ParseExpression.
+    //
+    // startLine/startColumn tell the lexer where this text begins in the file it came from, which
+    // only matters when parsing a fragment (an interpolation hole). safe to set here because the
+    // token stream is built but not filled: filling happens inside the parser rule call
+    private static FishboneParser CreateParser(string code, out CollectingErrorListener errorListener,
+                                               int startLine = 1, int startColumn = 1)
     {
         ICharStream charStream = CharStreams.fromString(code);
         var lexer = new FishboneLexer(charStream);
+
+        // antlr counts columns from 0 while fishbone counts from 1, hence the -1
+        lexer.Line = startLine;
+        lexer.Column = startColumn - 1;
+
         var parser = new FishboneParser(new CommonTokenStream(lexer));
 
         // remove default error listeners  and add our error listener
