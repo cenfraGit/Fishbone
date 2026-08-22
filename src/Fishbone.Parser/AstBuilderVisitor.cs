@@ -13,7 +13,7 @@ using System.Text;
 
 namespace Fishbone.Parser;
 
-public class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
+internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
 {
     public override AstNode VisitProgram(FishboneParser.ProgramContext context)
     {
