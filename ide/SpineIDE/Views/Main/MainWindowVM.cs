@@ -15,8 +15,6 @@ using Dock.Model.Core;
 using Fishbone.Core;
 using Fishbone.DebugClient;
 using Fishbone.Engine;
-using Fishbone.Interpreter;
-using Fishbone.Parser;
 using SpineIDE.Models.Layout;
 using SpineIDE.Models.Messages;
 using SpineIDE.Models;
@@ -229,23 +227,18 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         }
     }
 
-    private async Task ReportScriptErrorAsync(Exception exception)
-    {
-        if (exception is FishboneParseException parseException)
-        {
-            foreach (var error in parseException.Errors)
-                await AddErrorAsync(error.Message, error.Line > 0 ? error.Line : null, error.Column > 0 ? error.Column : null);
-            return;
-        }
+    // one path for syntax errors, runtime errors and anything foreign, instead of
+    // testing for each exception type here
+    private Task ReportScriptErrorAsync(Exception exception) =>
+        ReportDiagnosticsAsync(FishboneDiagnostics.From(exception));
 
-        int? line = null;
-        int? column = null;
-        if (exception is FishboneRuntimeException runtimeException)
-        {
-            line = runtimeException.Line > 0 ? runtimeException.Line : null;
-            column = runtimeException.Column > 0 ? runtimeException.Column : null;
-        }
-        await AddErrorAsync(exception.Message, line, column);
+    private async Task ReportDiagnosticsAsync(IReadOnlyList<FishboneDiagnostic> diagnostics)
+    {
+        foreach (var diagnostic in diagnostics)
+            await AddErrorAsync(
+                diagnostic.Message,
+                diagnostic.Span.IsKnown ? diagnostic.Span.Line : null,
+                diagnostic.Span.IsKnown ? diagnostic.Span.Column : null);
 
         async Task AddErrorAsync(string message, int? line, int? column)
         {
@@ -313,7 +306,11 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         var configuration = new FishboneConfiguration();
         var outputBuffer = new ScriptOutputBuffer();
 
-        FishbonePluginLoader.LoadPlugins(FishbonePluginLoader.DefaultPluginsDirectory, configuration);
+        // Load rather than LoadPlugins: there is no console attached here, so a plugin that
+        // failed to load has to reach the errors panel instead of Console.Error
+        var pluginLoad = FishbonePluginLoader.Load(FishbonePluginLoader.DefaultPluginsDirectory, configuration);
+        if (pluginLoad.Diagnostics.Count > 0)
+            await ReportDiagnosticsAsync(pluginLoad.Diagnostics);
 
         configuration.AddBuiltIn("print", new Action<object?>(outputBuffer.Append));
         configuration.AddBuiltIn("println", new Action<object?>(outputBuffer.AppendLine));

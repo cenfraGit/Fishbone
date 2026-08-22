@@ -1,7 +1,5 @@
-﻿using Fishbone.Core;
+using Fishbone.Core;
 using Fishbone.Engine;
-using Fishbone.Interpreter;
-using Fishbone.Parser;
 using System.CommandLine;
 
 namespace SpineCLI;
@@ -76,28 +74,14 @@ internal class Program
         {
             env = FishboneEngine.Run(contents, config);
         }
-        catch (FishboneParseException ex)
-        {
-            foreach (var error in ex.Errors)
-            {
-                if (error.Line > 0)
-                    Console.Error.WriteLine($"Error at line {error.Line}, column {error.Column}: {error.Message}");
-                else
-                    Console.Error.WriteLine($"Error: {error.Message}");
-            }
-            return;
-        }
-        catch (FishboneRuntimeException ex)
-        {
-            if (ex.Line > 0)
-                Console.Error.WriteLine($"Error at line {ex.Line}, column {ex.Column}: {ex.Message}");
-            else
-                Console.Error.WriteLine($"Error: {ex.Message}");
-            return;
-        }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Error: {ex.Message}");
+            // one path for syntax errors, runtime errors and anything foreign: From
+            // classifies the exception and hands back a list to print
+            foreach (var diagnostic in FishboneDiagnostics.From(ex))
+                Console.Error.WriteLine(diagnostic.Span.IsKnown
+                    ? $"Error at line {diagnostic.Span.Line}, column {diagnostic.Span.Column}: {diagnostic.Message}"
+                    : $"Error: {diagnostic.Message}");
             return;
         }
 
