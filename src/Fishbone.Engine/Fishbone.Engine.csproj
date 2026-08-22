@@ -4,11 +4,90 @@
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
 
+  <!-- ================================================================================
+       this project is the "Fishbone" package, and it carries Core, Debugging, Interpreter
+       and Parser inside it rather than shipping four more packages beside it.
+
+       they are one unit: always built together, always versioned together, and a consumer
+       has no reason to take some and not others. splitting them would put four names in
+       every dependency tree to describe one thing.
+       ================================================================================ -->
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Fishbone</PackageId>
+    <Description>A small scripting language for native .NET interop. Scripts construct your types, call your methods and pass your delegates, and every script value is a real .NET object. Made to be embedded in a host application, which decides exactly what the script can reach.</Description>
+  </PropertyGroup>
+
   <ItemGroup>
-    <ProjectReference Include="..\Fishbone.Debugging\Fishbone.Debugging.csproj" />
-    <ProjectReference Include="..\Fishbone.Core\Fishbone.Core.csproj" />
-    <ProjectReference Include="..\Fishbone.Interpreter\Fishbone.Interpreter.csproj" />
-    <ProjectReference Include="..\Fishbone.Parser\Fishbone.Parser.csproj" />
+    <!-- PrivateAssets is required, not tidiness. IsPackable=false on these projects does NOT
+         stop nuget emitting a dependency for them: packing without it produces a nuspec
+         depending on Fishbone.Core, Fishbone.Debugging, Fishbone.Interpreter and
+         Fishbone.Parser, packages that will never exist, so the package cannot be installed.
+         their assemblies ship inside this one instead, via the target at the bottom.
+
+         the cost is that these no longer flow transitively to anything referencing this
+         project, so an in-repo consumer using their types has to reference them itself. -->
+    <ProjectReference Include="..\Fishbone.Debugging\Fishbone.Debugging.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\Fishbone.Core\Fishbone.Core.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\Fishbone.Interpreter\Fishbone.Interpreter.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\Fishbone.Parser\Fishbone.Parser.csproj" PrivateAssets="all" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- Fishbone.Parser is what actually uses this, but its project reference above is
+         private, so the dependency would not reach the package. restated here or a consumer
+         restores Fishbone and gets a TypeLoadException on the first parse -->
+    <PackageReference Include="Antlr4.Runtime.Standard" Version="$(AntlrRuntimeVersion)" />
+  </ItemGroup>
+
+  <!-- ================================================================================
+       put the referenced projects' assemblies in lib/ next to this one, with their xml
+       documentation, so a consumer gets intellisense on SourceSpan, FishboneDiagnostic,
+       IManualCallable and the rest rather than bare signatures.
+       ================================================================================ -->
+  <PropertyGroup>
+    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);PackReferencedProjectAssemblies</TargetsForTfmSpecificBuildOutput>
+  </PropertyGroup>
+
+  <!-- DependsOnTargets is load-bearing: ReferenceCopyLocalPaths is produced by reference
+       resolution, and without it this target runs first, sees an empty list, and packs a
+       nupkg holding only Fishbone.Engine.dll -->
+  <Target Name="PackReferencedProjectAssemblies" DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <!-- .dll only. at this point ReferenceCopyLocalPaths holds nothing else for a project
+           reference anyway, and a .pdb would belong in the symbol package regardless -->
+      <_FishbonePackedAssembly Include="@(ReferenceCopyLocalPaths)"
+                               Condition="'%(ReferenceCopyLocalPaths.ReferenceSourceTarget)' == 'ProjectReference'
+                                          And '%(Extension)' == '.dll'" />
+
+      <BuildOutputInPackage Include="@(_FishbonePackedAssembly)" />
+
+      <!-- the xml docs are added to ReferenceCopyLocalPaths later than this target runs, so
+           they are taken from beside each assembly instead of read off the item list -->
+      <BuildOutputInPackage Include="@(_FishbonePackedAssembly->'%(RootDir)%(Directory)%(Filename).xml')"
+                            Condition="Exists('%(RootDir)%(Directory)%(Filename).xml')" />
+    </ItemGroup>
+  </Target>
+
+  <!-- the same for symbols. without this the snupkg carries Fishbone.Engine.pdb alone, and a
+       consumer stepping into the interpreter (where most of the runtime behaviour is) gets no
+       source at all -->
+  <PropertyGroup>
+    <TargetsForTfmSpecificDebugSymbolsInPackage>$(TargetsForTfmSpecificDebugSymbolsInPackage);PackReferencedProjectSymbols</TargetsForTfmSpecificDebugSymbolsInPackage>
+  </PropertyGroup>
+
+  <Target Name="PackReferencedProjectSymbols" DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <_FishboneSymbolSource Include="@(ReferenceCopyLocalPaths)"
+                             Condition="'%(ReferenceCopyLocalPaths.ReferenceSourceTarget)' == 'ProjectReference'
+                                        And '%(Extension)' == '.dll'
+                                        And Exists('%(RootDir)%(Directory)%(Filename).pdb')" />
+
+      <TfmSpecificDebugSymbolsFile Include="@(_FishboneSymbolSource->'%(RootDir)%(Directory)%(Filename).pdb')">
+        <TargetPath>/lib/$(TargetFramework)/%(Filename).pdb</TargetPath>
+        <TargetFramework>$(TargetFramework)</TargetFramework>
+      </TfmSpecificDebugSymbolsFile>
+    </ItemGroup>
+  </Target>
 
 </Project>

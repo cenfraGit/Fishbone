@@ -42,6 +42,13 @@
     <Description>Fishbone is a small scripting language for native .NET interop, designed to be embedded in a host application.</Description>
   </PropertyGroup>
 
+  <!-- the antlr runtime is used by Fishbone.Parser and restated as a dependency by the
+       Fishbone package, since Parser's project reference is private there. one version in
+       one place so those two cannot drift -->
+  <PropertyGroup>
+    <AntlrRuntimeVersion>4.13.1</AntlrRuntimeVersion>
+  </PropertyGroup>
+
   <!-- nothing ships unless it asks to. a project that should be published sets
        IsPackable to true in its own file, so adding a project never accidentally
        adds a package -->

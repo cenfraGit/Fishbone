@@ -68,4 +68,12 @@
           DestinationFiles="@(FishboneDapHostFiles->'$(OutDir)daphost\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
   </Target>
+  <ItemGroup>
+    <!-- referenced directly because the Fishbone package packs these assemblies
+         rather than depending on them, so they no longer flow through
+         Fishbone.Engine to whatever references it -->
+    <ProjectReference Include="..\..\src\Fishbone.Core\Fishbone.Core.csproj" />
+    <ProjectReference Include="..\..\src\Fishbone.Interpreter\Fishbone.Interpreter.csproj" />
+  </ItemGroup>
+
 </Project>

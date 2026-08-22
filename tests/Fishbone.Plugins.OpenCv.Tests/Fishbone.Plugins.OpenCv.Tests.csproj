@@ -22,4 +22,11 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- referenced directly because the Fishbone package packs these assemblies rather than
+         depending on them, so they no longer flow through Fishbone.Engine -->
+    <ProjectReference Include="..\..\src\Fishbone.Core\Fishbone.Core.csproj" />
+    <ProjectReference Include="..\..\src\Fishbone.Debugging\Fishbone.Debugging.csproj" />
+  </ItemGroup>
+
 </Project>

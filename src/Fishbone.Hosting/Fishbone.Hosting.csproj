@@ -4,12 +4,20 @@
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Folder-based plugin discovery for Fishbone. Scans a plugins directory and registers what it finds, for a standalone host whose users install plugins without recompiling. An application that embeds Fishbone does not need this: it references plugin packages and calls AddPlugin instead.</Description>
+  </PropertyGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="Fishbone.Hosting.Tests" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Fishbone.Core\Fishbone.Core.csproj" />
+    <!-- Fishbone.Core ships inside the Fishbone package, so this reference is here to compile
+         against and must not become a second dependency on its own -->
+    <ProjectReference Include="..\Fishbone.Core\Fishbone.Core.csproj" PrivateAssets="all" />
+    <!-- packs as a dependency on "Fishbone", which is this project's PackageId -->
     <ProjectReference Include="..\Fishbone.Engine\Fishbone.Engine.csproj" />
   </ItemGroup>
 

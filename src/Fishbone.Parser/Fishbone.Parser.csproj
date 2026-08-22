@@ -9,8 +9,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
-    <PackageReference Include="Antlr4BuildTasks" Version="12.14.0" />
+    <PackageReference Include="Antlr4.Runtime.Standard" Version="$(AntlrRuntimeVersion)" />
+    <!-- a source generator: needed to build, never to run, so it must not reach a consumer -->
+    <PackageReference Include="Antlr4BuildTasks" Version="12.14.0" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

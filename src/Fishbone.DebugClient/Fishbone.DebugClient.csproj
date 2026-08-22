@@ -2,6 +2,11 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Debug Adapter Protocol client for Fishbone. Drives a Fishbone debug session from a host that wants to present its own debugger UI. Pairs with Fishbone.DebugAdapter, which serves the session.</Description>
+  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="OmniSharp.Extensions.DebugAdapter.Client" Version="0.19.9" />
   </ItemGroup>

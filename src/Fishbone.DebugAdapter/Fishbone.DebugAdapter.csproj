@@ -2,12 +2,18 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Debug Adapter Protocol server for Fishbone. Lets a host offer real debugging of a script (breakpoints, stepping, variables) over a socket, so the debugger UI can live in any stack, including one that cannot load the host's own toolkit.</Description>
+  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="OmniSharp.Extensions.DebugAdapter" Version="0.19.9" />
     <PackageReference Include="OmniSharp.Extensions.DebugAdapter.Server" Version="0.19.9" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Fishbone.Debugging\Fishbone.Debugging.csproj" />
+    <!-- inside the Fishbone package already, so compile against it without depending on it -->
+    <ProjectReference Include="..\Fishbone.Debugging\Fishbone.Debugging.csproj" PrivateAssets="all" />
     <ProjectReference Include="..\Fishbone.Engine\Fishbone.Engine.csproj" />
   </ItemGroup>
 </Project>
