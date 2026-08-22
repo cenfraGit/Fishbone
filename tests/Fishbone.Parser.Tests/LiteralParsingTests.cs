@@ -52,10 +52,42 @@ public class LiteralParsingTests
             CultureInfo.CurrentCulture = new CultureInfo("de-DE");
             Assert.Equal(3.14, ParseSingleLiteral("3.14;"));
             Assert.Equal(1000000, ParseSingleLiteral("1_000_000;"));
+            Assert.Equal(2.5e-3, ParseSingleLiteral("2.5e-3;"));
+            Assert.Equal(1e10, ParseSingleLiteral("1e10;"));
         }
         finally
         {
             CultureInfo.CurrentCulture = previous;
         }
+    }
+
+    [Theory]
+    [InlineData("1e10;", 1e10)]
+    [InlineData("1E10;", 1e10)]
+    [InlineData("2.5e-3;", 2.5e-3)]
+    [InlineData("1.5E+7;", 1.5e+7)]
+    [InlineData("6.022e23;", 6.022e23)]
+    [InlineData(".5e3;", 500.0)]
+    [InlineData("1e0;", 1.0)]
+    [InlineData("5e-1;", 0.5)]
+    public void Parse_ScientificNotation_ProducesDoubleLiteral(string code, double expected)
+    {
+        var value = ParseSingleLiteral(code);
+
+        // exponent notation always yields a double, even when the value is integral
+        Assert.IsType<double>(value);
+        Assert.Equal(expected, value);
+    }
+
+    [Theory]
+    [InlineData("1e;")]
+    [InlineData("1e+;")]
+    [InlineData("1e-;")]
+    // underscores are not permitted in double literals, so the exponent form
+    // cannot be combined with them either (matches the existing "1_000.5" error)
+    [InlineData("1_000e3;")]
+    public void Parse_MalformedExponent_ThrowsParseException(string code)
+    {
+        Assert.Throws<FishboneParseException>(() => ASTParser.Parse(code));
     }
 }
