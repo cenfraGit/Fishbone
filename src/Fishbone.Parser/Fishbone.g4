@@ -11,7 +11,6 @@ statement
     | assignmentStat SEMI
     | indexedAssignmentStat SEMI
     | compoundAssignmentStat SEMI
-    | ID (COMMA ID)* ASSIGN expr SEMI
     | expr SEMI
     | functionDefinitionStat
     | ifStat
@@ -28,8 +27,8 @@ statement
 
 blockStat : '{' statement* '}' ;
 
-declarationStat       : LET ID (COMMA ID)* ASSIGN expr ;
-assignmentStat        : ID (COMMA ID)* ASSIGN expr ;
+declarationStat       : LET ID ASSIGN expr ;
+assignmentStat        : ID ASSIGN expr ;
 indexedAssignmentStat : expr ASSIGN expr ;
 compoundAssignmentStat : expr (PLUS_ASSIGN|MINUS_ASSIGN|MUL_ASSIGN|DIV_ASSIGN|MOD_ASSIGN) expr ;
 
@@ -49,7 +48,7 @@ finallyClause : FINALLY blockStat ;
 throwStat : THROW expr? ; // bare 'throw;' rethrows, only valid inside catch
 
 argument     : (OUT|REF)? expr ;
-returnStat   : RETURN (expr (COMMA expr)*)? ;
+returnStat   : RETURN expr? ;
 breakStat    : BREAK ;
 continueStat : CONTINUE ;
 dictPair     : expr COLON expr ;

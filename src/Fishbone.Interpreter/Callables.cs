@@ -72,9 +72,7 @@ internal class FishboneFunction
             }
             catch (ReturnException ret)
             {
-                return ret.Values is List<object> list && list.Count == 1
-                    ? list[0]
-                    : ret.Values;
+                return ret.Value!;
             }
 
             return null!;

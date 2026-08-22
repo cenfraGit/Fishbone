@@ -7,10 +7,11 @@
 
 namespace Fishbone.Interpreter;
 
-// thrown when a "return" is hit (from fb functions)
-internal class ReturnException(object values) : Exception
+// thrown when a "return" is hit (from fb functions).
+// value is null for a bare "return;"
+internal class ReturnException(object? value) : Exception
 {
-    public object Values { get; } = values;
+    public object? Value { get; } = value;
 }
 
 // thrown when a "break" is hit
