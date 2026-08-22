@@ -44,8 +44,8 @@ else
         {
             new IfNode(
                 new IdentifierNode("flag"),
-                new BlockNode(new List<AstNode> { new AssignmentNode(["x"], new LiteralNode(1)) }),
-                new BlockNode(new List<AstNode> { new AssignmentNode(["x"], new LiteralNode(2)) })
+                new BlockNode(new List<AstNode> { new AssignmentNode("x", new LiteralNode(1)) }),
+                new BlockNode(new List<AstNode> { new AssignmentNode("x", new LiteralNode(2)) })
             )
         });
 
@@ -71,8 +71,8 @@ if (a)
                 {
                     new IfNode(
                         new IdentifierNode("b"),
-                        new BlockNode(new List<AstNode> { new AssignmentNode(["x"], new LiteralNode(1)) }),
-                        new BlockNode(new List<AstNode> { new AssignmentNode(["x"], new LiteralNode(2)) })
+                        new BlockNode(new List<AstNode> { new AssignmentNode("x", new LiteralNode(1)) }),
+                        new BlockNode(new List<AstNode> { new AssignmentNode("x", new LiteralNode(2)) })
                     )
                 }),
                 null
@@ -101,10 +101,10 @@ if (b)
         {
             new IfNode(
                 new IdentifierNode("a"),
-                new BlockNode(new List<AstNode> { new AssignmentNode(["x"], new LiteralNode(1)) }),
+                new BlockNode(new List<AstNode> { new AssignmentNode("x", new LiteralNode(1)) }),
                 new IfNode(
                     new IdentifierNode("b"),
-                    new BlockNode(new List<AstNode> { new AssignmentNode(["x"], new LiteralNode(2)) }),
+                    new BlockNode(new List<AstNode> { new AssignmentNode("x", new LiteralNode(2)) }),
                     null
                 )
             )
@@ -127,7 +127,7 @@ while (x < 10)
                 new BinaryOpNode("<", new IdentifierNode("x"), new LiteralNode(10)),
                 new BlockNode(new List<AstNode>
                 {
-                    new AssignmentNode(["x"],
+                    new AssignmentNode("x",
                         new BinaryOpNode("+", new IdentifierNode("x"), new LiteralNode(1)))
                 })
             )
@@ -188,11 +188,11 @@ else
         {
             new IfNode(
                 new IdentifierNode("a"),
-                new BlockNode(new List<AstNode> { new AssignmentNode(["x"], new LiteralNode(1)) }),
+                new BlockNode(new List<AstNode> { new AssignmentNode("x", new LiteralNode(1)) }),
                 new IfNode(
                     new IdentifierNode("b"),
-                    new BlockNode(new List<AstNode> { new AssignmentNode(["x"], new LiteralNode(2)) }),
-                    new BlockNode(new List<AstNode> { new AssignmentNode(["x"], new LiteralNode(3)) })
+                    new BlockNode(new List<AstNode> { new AssignmentNode("x", new LiteralNode(2)) }),
+                    new BlockNode(new List<AstNode> { new AssignmentNode("x", new LiteralNode(3)) })
                 )
             )
         });
