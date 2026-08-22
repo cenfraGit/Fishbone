@@ -53,8 +53,17 @@ public class FishboneParseException : Exception, IFishboneDiagnosticSource
 
     // a single error is worth spelling out in the message, since a console client may print
     // only that. several are left to the caller to enumerate
-    private static string Summarize(IReadOnlyList<FishboneDiagnostic> diagnostics) =>
-        diagnostics.Count == 1
-            ? $"Line {diagnostics[0].Span.Line}, column {diagnostics[0].Span.Column}: {diagnostics[0].Message}"
-            : $"{diagnostics.Count} syntax errors found";
+    private static string Summarize(IReadOnlyList<FishboneDiagnostic> diagnostics)
+    {
+        if (diagnostics.Count != 1)
+            return $"{diagnostics.Count} syntax errors found";
+
+        FishboneDiagnostic diagnostic = diagnostics[0];
+
+        // not every diagnostic has somewhere to point: a whole-file rejection has no single
+        // position to blame, and prefixing it with "Line 0, column 0" reads as a bug
+        return diagnostic.Span.IsKnown
+            ? $"Line {diagnostic.Span.Line}, column {diagnostic.Span.Column}: {diagnostic.Message}"
+            : diagnostic.Message;
+    }
 }

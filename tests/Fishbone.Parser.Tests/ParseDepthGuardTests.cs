@@ -1,9 +1,10 @@
 namespace Fishbone.Parser.Tests;
 
 // the guard exists to stop a stack overflow, which cannot be caught and takes the process down.
-// the thresholds it defends against were measured on a default 1MB stack: roughly 500 chained
-// binary operators, 800 nested parentheses, and between 500 and 1000 nested brackets or blocks.
-// these tests pin that it refuses well before those, and does not refuse real code.
+// what it defends is evaluation, not parsing: parsing runs on an enlarged stack and copes with
+// about 2500 chained operators, while evaluating the resulting tree runs on the caller's stack
+// and dies between 400 and 500 in a debug build, around 900 in release. these tests pin that the
+// guard refuses well before that, and does not refuse real code.
 public class ParseDepthGuardTests
 {
     private static string Chain(int terms) => "let x = " + string.Join(" + ", Enumerable.Repeat("1", terms)) + ";";
@@ -61,7 +62,7 @@ public class ParseDepthGuardTests
     }
 
     [Fact]
-    public void TheGuardRefusesWellBeforeTheParserBreaks()
+    public void TheGuardRefusesWellBeforeTheInterpreterBreaks()
     {
         // a chain just under the limit still parses, so the guard is not merely refusing
         // everything: it has to let through what is safe
@@ -69,6 +70,50 @@ public class ParseDepthGuardTests
 
         Assert.False(ParseDepthGuard.LooksTooDeepToParse(safe));
         Assert.True(ASTParser.TryParse(safe, out _, out _), "input under the limit should parse");
+    }
+
+    [Fact]
+    public void OverTheLimit_TryParseReportsInsteadOfThrowing()
+    {
+        Assert.False(ASTParser.TryParse(Chain(500), out var ast, out var diagnostics));
+
+        Assert.Null(ast);
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Contains("nested too deeply", diagnostic.Message);
+        // the check counts characters, so there is no position to blame
+        Assert.False(diagnostic.Span.IsKnown);
+    }
+
+    [Fact]
+    public void OverTheLimit_ParseThrowsWithoutAPhantomLineZero()
+    {
+        // a diagnostic with no span used to render as "Line 0, column 0: ..."
+        var exception = Assert.Throws<FishboneParseException>(() => ASTParser.Parse(Chain(500)));
+
+        Assert.DoesNotContain("Line 0", exception.Message);
+        Assert.DoesNotContain("column 0", exception.Message);
+        Assert.StartsWith("This script is nested too deeply", exception.Message);
+    }
+
+    [Fact]
+    public void ParseStillReportsOrdinarySyntaxErrorsFromTheDeepStackThread()
+    {
+        // the parse now runs on another thread and its failure is marshalled back. a syntax
+        // error has to arrive as itself, not wrapped, or every caller's catch breaks
+        var exception = Assert.Throws<FishboneParseException>(() => ASTParser.Parse("let x = 1"));
+
+        Assert.Single(exception.Diagnostics);
+        Assert.Contains("Missing ';'", exception.Diagnostics[0].Message);
+    }
+
+    [Fact]
+    public void ParseStillReportsVisitorErrorsFromTheDeepStackThread()
+    {
+        // the visitor throws for a literal it cannot represent, and that also crosses the thread
+        var exception = Assert.Throws<FishboneParseException>(
+            () => ASTParser.Parse("let x = 99999999999999999999999999;"));
+
+        Assert.Contains("too large", exception.Diagnostics[0].Message);
     }
 
     // --------------------------------------------------------------------------------

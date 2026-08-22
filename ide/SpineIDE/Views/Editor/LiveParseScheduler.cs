@@ -10,17 +10,16 @@
 // so a DispatcherTimer would never tick and the interesting logic would ship
 // unexercised.
 //
-// three things guard the parse itself:
+// two things guard the parse itself:
 //
 // - antlr cannot be interrupted once it starts, so a stale parse runs to completion
 //   and its result is discarded at the boundary. the version check, not a token, is
 //   what keeps a slow result from overwriting a newer one.
-// - the parse runs on a thread with a large stack, because deep input overflows and a
-//   StackOverflowException would take the ide down. the injected depth check refuses
-//   the worst input before it gets here; the big stack covers what that check's crude
-//   character counting misses.
-// - one parse at a time across the whole process, so several open tabs cannot saturate
-//   the machine between keystrokes.
+// - the injected depth check refuses input deep enough to risk a stack overflow, which
+//   cannot be caught. the parser refuses such input too, but it answers with a
+//   diagnostic; here it is skipped silently, because nobody asked.
+//
+// the enlarged parse stack lives in the parser now, not here.
 // --------------------------------------------------------------------------------
 
 using System;
@@ -55,10 +54,9 @@ internal sealed class LiveParseScheduler : IDisposable
     /// </summary>
     public const int MaxDiagnostics = 50;
 
-    // 16MB against the default 1MB, which buys roughly an order of magnitude of nesting depth
-    private const int ParseThreadStackBytes = 16 * 1024 * 1024;
-
-    // one parse at a time process-wide; also keeps concurrent pressure off the parser
+    // one live parse at a time process-wide. not a safety mechanism (the parser serializes
+    // itself); this is so several open tabs cannot queue a parse each between keystrokes, and so
+    // the version re-check can drop the stale ones before any of them blocks a pool thread
     private static readonly SemaphoreSlim ParseSlot = new(1, 1);
 
     private readonly TimeSpan _debounce;
@@ -139,7 +137,7 @@ internal sealed class LiveParseScheduler : IDisposable
                 IReadOnlyList<FishboneDiagnostic> diagnostics =
                     text.Length > MaxSourceLength || _isTooDeep(text)
                         ? []
-                        : await ParseOnDeepStackAsync(text).ConfigureAwait(false);
+                        : await Task.Run(() => _parse(text)).ConfigureAwait(false);
 
                 Publish(version, Cap(diagnostics));
             }
@@ -152,29 +150,6 @@ internal sealed class LiveParseScheduler : IDisposable
         {
             // superseded by a newer keystroke, which is the normal outcome
         }
-    }
-
-    // ANTLR offers no way to bail out mid-parse, so this cannot be cancelled; the caller drops
-    // the result instead. the dedicated thread is purely for its stack size
-    private Task<IReadOnlyList<FishboneDiagnostic>> ParseOnDeepStackAsync(string text)
-    {
-        var completion = new TaskCompletionSource<IReadOnlyList<FishboneDiagnostic>>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                completion.SetResult(_parse(text));
-            }
-            catch (Exception exception)
-            {
-                completion.SetException(exception);
-            }
-        }, ParseThreadStackBytes) { IsBackground = true, Name = "fishbone-live-parse" };
-
-        thread.Start();
-        return completion.Task;
     }
 
     private static IReadOnlyList<FishboneDiagnostic> Cap(IReadOnlyList<FishboneDiagnostic> diagnostics) =>

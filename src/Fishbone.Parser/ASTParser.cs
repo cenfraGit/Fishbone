@@ -45,10 +45,36 @@ public static class ASTParser
     public static bool TryParse(string code, out AstNode? ast, out IReadOnlyList<FishboneDiagnostic> diagnostics)
     {
         lock (ParseGate)
-            return TryParseCore(code, out ast, out diagnostics);
+        {
+            // the deep stack raises the parser's ceiling but the interpreter still recurses on
+            // the caller's stack, so anything past the limit is refused rather than risking an
+            // uncatchable overflow later
+            if (ParseDepthGuard.LooksTooDeepToParse(code))
+            {
+                ast = null;
+                diagnostics = [TooDeeplyNested()];
+                return false;
     }
 
-    private static bool TryParseCore(string code, out AstNode? ast, out IReadOnlyList<FishboneDiagnostic> diagnostics)
+            // out parameters cannot be captured by the lambda, so the core hands back a tuple
+            (bool parsed, AstNode? node, IReadOnlyList<FishboneDiagnostic> found) =
+                DeepStackRunner.Run(() => TryParseCore(code));
+
+            ast = node;
+            diagnostics = found;
+            return parsed;
+        }
+    }
+
+    private static FishboneDiagnostic TooDeeplyNested() =>
+        new(DiagnosticStage.Parse,
+            DiagnosticSeverity.Error,
+            "This script is nested too deeply to run safely. Try splitting the expression " +
+            "across several statements.",
+            // the check counts characters and has no single position to blame
+            SourceSpan.None);
+
+    private static (bool Parsed, AstNode? Ast, IReadOnlyList<FishboneDiagnostic> Diagnostics) TryParseCore(string code)
     {
         var parser = CreateParser(code, out var errorListener);
         var parseTree = parser.program();
@@ -56,12 +82,9 @@ public static class ASTParser
         // the visitor is not safe against a broken parse tree (ParseSpans.Span already has to
         // special-case a rule with no Stop token), so a failed parse returns before it runs
         if (errorListener.Diagnostics.Count > 0)
-        {
-            ast = null;
-            diagnostics = errorListener.Diagnostics;
-            return false;
-        }
+            return (false, null, errorListener.Diagnostics);
 
+        AstNode ast;
         try
         {
             ast = new AstBuilderVisitor().Visit(parseTree);
@@ -70,13 +93,10 @@ public static class ASTParser
         {
             // the visitor diagnoses things the grammar cannot, like a literal too large for its
             // type or an unrecognized escape, and reports them by throwing
-            ast = null;
-            diagnostics = exception.Diagnostics;
-            return false;
+            return (false, null, exception.Diagnostics);
         }
 
-        diagnostics = [];
-        return true;
+        return (true, ast, []);
     }
 
     // used only for interpolated-string holes in expressions (VisitInterpStringExpr)
