@@ -36,7 +36,7 @@ ifStat : IF '(' expr ')' statement (ELSE statement)? ;
 
 whileStat   : WHILE '(' expr ')' statement ;
 foreachStat : FOREACH '(' ID IN expr ')' statement ;
-forStat     : FOR '(' ID IN expr (COMMA expr (COMMA expr)?)? ')' statement ;
+forStat     : FOR '(' ID IN expr COMMA expr (COMMA expr)? ')' statement ;
 
 functionDefinitionStat : FUNC ID '(' (parameter (COMMA parameter)*)? ')' blockStat ;
 
