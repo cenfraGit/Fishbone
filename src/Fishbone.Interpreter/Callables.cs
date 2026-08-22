@@ -163,13 +163,14 @@ public interface IManualCallable
 /// </summary>
 public sealed class BoundMethod
 {
-    public BoundMethod(object target, IReadOnlyList<MethodInfo> methods)
+    public BoundMethod(object? target, IReadOnlyList<MethodInfo> methods)
     {
         Target = target;
         Methods = methods;
     }
 
-    public object Target { get; }
+    // null for a static method, which reflection invokes with no instance
+    public object? Target { get; }
     public IReadOnlyList<MethodInfo> Methods { get; }
 }
 

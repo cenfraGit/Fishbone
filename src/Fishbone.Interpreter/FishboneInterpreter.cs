@@ -1213,17 +1213,24 @@ public class FishboneInterpreter
         if (target is null)
             throw new FishboneRuntimeException($"Cannot access member '{node.MemberName}' on null.");
 
-        var type = target.GetType();
-        var member = ReflectionCache.ResolveMember(type, node.MemberName);
+        // a registered type is a static scope, mirroring C# where a type name is both
+        // constructible and a place to reach statics from. anything else is an instance.
+        // note a bare System.Type stays an instance target on purpose, so that a script
+        // doing x.GetType().Name still reads Type's own properties
+        var isStatic = target is RegisteredType;
+        var type = target is RegisteredType registered ? registered.Type : target.GetType();
+        var instance = isStatic ? null : target;
+
+        var member = ReflectionCache.ResolveMember(type, node.MemberName, isStatic);
 
         if (member.Property is not null)
-            return member.Property.GetValue(target)!;
+            return member.Property.GetValue(instance)!;
 
         if (member.Field is not null)
-            return member.Field.GetValue(target)!;
+            return member.Field.GetValue(instance)!;
 
         if (member.Methods is not null)
-            return new BoundMethod(target, member.Methods);
+            return new BoundMethod(instance, member.Methods);
 
         throw new FishboneRuntimeException($"Type '{type.Name}' does not have a public member named '{node.MemberName}'.");
     }
