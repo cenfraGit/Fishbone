@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- build as a self-contained, loadable plugin: copies HalconDotNet next to the plugin dll -->
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <!-- Fishbone.Engine pulls Core/Interpreter/Debugging/Parser in behind it, and marking the
+         direct references non-copying does not stop those from landing in the output. A plugin
+         that ships its own copy of Fishbone.Core risks the loader binding to it instead of the
+         host's, which would make IFishbonePlugin a different type than the one the host checks
+         against. Reference only what is needed to compile, and let the host supply all of it. -->
+    <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- the host already has these loaded; reference them for the IFishbonePlugin contract and
+         the IManualCallable/BoundMethod types, but do NOT ship a second copy -->
+    <ProjectReference Include="..\..\src\Fishbone.Engine\Fishbone.Engine.csproj">
+      <Private>false</Private>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\Fishbone.Interpreter\Fishbone.Interpreter.csproj">
+      <Private>false</Private>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- HALCON is licensed software installed separately; this package carries only the .NET
+         binding, which loads the native runtime from the machine's HALCON installation -->
+    <PackageReference Include="MVTec.HalconDotNet" Version="24111.0.0" />
+  </ItemGroup>
+
+</Project>
