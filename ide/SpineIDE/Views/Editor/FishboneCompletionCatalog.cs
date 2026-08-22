@@ -113,8 +113,8 @@ public sealed class FishboneCompletionCatalog
             case Delegate del:
                 return (FishboneCompletionKind.Function, [SignatureFromMethod(name, del.Method)]);
 
-            case INativeCallable native:
-                return (FishboneCompletionKind.Function, [SignatureFromNative(name, native)]);
+            case IManualCallable manual:
+                return (FishboneCompletionKind.Function, [SignatureFromManual(name, manual)]);
 
             case BoundMethod bound:
                 var overloads = bound.Methods.Select(m => SignatureFromMethod(name, m)).ToList();
@@ -146,9 +146,9 @@ public sealed class FishboneCompletionCatalog
         return new FishboneSignature(name, parameters, type.Name);
     }
 
-    private static FishboneSignature SignatureFromNative(string name, INativeCallable native)
+    private static FishboneSignature SignatureFromManual(string name, IManualCallable manual)
     {
-        var parameters = native.Parameters
+        var parameters = manual.Parameters
             .Select(p => new FishboneParameter(p.Name, FriendlyType(p.Type), MapDirection(p.Direction)))
             .ToList();
         return new FishboneSignature(name, parameters, ReturnType: null);

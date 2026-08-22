@@ -8,7 +8,7 @@ public class TryCatchTests
     public void Run_CatchBindsRealNetExceptionFromDelegate()
     {
         var config = new FishboneConfiguration()
-            .AddFunction("boom", new Action(() => throw new InvalidOperationException("delegate failed")));
+            .AddBuiltIn("boom", new Action(() => throw new InvalidOperationException("delegate failed")));
 
         var env = FishboneEngine.Run("""
 let message = "";
@@ -61,7 +61,7 @@ try { throw "x"; } catch { log.Add("caught"); } finally { log.Add("f2"); }
     {
         var log = new List<string>();
         var config = new FishboneConfiguration()
-            .AddFunction("record", new Action<string>(log.Add));
+            .AddBuiltIn("record", new Action<string>(log.Add));
 
         var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneEngine.Run("""
 try { throw "escaping"; }
@@ -94,7 +94,7 @@ catch (e)
     public void Run_BareThrow_RethrowsOriginalException()
     {
         var config = new FishboneConfiguration()
-            .AddFunction("boom", new Action(() => throw new InvalidOperationException("original")));
+            .AddBuiltIn("boom", new Action(() => throw new InvalidOperationException("original")));
 
         var env = FishboneEngine.Run("""
 let outer = "";

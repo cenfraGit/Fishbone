@@ -6,7 +6,7 @@ public class DelegateBridgeTests
     public void Run_CSharpDelegateBridge_InvokesAndMarshalsTypesCorrectly()
     {
         var config = new FishboneConfiguration()
-            .AddFunction("formatValue", new Func<double, int, string>((val, precision) =>
+            .AddBuiltIn("formatValue", new Func<double, int, string>((val, precision) =>
                 val.ToString($"F{precision}")));
 
         var env = FishboneEngine.Run("""
@@ -20,7 +20,7 @@ let scriptResult = formatValue(42, 3);
     public void Run_CSharpDelegateBridge_ReturnsPrimitiveValuesToScript()
     {
         var config = new FishboneConfiguration()
-            .AddFunction("doubleValue", new Func<int, int>(value => value * 2));
+            .AddBuiltIn("doubleValue", new Func<int, int>(value => value * 2));
 
         var env = FishboneEngine.Run("""
 let scriptResult = doubleValue(21);
@@ -33,7 +33,7 @@ let scriptResult = doubleValue(21);
     public void Run_CSharpDelegateBridge_WithWrongArity_Throws()
     {
         var config = new FishboneConfiguration()
-            .AddFunction("add", new Func<int, int, int>((left, right) => left + right));
+            .AddBuiltIn("add", new Func<int, int, int>((left, right) => left + right));
 
         Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("""
 let scriptResult = add(1);
@@ -44,7 +44,7 @@ let scriptResult = add(1);
     public void Run_CSharpDelegateBridge_PropagatesDelegateExceptions()
     {
         var config = new FishboneConfiguration()
-            .AddFunction("explode", new Func<int>(() => throw new InvalidOperationException("boom")));
+            .AddBuiltIn("explode", new Func<int>(() => throw new InvalidOperationException("boom")));
 
         var exception = Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("""
 let scriptResult = explode();
@@ -58,8 +58,8 @@ let scriptResult = explode();
     public void Run_CSharpDelegateBridge_AssignsOutAndRefIdentifierArguments()
     {
         var config = new FishboneConfiguration()
-            .AddFunction("tryParse", new TryParseDelegate(TryParse))
-            .AddFunction("increment", new IncrementDelegate(Increment));
+            .AddBuiltIn("tryParse", new TryParseDelegate(TryParse))
+            .AddBuiltIn("increment", new IncrementDelegate(Increment));
 
         var env = FishboneEngine.Run("""
 let ok = tryParse("42", out parsed);

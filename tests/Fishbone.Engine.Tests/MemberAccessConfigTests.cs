@@ -34,7 +34,7 @@ let n = xs.Count;
     {
         // indexing, loops, operators, and registered functions are the intended surface
         var config = new FishboneConfiguration { EnableMemberAccess = false }
-            .AddFunction("count", new Func<List<object>, int>(xs => xs.Count));
+            .AddBuiltIn("count", new Func<List<object>, int>(xs => xs.Count));
 
         var env = FishboneEngine.Run("""
 let xs = [10, 20, 30];

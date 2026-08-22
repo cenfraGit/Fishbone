@@ -1,4 +1,11 @@
-using Antlr4.Runtime.Misc;
+// --------------------------------------------------------------------------------
+// AstBuilderVisitor.cs
+//
+// this class builds the actual AST for a given program. it takes the
+// FishboneParser elements produced by ANTLR and traverses them to
+// build the AST (normally starting with ProgramContext)
+// --------------------------------------------------------------------------------
+
 using Fishbone.Core;
 using System.Collections.Immutable;
 using System.Globalization;

@@ -1,3 +1,12 @@
+// --------------------------------------------------------------------------------
+// FishboneInterpreter.cs
+//
+// the tree-walking interpreter implementation used to evaluate a fishbone AST.
+//
+// there's mainly a single Evaluate method which takes in an AstNode and dispatches
+// it to the correct Evaluate* method. it can be used to evaluate a whole program
+// --------------------------------------------------------------------------------
+
 using Fishbone.Core;
 using Fishbone.Debugging;
 using System.Collections;
@@ -9,6 +18,10 @@ namespace Fishbone.Interpreter;
 
 public class FishboneInterpreter
 {
+    // --------------------------------------------------------------------------------
+    // fields and properties
+    // --------------------------------------------------------------------------------
+
     private readonly CancellationToken _cancellationToken;
     private readonly IFishboneDebugger _debugger;
     private readonly IReadOnlyDictionary<Type, FishboneTypeConverter> _typeConverters;
@@ -24,6 +37,10 @@ public class FishboneInterpreter
     // when false, the '.' operator is disabled entirely (see FishboneConfiguration.EnableMemberAccess)
     private readonly bool _enableMemberAccess;
 
+    // --------------------------------------------------------------------------------
+    // constructors
+    // --------------------------------------------------------------------------------
+
     public FishboneInterpreter(
         CancellationToken cancellationToken = default,
         IFishboneDebugger? debugger = null,
@@ -36,24 +53,13 @@ public class FishboneInterpreter
         _enableMemberAccess = enableMemberAccess;
     }
 
-    /// <summary>
-    /// Normalizes a value crossing back into the script: if its runtime type has a registered
-    /// converter with a from-direction, applies it; otherwise returns the value unchanged so it
-    /// remains an ordinary .NET object the script can interop with.
-    /// </summary>
-    private object? ApplyFromNetConverter(object? value)
-    {
-        if (value is not null
-            && _typeConverters.TryGetValue(value.GetType(), out var converter)
-            && converter.FromNet is not null)
-            return converter.FromNet(value);
-        return value;
-    }
+    // --------------------------------------------------------------------------------
+    // dispatch
+    // --------------------------------------------------------------------------------
 
     public object Evaluate(FishboneEnvironment env, AstNode node)
     {
-        if (node is null)
-            throw new ArgumentNullException(nameof(node));
+        ArgumentNullException.ThrowIfNull(node);
 
         _cancellationToken.ThrowIfCancellationRequested();
         _debugger.OnBeforeExecute(node, env);
@@ -125,13 +131,9 @@ public class FishboneInterpreter
         exception is not OperationCanceledException and not ReturnException and not BreakException and not ContinueException
         && !exception.Data.Contains(DebuggerReportedKey);
 
-    internal object EvaluateProgram(FishboneEnvironment env, ProgramNode node)
-    {
-        object lastValue = null!;
-        foreach (var statement in node.Statements)
-            lastValue = Evaluate(env, statement);
-        return lastValue;
-    }
+    // --------------------------------------------------------------------------------
+    // declarations and assignment
+    // --------------------------------------------------------------------------------
 
     internal object EvaluateDeclaration(FishboneEnvironment env, DeclarationNode node)
     {
@@ -202,6 +204,10 @@ public class FishboneInterpreter
         return value!;
     }
 
+    // --------------------------------------------------------------------------------
+    // operators
+    // --------------------------------------------------------------------------------
+
     internal object EvaluateUnary(FishboneEnvironment env, UnaryOpNode node)
     {
         dynamic right = Evaluate(env, node.Right);
@@ -263,6 +269,10 @@ public class FishboneInterpreter
         };
     }
 
+    // --------------------------------------------------------------------------------
+    // casts
+    // --------------------------------------------------------------------------------
+
     // names accepted as cast targets when the environment doesn't resolve them to a type;
     // "int" etc. normally resolve to the conversion builtins, which are functions, not types
     private static readonly Dictionary<string, Type> PrimitiveTypeNames = new(StringComparer.Ordinal)
@@ -303,6 +313,10 @@ public class FishboneInterpreter
             node.Line, node.Column);
     }
 
+    // --------------------------------------------------------------------------------
+    // strings
+    // --------------------------------------------------------------------------------
+
     internal object EvaluateInterpolatedString(FishboneEnvironment env, InterpolatedStringNode node)
     {
         var builder = new System.Text.StringBuilder();
@@ -317,6 +331,30 @@ public class FishboneInterpreter
             });
         }
         return builder.ToString();
+    }
+
+    // --------------------------------------------------------------------------------
+    // control flow
+    // --------------------------------------------------------------------------------
+
+    internal object EvaluateProgram(FishboneEnvironment env, ProgramNode node)
+    {
+        object lastValue = null!;
+        foreach (var statement in node.Statements)
+            lastValue = Evaluate(env, statement);
+        return lastValue;
+    }
+
+    internal object EvaluateBlock(FishboneEnvironment env, BlockNode node)
+    {
+        var blockEnv = new FishboneEnvironment(env);
+
+        object lastValue = null!;
+
+        foreach (var statement in node.Statements)
+            lastValue = Evaluate(blockEnv, statement);
+
+        return lastValue;
     }
 
     internal object EvaluateIf(FishboneEnvironment env, IfNode node)
@@ -443,17 +481,86 @@ public class FishboneInterpreter
         return lastValue;
     }
 
-    internal object EvaluateBlock(FishboneEnvironment env, BlockNode node)
+    internal object EvaluateReturn(FishboneEnvironment env, ReturnNode node)
     {
-        var blockEnv = new FishboneEnvironment(env);
+        // return;
+        if (node.ReturnValues.Count == 0)
+            throw new ReturnException(null!);
 
-        object lastValue = null!;
+        // return expr, expr;
+        var returnValues = new List<object>();
+        for (int i = 0; i < node.ReturnValues.Count; i++)
+            returnValues.Add(Evaluate(env, node.ReturnValues[i]));
 
-        foreach (var statement in node.Statements)
-            lastValue = Evaluate(blockEnv, statement);
-
-        return lastValue;
+        throw new ReturnException(returnValues);
     }
+
+    internal object EvaluateBreak(FishboneEnvironment env, BreakNode node)
+    {
+        throw new BreakException();
+    }
+
+    internal object EvaluateContinue(FishboneEnvironment env, ContinueNode node)
+    {
+        throw new ContinueException();
+    }
+
+    internal object EvaluateTry(FishboneEnvironment env, TryNode node)
+    {
+        try
+        {
+            try
+            {
+                _tryDepth++;
+                return Evaluate(env, node.TryBlock);
+            }
+            finally
+            {
+                _tryDepth--;
+            }
+        }
+        catch (Exception exception) when (node.CatchBlock is not null && IsCatchableByScript(exception))
+        {
+            var catchEnv = new FishboneEnvironment(env);
+            if (node.ExceptionName is not null)
+                catchEnv.Declare(node.ExceptionName, UnwrapForScript(exception));
+
+            _activeCatchExceptions.Push(exception);
+            try
+            {
+                return Evaluate(catchEnv, node.CatchBlock);
+            }
+            finally
+            {
+                _activeCatchExceptions.Pop();
+            }
+        }
+        finally
+        {
+            if (node.FinallyBlock is not null)
+                Evaluate(env, node.FinallyBlock);
+        }
+    }
+
+    internal object EvaluateThrow(FishboneEnvironment env, ThrowNode node)
+    {
+        if (node.Value is null)
+        {
+            if (_activeCatchExceptions.Count == 0)
+                throw new FishboneRuntimeException(
+                    "A bare 'throw;' is only valid inside a catch block.", node.Line, node.Column);
+            ExceptionDispatchInfo.Capture(_activeCatchExceptions.Peek()).Throw();
+        }
+
+        var value = Evaluate(env, node.Value!);
+        if (value is Exception exception)
+            throw exception;
+        throw new FishboneScriptException(value);
+    }
+
+    // --------------------------------------------------------------------------------
+    // functions and calls
+    // --------------------------------------------------------------------------------
 
     internal object EvaluateFunctionDefinition(FishboneEnvironment env,  FunctionDefinitionNode node)
     {
@@ -470,7 +577,7 @@ public class FishboneInterpreter
 
     internal object EvaluateCall(FishboneEnvironment env, object callee, IReadOnlyList<ArgumentNode> argumentNodes)
     {
-        if (callee is ICallable fishboneFunction)
+        if (callee is FishboneFunction fishboneFunction)
         {
             if (argumentNodes.Count != fishboneFunction.Arity)
                 throw new FishboneRuntimeException($"Expected {fishboneFunction.Arity} args but got {argumentNodes.Count}.");
@@ -493,8 +600,8 @@ public class FishboneInterpreter
         if (callee is BoundMethod boundMethod)
             return InvokeBoundMethod(env, boundMethod, argumentNodes);
 
-        if (callee is INativeCallable nativeCallable)
-            return InvokeNativeCallable(env, nativeCallable, argumentNodes);
+        if (callee is IManualCallable manualCallable)
+            return InvokeManualCallable(env, manualCallable, argumentNodes);
 
         if (callee is RegisteredType registeredType)
             return InvokeConstructorOverload(env, registeredType, argumentNodes);
@@ -521,14 +628,14 @@ public class FishboneInterpreter
     }
 
     /// <summary>
-    /// Invokes a host-supplied <see cref="INativeCallable"/>. Unlike the reflection path there is a
+    /// Invokes a host-supplied <see cref="IManualCallable"/>. Unlike the reflection path there is a
     /// single fixed signature, so no overload resolution is needed; arguments are bound positionally,
     /// converted through the same registered-converter logic as .NET calls, and out/ref results are
     /// written back via the shared <see cref="WriteBackByRefArguments"/> helper.
     /// </summary>
-    internal object InvokeNativeCallable(
+    internal object InvokeManualCallable(
         FishboneEnvironment env,
-        INativeCallable callable,
+        IManualCallable callable,
         IReadOnlyList<ArgumentNode> argumentNodes)
     {
         var parameters = callable.Parameters;
@@ -582,6 +689,63 @@ public class FishboneInterpreter
         WriteBackByRefArguments(env, args, writeBacks);
         return ApplyFromNetConverter(result)!;
     }
+
+    private object InvokeMethod(
+        FishboneEnvironment env,
+        object? target,
+        MethodInfo method,
+        object?[] args,
+        List<(string Name, int Index, bool IsOut)> writeBacks)
+    {
+        var delegateEnv = new FishboneEnvironment(env);
+        OnFunctionEnter(method.Name, delegateEnv);
+        try
+        {
+            // span overload is required, it is the only MethodInvoker.Invoke overload that
+            // writes by-ref (out/ref) results back into the supplied argument buffer.
+            var result = ReflectionCache.GetInvoker(method).Invoke(target, args.AsSpan());
+            WriteBackByRefArguments(env, args, writeBacks);
+
+            return ApplyFromNetConverter(result)!;
+        }
+        catch (TargetInvocationException ex)
+        {
+            throw ex.InnerException ?? ex;
+        }
+        finally
+        {
+            OnFunctionExit(method.Name);
+        }
+    }
+
+    private object InvokeConstructor(
+        FishboneEnvironment env,
+        ConstructorInfo constructor,
+        object?[] args,
+        List<(string Name, int Index, bool IsOut)> writeBacks)
+    {
+        var typeName = constructor.DeclaringType?.Name ?? "constructor";
+        OnFunctionEnter(typeName, new FishboneEnvironment(env));
+        try
+        {
+            var instance = ReflectionCache.GetConstructorInvoker(constructor).Invoke(args.AsSpan());
+            WriteBackByRefArguments(env, args, writeBacks);
+
+            return instance!;
+        }
+        catch (TargetInvocationException ex)
+        {
+            throw ex.InnerException ?? ex;
+        }
+        finally
+        {
+            OnFunctionExit(typeName);
+        }
+    }
+
+    // --------------------------------------------------------------------------------
+    // overload resolution and arg conversion
+    // --------------------------------------------------------------------------------
 
     /// <summary>
     /// Selects the best-matching overload from <paramref name="methods"/> and invokes it.
@@ -658,59 +822,6 @@ public class FishboneInterpreter
             MethodInfo method => InvokeMethod(env, target, method, bestArgs!, bestWriteBacks!),
             _ => throw new FishboneRuntimeException($"Cannot invoke member \"{methodName}\".")
         };
-    }
-
-    private object InvokeMethod(
-        FishboneEnvironment env,
-        object? target,
-        MethodInfo method,
-        object?[] args,
-        List<(string Name, int Index, bool IsOut)> writeBacks)
-    {
-        var delegateEnv = new FishboneEnvironment(env);
-        OnFunctionEnter(method.Name, delegateEnv);
-        try
-        {
-            // span overload is required, it is the only MethodInvoker.Invoke overload that
-            // writes by-ref (out/ref) results back into the supplied argument buffer.
-            var result = ReflectionCache.GetInvoker(method).Invoke(target, args.AsSpan());
-            WriteBackByRefArguments(env, args, writeBacks);
-
-            return ApplyFromNetConverter(result)!;
-        }
-        catch (TargetInvocationException ex)
-        {
-            throw ex.InnerException ?? ex;
-        }
-        finally
-        {
-            OnFunctionExit(method.Name);
-        }
-    }
-
-    private object InvokeConstructor(
-        FishboneEnvironment env,
-        ConstructorInfo constructor,
-        object?[] args,
-        List<(string Name, int Index, bool IsOut)> writeBacks)
-    {
-        var typeName = constructor.DeclaringType?.Name ?? "constructor";
-        OnFunctionEnter(typeName, new FishboneEnvironment(env));
-        try
-        {
-            var instance = ReflectionCache.GetConstructorInvoker(constructor).Invoke(args.AsSpan());
-            WriteBackByRefArguments(env, args, writeBacks);
-
-            return instance!;
-        }
-        catch (TargetInvocationException ex)
-        {
-            throw ex.InnerException ?? ex;
-        }
-        finally
-        {
-            OnFunctionExit(typeName);
-        }
     }
 
     /// <summary>
@@ -948,6 +1059,10 @@ public class FishboneInterpreter
         return ArgumentMatch.None;
     }
 
+    // --------------------------------------------------------------------------------
+    // collections
+    // --------------------------------------------------------------------------------
+
     internal object EvaluateListNode(FishboneEnvironment env, ListNode node)
     {
         return node.Elements.Select(i => Evaluate(env, i)).ToList();
@@ -960,6 +1075,10 @@ public class FishboneInterpreter
             newDict.Add(Evaluate(env, item.Key), Evaluate(env, item.Value));
         return newDict;
     }
+
+    // --------------------------------------------------------------------------------
+    // indexing
+    // --------------------------------------------------------------------------------
 
     internal object EvaluateIndexingNode(FishboneEnvironment env, IndexingNode node)
     {
@@ -1084,6 +1203,10 @@ public class FishboneInterpreter
     private static PropertyInfo[] GetSingleParameterIndexers(Type type) =>
         ReflectionCache.GetSingleParameterIndexers(type);
 
+    // --------------------------------------------------------------------------------
+    // member access
+    // --------------------------------------------------------------------------------
+
     internal object EvaluateMemberAccessNode(FishboneEnvironment env,  MemberAccessNode node)
     {
         if (!_enableMemberAccess)
@@ -1109,82 +1232,9 @@ public class FishboneInterpreter
         throw new FishboneRuntimeException($"Type \"{type.Name}\" does not have a public member named \"{node.MemberName}\".");
     }
 
-    internal object EvaluateReturn(FishboneEnvironment env, ReturnNode node)
-    {
-        // return;
-        if (node.ReturnValues.Count == 0)
-            throw new ReturnException(null!);
-
-        // return expr, expr;
-        var returnValues = new List<object>();
-        for (int i = 0; i < node.ReturnValues.Count; i++)
-            returnValues.Add(Evaluate(env, node.ReturnValues[i]));
-
-        throw new ReturnException(returnValues);
-    }
-
-    internal object EvaluateBreak(FishboneEnvironment env, BreakNode node)
-    {
-        throw new BreakException();
-    }
-
-    internal object EvaluateContinue(FishboneEnvironment env, ContinueNode node)
-    {
-        throw new ContinueException();
-    }
-
-    internal object EvaluateTry(FishboneEnvironment env, TryNode node)
-    {
-        try
-        {
-            try
-            {
-                _tryDepth++;
-                return Evaluate(env, node.TryBlock);
-            }
-            finally
-            {
-                _tryDepth--;
-            }
-        }
-        catch (Exception exception) when (node.CatchBlock is not null && IsCatchableByScript(exception))
-        {
-            var catchEnv = new FishboneEnvironment(env);
-            if (node.ExceptionName is not null)
-                catchEnv.Declare(node.ExceptionName, UnwrapForScript(exception));
-
-            _activeCatchExceptions.Push(exception);
-            try
-            {
-                return Evaluate(catchEnv, node.CatchBlock);
-            }
-            finally
-            {
-                _activeCatchExceptions.Pop();
-            }
-        }
-        finally
-        {
-            if (node.FinallyBlock is not null)
-                Evaluate(env, node.FinallyBlock);
-        }
-    }
-
-    internal object EvaluateThrow(FishboneEnvironment env, ThrowNode node)
-    {
-        if (node.Value is null)
-        {
-            if (_activeCatchExceptions.Count == 0)
-                throw new FishboneRuntimeException(
-                    "A bare 'throw;' is only valid inside a catch block.", node.Line, node.Column);
-            ExceptionDispatchInfo.Capture(_activeCatchExceptions.Peek()).Throw();
-        }
-
-        var value = Evaluate(env, node.Value!);
-        if (value is Exception exception)
-            throw exception;
-        throw new FishboneScriptException(value);
-    }
+    // --------------------------------------------------------------------------------
+    // misc
+    // --------------------------------------------------------------------------------
 
     // cancellation and the loop/function control-flow signals must never be observable
     // by a script catch
@@ -1214,4 +1264,18 @@ public class FishboneInterpreter
         string s => !string.IsNullOrEmpty(s),
         _ => true
     };
+
+    /// <summary>
+    /// Normalizes a value crossing back into the script: if its runtime type has a registered
+    /// converter with a from-direction, applies it; otherwise returns the value unchanged so it
+    /// remains an ordinary .NET object the script can interop with.
+    /// </summary>
+    private object? ApplyFromNetConverter(object? value)
+    {
+        if (value is not null
+            && _typeConverters.TryGetValue(value.GetType(), out var converter)
+            && converter.FromNet is not null)
+            return converter.FromNet(value);
+        return value;
+    }
 }

@@ -1,3 +1,12 @@
+// --------------------------------------------------------------------------------
+// FishboneEngine.cs
+//
+// static class with Run method to initialize the execution of a script. takes
+// in the source code and FishboneConfiguration to execute.
+//
+// note: mainly for one-time execution.
+// --------------------------------------------------------------------------------
+
 using Fishbone.Core;
 using Fishbone.Debugging;
 

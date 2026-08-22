@@ -19,7 +19,7 @@ public class ErrorTypingTests
     public void Run_HostDelegateThrow_IsRuntimeExceptionWrappingOriginal()
     {
         var config = new FishboneConfiguration()
-            .AddFunction("boom", new Action(() => throw new InvalidOperationException("host failure")));
+            .AddBuiltIn("boom", new Action(() => throw new InvalidOperationException("host failure")));
 
         var exception = Assert.Throws<FishboneRuntimeException>(
             () => FishboneEngine.Run("boom();", config));

@@ -95,17 +95,17 @@ let dictionaryValue = dictionary["new"];
         int indexCalls = 0;
         int valueCalls = 0;
         var configuration = new FishboneConfiguration()
-            .AddFunction("getTarget", new Func<List<object>>(() =>
+            .AddBuiltIn("getTarget", new Func<List<object>>(() =>
             {
                 targetCalls++;
                 return values;
             }))
-            .AddFunction("getIndex", new Func<int>(() =>
+            .AddBuiltIn("getIndex", new Func<int>(() =>
             {
                 indexCalls++;
                 return 0;
             }))
-            .AddFunction("getValue", new Func<int>(() =>
+            .AddBuiltIn("getValue", new Func<int>(() =>
             {
                 valueCalls++;
                 return 42;

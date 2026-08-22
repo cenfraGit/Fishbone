@@ -36,8 +36,8 @@ public class FishboneProgramTests
 
         Assert.Equal(42, env.GetValue("doubled"));
         // The seeded value lives in the variables dict (what the debugger surfaces), not built-ins.
-        Assert.True(env.LocalValues.ContainsKey("injected"));
-        Assert.Equal(21, env.LocalValues["injected"]);
+        Assert.True(env.Values.ContainsKey("injected"));
+        Assert.Equal(21, env.Values["injected"]);
     }
 
     [Fact]
@@ -47,7 +47,7 @@ public class FishboneProgramTests
         var env = program.Run(new FishboneConfiguration().AddBuiltIn("service", 99));
 
         Assert.Equal(99, env.GetValue("service"));          // reachable by name
-        Assert.False(env.LocalValues.ContainsKey("service")); // but not a script variable
+        Assert.False(env.Values.ContainsKey("service")); // but not a script variable
     }
 
     [Fact]
