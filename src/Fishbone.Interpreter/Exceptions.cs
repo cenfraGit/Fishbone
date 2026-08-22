@@ -1,17 +1,26 @@
-﻿namespace Fishbone.Interpreter;
+﻿// --------------------------------------------------------------------------------
+// Exceptions.cs
+//
+// this file holds exception types that are used in control flow during execution.
+// these are implemented as exceptions just to break control flow easily.
+// --------------------------------------------------------------------------------
 
-public class ReturnException(object values) : Exception
+namespace Fishbone.Interpreter;
+
+// thrown when a "return" is hit (from fb functions)
+internal class ReturnException(object values) : Exception
 {
     public object Values { get; } = values;
 }
 
-public class BreakException : Exception { }
-public class ContinueException : Exception { }
+// thrown when a "break" is hit
+internal class BreakException : Exception { }
 
-/// <summary>
-/// Thrown by a script <c>throw</c> statement when the thrown value is not already a
-/// .NET <see cref="Exception"/>. The original value is preserved in <see cref="Value"/>.
-/// </summary>
+// thrown when a "continue" is hit
+internal class ContinueException : Exception { }
+
+// thrown by a script "throw" statement when the thrown value is not already
+// a .NET exception. The original value is preserved in Value.
 public sealed class FishboneScriptException : Exception
 {
     public object? Value { get; }

@@ -1,3 +1,16 @@
+// --------------------------------------------------------------------------------
+// ReflectionCache.cs
+//
+// every time a script calls a method or something reflection-based,
+// the interpreter needs reflection data from that object (like
+// parameter lists, which method matches, etc). this operation can be
+// slow if done every time its needed.
+//
+// the ReflectionCache class provides a way to cache the answer to the
+// first lookup, attempting to make further calls faster. mainly just
+// for speed optimization, but no actual behavior changes.
+// --------------------------------------------------------------------------------
+
 using System.Collections.Concurrent;
 using System.Reflection;
 
