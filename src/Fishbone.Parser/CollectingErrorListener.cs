@@ -57,7 +57,7 @@ internal sealed partial class CollectingErrorListener : IAntlrErrorListener<ITok
             ? new SourceSpan(line, charPositionInLine + 1)
             : offendingSymbol.Span();
 
-        Add(DiagnosticStage.Parse, msg, span, offendingSymbol?.Text);
+        Add(DiagnosticStage.Parse, msg, span, offendingSymbol?.Text, ExpectedTokensOf(recognizer, e));
     }
 
     // the lexer overload: there is no token, because failing to build one is the error.
@@ -77,9 +77,25 @@ internal sealed partial class CollectingErrorListener : IAntlrErrorListener<ITok
         Add(DiagnosticStage.Lex, msg, span, offendingText);
     }
 
-    private void Add(DiagnosticStage stage, string message, SourceSpan span, string? offendingText)
+    // some antlr messages omit what the parser was expecting, but the exception still knows, so
+    // read it off there rather than leaving the diagnostic vaguer than it needs to be
+    private static string? ExpectedTokensOf(IRecognizer recognizer, RecognitionException? exception)
     {
-        var rewritten = ParseErrorMessages.Rewrite(message);
+        try
+        {
+            return exception?.GetExpectedTokens()?.ToString(recognizer.Vocabulary);
+        }
+        catch
+        {
+            // the expected set is a nicety; never let computing it turn into a reported error
+            return null;
+        }
+    }
+
+    private void Add(DiagnosticStage stage, string message, SourceSpan span, string? offendingText,
+        string? expectedSet = null)
+    {
+        var rewritten = ParseErrorMessages.Rewrite(message, offendingText, expectedSet);
 
         Diagnostics.Add(new FishboneDiagnostic(stage, DiagnosticSeverity.Error, rewritten ?? message, span)
         {

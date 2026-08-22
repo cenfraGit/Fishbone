@@ -81,6 +81,43 @@ public class ParseErrorMessageTests
         });
     }
 
+    [Theory]
+    // an unclosed bracket is the case where the expecting set is the whole point: the missing
+    // closer is named, which is what makes the message actionable
+    [InlineData("let a = [1, 2, 3;", "Unexpected ';', expected ']' or ','.")]
+    [InlineData("let d = {1: 2;", "Unexpected ';', expected '}' or ','.")]
+    public void SmallAllLiteralExpectingSet_IsKept(string code, string expected)
+    {
+        Assert.Contains(DiagnosticsFor(code), d => d.Message == expected);
+    }
+
+    [Fact]
+    public void ExpectingSetNamingGrammarRules_IsDropped()
+    {
+        // 'expecting {')', 'out', 'ref', ID}' mixes literals with a rule name. listing only the
+        // literals would steer the author away from the identifier they probably meant to type
+        var diagnostics = DiagnosticsFor("func f( { }");
+
+        Assert.Contains(diagnostics, d => d.Message == "Unexpected '{'.");
+        Assert.All(diagnostics, d => Assert.DoesNotContain("ID", d.Message));
+    }
+
+    [Fact]
+    public void NoViableAlternative_QuotesTheOffendingTokenNotAntlrsTokenDump()
+    {
+        // antlr reports this one as "no viable alternative at input 'a=[1,2,3;'", quoting every
+        // token it consumed with the whitespace stripped. echoing that shows the author a mangled
+        // rendering of their own line, so the message names the single token that actually failed
+        var diagnostics = DiagnosticsFor("a = 10;\n\n\na = [ 1, 2, 3;\n");
+
+        Assert.All(diagnostics, diagnostic =>
+        {
+            Assert.DoesNotContain("a=[1,2,3;", diagnostic.Message);
+            Assert.DoesNotContain("no viable alternative", diagnostic.Message);
+        });
+        Assert.Contains(diagnostics, d => d.Message.Contains("Unexpected ';'"));
+    }
+
     [Fact]
     public void SingleExpectation_IsKeptBecauseItIsUseful()
     {
