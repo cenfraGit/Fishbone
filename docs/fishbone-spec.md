@@ -583,20 +583,61 @@ and returned from other functions.
 
 ### Parameters and return
 
-- Parameters are passed by value.
+- Parameters are passed by value unless the definition marks them `out`
+  or `ref` (see By-reference parameters below).
 - A function without a `return` statement implicitly returns `null`.
-- A function returns exactly one value. To hand back several, return a
-  list or a dictionary.
+- A function returns exactly one value. To hand back several, use `out`
+  parameters, or return a list or a dictionary.
 
 ### Closures
 
 Functions close over the environment in which they are defined. Inner
 functions can access variables from outer scopes.
 
+### By-reference parameters (`out` / `ref`)
+
+A parameter in a function definition may be marked `out` or `ref`. The
+call site must then mark the matching argument with the same keyword,
+and that argument must be a plain variable:
+
+```csharp
+func tryHalve(n, out half)
+{
+    if (n % 2 != 0) { return false; }
+    half = n / 2;
+    return true;
+}
+
+let ok = tryHalve(10, out h);   // ok is true, h is 5; 'h' is introduced by the call
+
+func bump(ref n) { n = n + 1; }
+let count = 10;
+bump(ref count);                // 'count' must already exist; it becomes 11
+```
+
+- An `out` parameter starts as `null` inside the function; it does not
+  read the caller's variable. Assigning it is not required, so a
+  function that never assigns its `out` parameter hands back `null`.
+- An `out` argument does not require the caller's variable to exist. If
+  it is undefined, the call declares it in the current scope; if it
+  already exists, the call writes through to it.
+- A `ref` parameter reads the caller's current value on the way in, and
+  its final value is written back. The caller's variable must already be
+  defined.
+- Write-back happens when the function returns normally, with or without
+  a `return` value. If the body throws, nothing is written back.
+- Omitting the keyword on an `out`/`ref` parameter, using a keyword on a
+  by-value parameter, using the wrong keyword, or passing anything other
+  than a plain variable with a keyword are all errors.
+
+These are the same rules the `out`/`ref` arguments of .NET methods
+follow.
+
 ### Arity
 
 The number of arguments at the call site must match the number of
-parameters in the definition.
+parameters in the definition, and each argument's `out`/`ref` keyword
+must match the direction its parameter declares.
 
 ## Builtins & interop
 
@@ -728,15 +769,15 @@ Increment(ref n);                      // 'n' must already exist; it is updated 
 - `ref` requires the variable to already be defined; its current value
   is passed in and the updated value is written back.
 - Omitting the keyword on an `out`/`ref` parameter, using a keyword on
-  a by-value parameter, passing a non-variable expression with a
-  keyword, or using `out`/`ref` when calling a Fishbone function are
-  all errors.
+  a by-value parameter, or passing a non-variable expression with a
+  keyword are all errors. The same rules apply to Fishbone functions
+  that declare `out`/`ref` parameters (see Functions).
 
-**Host callables with native signatures (`INativeCallable`)** —
+**Host callables with native signatures (`IManualCallable`)** —
 `out`/`ref` are not limited to reflected .NET methods. A host can
 expose a callable that is not a .NET method but still declares a typed
 `in`/`out`/`ref` signature, by registering an object implementing
-`INativeCallable` (its `Parameters` list gives each parameter a name,
+`IManualCallable` (its `Parameters` list gives each parameter a name,
 .NET type, and direction). The interpreter binds arguments
 positionally, converts inputs through the same registered-converter
 logic as a .NET call, invokes the host's implementation, and writes
