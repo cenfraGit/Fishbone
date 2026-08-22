@@ -37,13 +37,19 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
 
     public override AstNode VisitFunctionDefinitionStat(FishboneParser.FunctionDefinitionStatContext context)
     {
-        var funcName = context.ID(0).GetText();
+        var funcName = context.ID().GetText();
         var block = Visit(context.blockStat());
 
-        // get parameters
-        var funcParams = new List<string>();
-        for (int i = 1; i < context.ID().Length; i++)
-            funcParams.Add(context.ID(i).GetText());
+        // get parameters, each optionally marked 'out' or 'ref'
+        var funcParams = new List<ParameterNode>();
+        foreach (var parameter in context.parameter())
+        {
+            var modifier = parameter.OUT() is not null ? ArgumentModifier.Out
+                : parameter.REF() is not null ? ArgumentModifier.Ref
+                : ArgumentModifier.None;
+
+            funcParams.Add(new ParameterNode(modifier, parameter.ID().GetText()));
+        }
 
         return new FunctionDefinitionNode(funcName, funcParams.ToImmutableArray(), (BlockNode)block) { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }

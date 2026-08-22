@@ -38,7 +38,7 @@ whileStat   : WHILE '(' expr ')' statement ;
 foreachStat : FOREACH '(' ID IN expr ')' statement ;
 forStat     : FOR '(' ID IN expr (COMMA expr (COMMA expr)?)? ')' statement ;
 
-functionDefinitionStat : FUNC ID '(' (ID (COMMA ID)*)? ')' blockStat ;
+functionDefinitionStat : FUNC ID '(' (parameter (COMMA parameter)*)? ')' blockStat ;
 
 // at least one of catchClause/finallyClause is required (enforced when building the AST)
 tryStat       : TRY blockStat catchClause? finallyClause? ;
@@ -47,6 +47,7 @@ finallyClause : FINALLY blockStat ;
 
 throwStat : THROW expr? ; // bare 'throw;' rethrows, only valid inside catch
 
+parameter    : (OUT|REF)? ID ;
 argument     : (OUT|REF)? expr ;
 returnStat   : RETURN expr? ;
 breakStat    : BREAK ;

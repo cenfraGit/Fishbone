@@ -526,21 +526,7 @@ public class FishboneInterpreter
     internal object EvaluateCall(FishboneEnvironment env, object callee, IReadOnlyList<ArgumentNode> argumentNodes)
     {
         if (callee is FishboneFunction fishboneFunction)
-        {
-            if (argumentNodes.Count != fishboneFunction.Arity)
-                throw new FishboneRuntimeException($"Expected {fishboneFunction.Arity} args but got {argumentNodes.Count}.");
-
-            var evaluatedArgs = new List<object>();
-            foreach (var argNode in argumentNodes)
-            {
-                if (argNode.Modifier != ArgumentModifier.None)
-                    throw new FishboneRuntimeException($"'{argNode.Modifier.ToString().ToLowerInvariant()}' arguments are only supported when calling .NET methods.");
-
-                evaluatedArgs.Add(Evaluate(env, argNode.Value));
-            }
-
-            return fishboneFunction.Call(this, evaluatedArgs);
-        }
+            return InvokeFishboneFunction(env, fishboneFunction, argumentNodes);
 
         if (callee is Delegate csharpDelegate)
             return InvokeReflectedCallable(env, csharpDelegate.Target, csharpDelegate.Method, argumentNodes);
@@ -573,6 +559,68 @@ public class FishboneInterpreter
             throw new FishboneRuntimeException($"Type \"{registeredType.Type.Name}\" has no public constructor to call.");
 
         return InvokeBestOverload(env, target: null, constructors, argumentNodes, registeredType.Type.Name);
+    }
+
+    /// <summary>
+    /// Invokes a Fishbone script-defined function. Like the <see cref="IManualCallable"/> path there
+    /// is a single fixed signature, so arguments are bound positionally with no overload resolution.
+    /// Unlike it, script parameters are untyped, so nothing is converted on the way in. An
+    /// <c>out</c> parameter is seeded as <c>null</c> inside the callee; after the body finishes the
+    /// function copies the final value of every <c>out</c>/<c>ref</c> parameter back into the
+    /// argument buffer, and those land in the caller's variables through the shared
+    /// <see cref="WriteBackByRefArguments"/> helper.
+    /// </summary>
+    internal object InvokeFishboneFunction(
+        FishboneEnvironment env,
+        FishboneFunction function,
+        IReadOnlyList<ArgumentNode> argumentNodes)
+    {
+        var parameters = function.Parameters;
+        if (argumentNodes.Count != parameters.Count)
+            throw new FishboneRuntimeException($"Expected {parameters.Count} args but got {argumentNodes.Count}.");
+
+        var args = new object?[parameters.Count];
+        var writeBacks = new List<(string Name, int Index, bool IsOut)>();
+
+        for (int i = 0; i < parameters.Count; i++)
+        {
+            var parameter = parameters[i];
+            var argument = argumentNodes[i];
+
+            switch (parameter.Modifier)
+            {
+                case ArgumentModifier.Out:
+                    if (argument.Modifier != ArgumentModifier.Out)
+                        throw new FishboneRuntimeException($"Parameter \"{parameter.Name}\" is an out parameter; pass the argument with 'out'.");
+                    if (argument.Value is not IdentifierNode outTarget)
+                        throw new FishboneRuntimeException($"Out argument \"{parameter.Name}\" must be a variable.");
+                    // an out parameter starts as null in the callee; the caller's value is not read
+                    args[i] = null;
+                    writeBacks.Add((outTarget.Name, i, true));
+                    break;
+
+                case ArgumentModifier.Ref:
+                    if (argument.Modifier != ArgumentModifier.Ref)
+                        throw new FishboneRuntimeException($"Parameter \"{parameter.Name}\" is a ref parameter; pass the argument with 'ref'.");
+                    if (argument.Value is not IdentifierNode refTarget)
+                        throw new FishboneRuntimeException($"Ref argument \"{parameter.Name}\" must be a variable.");
+                    // evaluating the identifier also enforces that the caller's variable exists
+                    args[i] = Evaluate(env, argument.Value);
+                    writeBacks.Add((refTarget.Name, i, false));
+                    break;
+
+                default: // by value
+                    if (argument.Modifier != ArgumentModifier.None)
+                        throw new FishboneRuntimeException($"Parameter \"{parameter.Name}\" is passed by value; remove '{argument.Modifier.ToString().ToLowerInvariant()}'.");
+                    args[i] = Evaluate(env, argument.Value);
+                    break;
+            }
+        }
+
+        // the body mutates args for out/ref parameters, so the shared write-back can run against it
+        var result = function.Call(this, args);
+        WriteBackByRefArguments(env, args, writeBacks);
+        return result;
     }
 
     /// <summary>

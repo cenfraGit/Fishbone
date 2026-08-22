@@ -144,7 +144,8 @@ public record MemberAccessNode(AstNode Target,
 // calls and args
 // --------------------------------------------------------------------------------
 
-// how a call-site argument is passed
+// how an argument is passed at a call site, and how a parameter is
+// declared at a function definition
 public enum ArgumentModifier
 {
     None, // by value
@@ -156,6 +157,13 @@ public enum ArgumentModifier
 public record ArgumentNode(ArgumentModifier Modifier, AstNode Value)
 {
     public static implicit operator ArgumentNode(AstNode value) => new(ArgumentModifier.None, value);
+}
+
+// single function-definition parameter + its direction. not a node itself,
+// this is the definition-site twin of ArgumentNode above.
+public record ParameterNode(ArgumentModifier Modifier, string Name)
+{
+    public static implicit operator ParameterNode(string name) => new(ArgumentModifier.None, name);
 }
 
 public record CallNode(AstNode Callee, ImmutableArray<ArgumentNode> Arguments) : AstNode
@@ -272,7 +280,7 @@ public record IndexedAssignmentNode(AstNode Target,
                                     AstNode Value) : AstNode;
 
 public record FunctionDefinitionNode(string Name,
-                                     ImmutableArray<string> Parameters,
+                                     ImmutableArray<ParameterNode> Parameters,
                                      BlockNode Body) : AstNode
 {
     public virtual bool Equals(FunctionDefinitionNode? other)
