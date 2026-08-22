@@ -109,7 +109,7 @@ which include:
 | `{` `}`                     | Block delimiters                                  |
 | `;`                         | Statement terminator                              |
 | `:`                         | Key-value separator in dictionary literals        |
-| `,`                         | Separator in lists, parameters, and destructuring |
+| `,`                         | Separator in lists, dictionaries, parameters, and arguments |
 
 ### Literals
 
@@ -381,14 +381,15 @@ bodies.
 
 ```csharp
 let x = 42;
-let a, b = functionThatReturnsTwoValues();
 ```
+
+Declares exactly one variable. The value on the right is bound whole,
+so a list stays a list.
 
 ### Assignment
 
 ```csharp
 x = 10;
-a, b = functionThatReturnsTwoValues();
 ```
 
 Updates an existing variable. Assignment walks up the scope chain to
@@ -503,11 +504,11 @@ iteration.
 ```csharp
 return;
 return expr;
-return expr1, expr2;
 ```
 
-Exits the current Fishbone function. Single return yields the
-value. Returning multiple values yields a list of values.
+Exits the current Fishbone function, yielding exactly one value. A
+bare `return;` yields `null`. The value travels as-is, so
+`return [1, 2];` gives the caller that same two-element list.
 
 ### Try / Catch / Finally / Throw
 
@@ -584,8 +585,8 @@ and returned from other functions.
 
 - Parameters are passed by value.
 - A function without a `return` statement implicitly returns `null`.
-- Multi-return uses the syntax `return a, b;` and produces a list.
-- The caller can destructure the result with `let a, b = func();`.
+- A function returns exactly one value. To hand back several, return a
+  list or a dictionary.
 
 ### Closures
 

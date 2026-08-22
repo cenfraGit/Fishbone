@@ -223,15 +223,6 @@ The remaining projects `Fishbone.Core`, `Fishbone.Parser`,
 
 ---
 
-## Note
-
-This project is in early stage and although no major breaking changes
-are planned for now, I can't guarantee that syntax will remain the
-same. (e.g. don't know if variable-list unpacking will remain, since
-methods already support `out`).
-
----
-
 ## License
 
 [MIT](LICENSE) © 2026 cenfraGit
