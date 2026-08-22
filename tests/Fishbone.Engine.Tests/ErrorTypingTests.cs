@@ -15,6 +15,17 @@ public class ErrorTypingTests
         Assert.Contains("missing", exception.Message);
     }
 
+    // a malformed 'for' header used to escape as a bare NullReferenceException from the AST
+    // builder; every diagnosable script defect must surface as a Fishbone exception type
+    [Fact]
+    public void Run_ForWithoutEndBound_IsParseExceptionNotNullReference()
+    {
+        var exception = Record.Exception(
+            () => FishboneEngine.Run("for (i in 5) { println(i); }", new FishboneConfiguration()));
+
+        Assert.IsType<Fishbone.Parser.FishboneParseException>(exception);
+    }
+
     [Fact]
     public void Run_HostDelegateThrow_IsRuntimeExceptionWrappingOriginal()
     {

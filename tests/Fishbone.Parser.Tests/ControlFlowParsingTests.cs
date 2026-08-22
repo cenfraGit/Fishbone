@@ -168,6 +168,21 @@ for (i in 0, 10)
         Assert.Equal(expectedAst, ast);
     }
 
+    // a numeric for needs both bounds. the grammar used to accept a lone expression and
+    // the AST builder then dereferenced the missing end bound, surfacing a bare
+    // NullReferenceException instead of a parse error
+    [Theory]
+    [InlineData("for (i in 5) { }")]
+    [InlineData("for (i in 5) println(i);")]
+    [InlineData("for (i in count) { }")]
+    // no bounds at all, and more than start/end/step
+    [InlineData("for (i in ) { }")]
+    [InlineData("for (i in 0, 5, 2, 9) { }")]
+    public void Parse_ForWithMalformedBounds_ThrowsParseException(string code)
+    {
+        Assert.Throws<FishboneParseException>(() => ASTParser.Parse(code));
+    }
+
     [Fact]
     public void Parse_ForThreeArgs_ReturnsForNodeWithStep()
     {
