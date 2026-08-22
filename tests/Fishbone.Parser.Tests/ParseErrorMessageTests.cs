@@ -83,9 +83,18 @@ public class ParseErrorMessageTests
 
     [Theory]
     // an unclosed bracket is the case where the expecting set is the whole point: the missing
-    // closer is named, which is what makes the message actionable
+    // closer is named, which is what makes the message actionable.
+    //
+    // the pairs without 'let' used to report a bare "Unexpected ';'." because the parser could
+    // not tell an assignment from an indexed assignment from a bare expression until it had read
+    // past the whole expression, so it gave up at the statement level with no context. one
+    // exprStatement rule lets it commit early and fail inside the list instead
     [InlineData("let a = [1, 2, 3;", "Unexpected ';', expected ']' or ','.")]
+    [InlineData("a = [1, 2, 3;", "Unexpected ';', expected ']' or ','.")]
+    [InlineData("a[0] = [1, 2, 3;", "Unexpected ';', expected ']' or ','.")]
+    [InlineData("a += [1, 2, 3;", "Unexpected ';', expected ']' or ','.")]
     [InlineData("let d = {1: 2;", "Unexpected ';', expected '}' or ','.")]
+    [InlineData("d = {1: 2;", "Unexpected ';', expected '}' or ','.")]
     public void SmallAllLiteralExpectingSet_IsKept(string code, string expected)
     {
         Assert.Contains(DiagnosticsFor(code), d => d.Message == expected);
@@ -115,7 +124,9 @@ public class ParseErrorMessageTests
             Assert.DoesNotContain("a=[1,2,3;", diagnostic.Message);
             Assert.DoesNotContain("no viable alternative", diagnostic.Message);
         });
-        Assert.Contains(diagnostics, d => d.Message.Contains("Unexpected ';'"));
+        // exact, not Contains: the statement rules were consolidated so this input now names the
+        // bracket it wants, and a loose assertion would not notice losing that again
+        Assert.Contains(diagnostics, d => d.Message == "Unexpected ';', expected ']' or ','.");
     }
 
     [Fact]
