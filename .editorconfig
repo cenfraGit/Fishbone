@@ -3,3 +3,8 @@ root = true
 [*]
 end_of_line = lf
 insert_final_newline = false
+
+# utf-8 here means without a BOM (utf-8-bom is the opt-in spelling). set explicitly
+# because visual studio writes a BOM into project files it edits, and nothing else in
+# the repo would catch it drifting back
+charset = utf-8
