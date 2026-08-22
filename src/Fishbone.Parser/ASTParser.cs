@@ -15,14 +15,48 @@ public static class ASTParser
     // used to create an AST for the program in the string
     public static AstNode Parse(string code)
     {
+        if (!TryParse(code, out var ast, out var diagnostics))
+            throw new FishboneParseException(diagnostics);
+
+        return ast!;
+    }
+
+    /// <summary>
+    /// Parses without throwing for a bad script, handing back the syntax errors instead. Intended
+    /// for a caller that expects invalid input to be normal, such as an editor validating as the
+    /// user types, where throwing on nearly every keystroke is both wasteful and makes
+    /// break-on-all-exceptions unusable. <see cref="Parse"/> is this plus a throw.
+    /// </summary>
+    /// <returns>True when <paramref name="ast"/> was produced; false when the source has errors.</returns>
+    public static bool TryParse(string code, out AstNode? ast, out IReadOnlyList<FishboneDiagnostic> diagnostics)
+    {
         var parser = CreateParser(code, out var errorListener);
         var parseTree = parser.program();
 
+        // the visitor is not safe against a broken parse tree (ParseSpans.Span already has to
+        // special-case a rule with no Stop token), so a failed parse returns before it runs
         if (errorListener.Diagnostics.Count > 0)
-            throw new FishboneParseException(errorListener.Diagnostics);
+        {
+            ast = null;
+            diagnostics = errorListener.Diagnostics;
+            return false;
+        }
 
-        var visitor = new AstBuilderVisitor();
-        return visitor.Visit(parseTree);
+        try
+        {
+            ast = new AstBuilderVisitor().Visit(parseTree);
+        }
+        catch (FishboneParseException exception)
+        {
+            // the visitor diagnoses things the grammar cannot, like a literal too large for its
+            // type or an unrecognized escape, and reports them by throwing
+            ast = null;
+            diagnostics = exception.Diagnostics;
+            return false;
+        }
+
+        diagnostics = [];
+        return true;
     }
 
     // used only for interpolated-string holes in expressions (VisitInterpStringExpr)
