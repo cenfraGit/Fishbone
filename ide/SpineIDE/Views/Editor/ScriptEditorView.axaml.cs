@@ -124,6 +124,8 @@ public partial class ScriptEditorView : UserControl
 
         // re-apply in case the theme variant changed while this view was detached
         ApplyEditorTheme();
+        // the renderer is installed above, and the bound view model may already hold diagnostics
+        Editor.TextArea.TextView.InvalidateVisual();
     }
 
     private void OnFoldingTimerTick(object? sender, EventArgs e)
@@ -180,6 +182,10 @@ public partial class ScriptEditorView : UserControl
             vm.PropertyChanged += OnViewModelPropertyChanged;
             vm.DiagnosticsChanged += OnDiagnosticsChanged;
             SetDocument(vm.ScriptDocument);
+            // the background parse can finish before this view exists to hear about it, so a tab
+            // being bound may already have diagnostics waiting. repaint once rather than leaving
+            // them until something else happens to invalidate
+            OnDiagnosticsChanged(vm, EventArgs.Empty);
         }
         else
         {

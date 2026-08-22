@@ -196,9 +196,17 @@ public class DockFactory : Factory
         public override void CloseDockable(IDockable dockable)
         {
             if (IsManaged(dockable))
+            {
                 HideTool(dockable);
-            else
-                base.CloseDockable(dockable);
+                return;
+            }
+
+            base.CloseDockable(dockable);
+
+            // a script editor parses in the background, so a closed tab has to be told to stop.
+            // deliberately not done for a managed tool above: hiding one is not closing it
+            if (dockable is IDisposable disposable)
+                disposable.Dispose();
         }
 
         private void EnsureContainer(IDock parent, IDock container, bool atStart)
