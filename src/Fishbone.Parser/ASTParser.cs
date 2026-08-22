@@ -3,6 +3,16 @@
 //
 // this class holds static methods used to produce the actual AST from
 // a string of code, using AstBuilderVisitor.
+//
+// parses are serialized. antlr's generated parser and lexer share one DFA array and
+// one PredictionContextCache across every instance in the process (static fields in
+// the generated FishboneParser), and those are mutated as the ATN warms up. whether
+// the C# runtime makes that safe under concurrency is not something this repo can
+// verify, and it stopped being hypothetical once the ide began parsing in the
+// background on every typing pause while a run could be parsing at the same time.
+// a parse is single-digit milliseconds warm, so serializing them costs little; a host
+// wanting genuine parallel throughput would need per-instance ATN caches instead,
+// which trades the warm-DFA speedup away on every call.
 // --------------------------------------------------------------------------------
 
 using Antlr4.Runtime;
@@ -12,6 +22,10 @@ namespace Fishbone.Parser;
 
 public static class ASTParser
 {
+    // re-entrant by design: the visitor calls back into ParseExpression for each
+    // interpolated-string hole while this is already held
+    private static readonly object ParseGate = new();
+
     // used to create an AST for the program in the string
     public static AstNode Parse(string code)
     {
@@ -29,6 +43,12 @@ public static class ASTParser
     /// </summary>
     /// <returns>True when <paramref name="ast"/> was produced; false when the source has errors.</returns>
     public static bool TryParse(string code, out AstNode? ast, out IReadOnlyList<FishboneDiagnostic> diagnostics)
+    {
+        lock (ParseGate)
+            return TryParseCore(code, out ast, out diagnostics);
+    }
+
+    private static bool TryParseCore(string code, out AstNode? ast, out IReadOnlyList<FishboneDiagnostic> diagnostics)
     {
         var parser = CreateParser(code, out var errorListener);
         var parseTree = parser.program();
