@@ -6,6 +6,29 @@
     <AssemblyName>spine</AssemblyName>
   </PropertyGroup>
 
+  <!-- ================================================================================
+       ships as a dotnet tool, which is the whole standalone story:
+
+           dotnet tool install -g Fishbone.Cli
+           spine script.fb
+           spine plugin install Fishbone.Plugins.OpenCv
+
+       somebody can run a script and add plugins to it without creating a project. an
+       application embedding Fishbone never installs this; it references the Fishbone
+       package and calls AddPlugin.
+
+       PackAsTool bundles every dependency into tools/, so unlike the library packages
+       this one is deliberately self-contained.
+       ================================================================================ -->
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <PackageId>Fishbone.Cli</PackageId>
+    <ToolCommandName>spine</ToolCommandName>
+    <Description>Command line runner for Fishbone scripts. Runs a .fb file, shows the variables and builtins it ended up with, and installs plugins from a NuGet feed into the plugins folder so scripts can reach them without a host application.</Description>
+    <PackageTags>$(PackageTags);cli;dotnet-tool</PackageTags>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="System.CommandLine" Version="2.0.9" />
   </ItemGroup>
