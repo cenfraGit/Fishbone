@@ -4,6 +4,11 @@
     <TargetFramework>net8.0</TargetFramework>
     <!-- build as a self-contained, loadable plugin: copies OpenCvSharp (managed + native) -->
     <EnableDynamicLoading>true</EnableDynamicLoading>
+    <!-- Fishbone.Engine pulls Core/Interpreter/Debugging/Parser in behind it, and marking the
+         direct reference non-copying does not stop those landing in the output. A plugin shipping
+         its own Fishbone.Core risks the loader binding to it instead of the host's, which would
+         make IFishbonePlugin a different type than the one the host checks against. -->
+    <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
   </PropertyGroup>
 
   <PropertyGroup>

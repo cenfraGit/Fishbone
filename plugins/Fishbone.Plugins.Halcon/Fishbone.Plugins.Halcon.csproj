@@ -12,6 +12,12 @@
     <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>HALCON for Fishbone. Exposes every HALCON operator under its usual snake_case name, and the HDevelop procedures in a directory under their own, both callable with native out syntax: read_image(img, "file"), threshold(img, out region, 128, 255). Requires a licensed HALCON installation on the machine.</Description>
+    <PackageTags>$(PackageTags);fishbone-plugin;halcon;machine-vision</PackageTags>
+  </PropertyGroup>
+
   <ItemGroup>
     <!-- the host already has these loaded; reference them for the IFishbonePlugin contract and
          the IManualCallable/BoundMethod types, but do NOT ship a second copy -->
@@ -19,7 +25,10 @@
       <Private>false</Private>
       <ExcludeAssets>runtime</ExcludeAssets>
     </ProjectReference>
-    <ProjectReference Include="..\..\src\Fishbone.Interpreter\Fishbone.Interpreter.csproj">
+    <!-- Fishbone.Interpreter is not a package of its own: its assembly ships inside Fishbone.
+         PrivateAssets keeps the nuspec from depending on a package that will never exist -->
+    <ProjectReference Include="..\..\src\Fishbone.Interpreter\Fishbone.Interpreter.csproj"
+                     PrivateAssets="all">
       <Private>false</Private>
       <ExcludeAssets>runtime</ExcludeAssets>
     </ProjectReference>
