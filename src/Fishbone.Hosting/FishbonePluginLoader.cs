@@ -20,6 +20,7 @@
 // --------------------------------------------------------------------------------
 
 using System.Reflection;
+using System.Reflection.PortableExecutable;
 using Fishbone.Core;
 using Fishbone.Engine;
 
@@ -79,6 +80,13 @@ public static class FishbonePluginLoader
         {
             foreach (var dll in Directory.EnumerateFiles(dir, "*.dll"))
             {
+                // a native library beside the plugin is normal (OpenCV installs
+                // OpenCvSharpExtern.dll next to its own assembly), and reporting each one as a
+                // failed plugin was noise. a file that is not a portable executable at all is a
+                // different matter and still gets reported
+                if (Classify(dll) == DllKind.NativeLibrary)
+                    continue;
+
                 Assembly assembly;
                 try
                 {
@@ -152,6 +160,43 @@ public static class FishbonePluginLoader
         }
 
         return new PluginLoadResult(loaded, diagnostics);
+    }
+
+    private enum DllKind
+    {
+        /// <summary>Carries CLI metadata, so it may hold a plugin.</summary>
+        Managed,
+
+        /// <summary>A valid binary with no CLI metadata: a native library, which is expected.</summary>
+        NativeLibrary,
+
+        /// <summary>Not a binary at all, which is worth telling somebody about.</summary>
+        NotAPortableExecutable,
+    }
+
+    /// <summary>
+    /// Reads just enough of the file's header to tell a native library apart from a managed
+    /// assembly, without loading anything. Distinguishing those two is what lets the loader stay
+    /// quiet about the first and still report the second.
+    /// </summary>
+    private static DllKind Classify(string path)
+    {
+        try
+        {
+            using FileStream stream = File.OpenRead(path);
+            using var reader = new PEReader(stream);
+            return reader.HasMetadata ? DllKind.Managed : DllKind.NativeLibrary;
+        }
+        catch (BadImageFormatException)
+        {
+            return DllKind.NotAPortableExecutable;
+        }
+        catch (IOException)
+        {
+            // unreadable for some other reason. treat it as managed so Assembly.LoadFrom
+            // produces the real message rather than this guessing at one
+            return DllKind.Managed;
+        }
     }
 
     /// <summary>

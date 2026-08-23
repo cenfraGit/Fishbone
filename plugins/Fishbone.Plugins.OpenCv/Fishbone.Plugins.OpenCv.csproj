@@ -6,6 +6,12 @@
     <EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>OpenCV for Fishbone. Registers Cv2 as "cv" and Mat as a constructible type, so a script can call cv.CvtColor, cv.GaussianBlur, cv.Canny and the rest with lists standing in for Size, Point and Scalar.</Description>
+    <PackageTags>$(PackageTags);fishbone-plugin;opencv;computer-vision</PackageTags>
+  </PropertyGroup>
+
   <ItemGroup>
     <!-- the host already has Fishbone.Engine loaded; reference it for the IFishbonePlugin
          contract but do NOT ship a second copy -->

@@ -38,6 +38,7 @@ internal class Program
         };
 
         var rootCommand = new RootCommand("Fishbone script runner.");
+        rootCommand.Add(PluginCommand.Create());
         rootCommand.Add(argumentScript);
         rootCommand.Add(optionShowValues);
         rootCommand.Add(optionShowBuiltins);

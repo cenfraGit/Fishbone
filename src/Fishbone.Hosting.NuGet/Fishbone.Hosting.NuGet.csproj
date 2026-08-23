@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+
+  <!-- separate from Fishbone.Hosting on purpose. Hosting has no external dependencies at all,
+       and the DAP host references it just to discover plugins. pulling the NuGet client stack
+       in there would put it in every host that only ever reads a folder. -->
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Installs Fishbone plugins from a NuGet feed into a plugins folder, for a standalone host whose users add plugins without recompiling. Resolves the package and its dependencies, picks the assets matching the host's framework and platform, and leaves the engine's own assemblies to the host.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Fishbone.Hosting.NuGet.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NuGet.Protocol" Version="7.9.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fishbone.Core\Fishbone.Core.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\Fishbone.Hosting\Fishbone.Hosting.csproj" />
+  </ItemGroup>
+
+</Project>

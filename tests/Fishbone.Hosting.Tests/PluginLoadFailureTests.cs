@@ -33,6 +33,41 @@ public class PluginLoadFailureTests
     }
 
     [Fact]
+    public void PluginLoad_ANativeLibraryBesideAPlugin_IsNotReportedAsAFailure()
+    {
+        // a plugin folder legitimately holds native libraries: installing the OpenCV plugin puts
+        // OpenCvSharpExtern.dll next to its assembly. those are not assemblies and reporting each
+        // one as a failed plugin buried the real diagnostics.
+        //
+        // any native library will do as a stand-in, and every machine running this has one
+        string source = Path.Combine(
+            Path.GetDirectoryName(typeof(object).Assembly.Location)!, NativeLibraryName);
+        Assert.True(File.Exists(source), $"expected a native library at {source}");
+
+        var directory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(Path.Combine(directory, "withnative"));
+        File.Copy(source, Path.Combine(directory, "withnative", "somenative.dll"));
+
+        try
+        {
+            var result = FishbonePluginLoader.Load(directory, new FishboneConfiguration());
+
+            Assert.Empty(result.Loaded);
+            Assert.Empty(result.Diagnostics);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    // the runtime's own native host, which sits beside System.Private.CoreLib on every platform
+    private static string NativeLibraryName =>
+        OperatingSystem.IsWindows() ? "hostpolicy.dll"
+        : OperatingSystem.IsMacOS() ? "libhostpolicy.dylib"
+        : "libhostpolicy.so";
+
+    [Fact]
     public void PluginLoad_MissingDirectoryReportsNothing()
     {
         var result = FishbonePluginLoader.Load(

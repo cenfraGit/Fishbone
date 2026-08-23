@@ -13,6 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Fishbone.Engine\Fishbone.Engine.csproj" />
     <ProjectReference Include="..\..\src\Fishbone.Hosting\Fishbone.Hosting.csproj" />
+    <ProjectReference Include="..\..\src\Fishbone.Hosting.NuGet\Fishbone.Hosting.NuGet.csproj" />
   </ItemGroup>
 
   <ItemGroup>
