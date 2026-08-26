@@ -25,8 +25,8 @@ public sealed class FishboneProgram
     private readonly AstNode? _ast;
 
     public string SourceCode { get; } = string.Empty;
-    public string SourceName { get; } = string.Empty;    // display name for source
-    public string SourceIdentity { get; } = string.Empty; // SHA256 for program
+    public string SourceName { private set; get; } = "New";  // display name for source
+    public string SourceIdentity { get; } = string.Empty;    // SHA256 for program
 
     // --------------------------------------------------------------------------------
     // constructors
@@ -49,7 +49,6 @@ public sealed class FishboneProgram
     {
         _ast = FromSourceCodeCode(sourceCode);
         SourceCode = sourceCode;
-        SourceName = "New";
         SourceIdentity = ComputeIdentity(sourceCode);
     }
 
@@ -61,7 +60,9 @@ public sealed class FishboneProgram
     public static FishboneProgram FromFile(string filePath)
     {
         var sourceCode = ReadFile(filePath);
-        return new FishboneProgram(sourceCode);
+        var program = new FishboneProgram(sourceCode);
+        program.SourceName = Path.GetFileName(filePath);
+        return program;
     }
 
     // --------------------------------------------------------------------------------

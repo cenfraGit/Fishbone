@@ -113,7 +113,7 @@ public sealed class FishboneDebugServerSession : IAsyncDisposable
                 {
                     try
                     {
-                        environment = FishboneEngine.Run(source, configuration, token, coordinator);
+                        environment = FishboneProgram.Run(source, configuration, coordinator, token);
                     }
                     catch (OperationCanceledException)
                     {

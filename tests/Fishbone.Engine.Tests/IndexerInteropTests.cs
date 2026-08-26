@@ -8,7 +8,7 @@ public class IndexerInteropTests
         var sample = new CustomIndexer();
         var configuration = new FishboneConfiguration().AddBuiltIn("sample", sample);
 
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 sample["2"] = "7";
 let value = sample[2];
 """, configuration);
@@ -23,7 +23,7 @@ let value = sample[2];
         int[] values = [1, 2, 3];
         var configuration = new FishboneConfiguration().AddBuiltIn("values", values);
 
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 values[1] = "9";
 let result = values[1];
 """, configuration);
@@ -38,7 +38,7 @@ let result = values[1];
         var values = new Dictionary<string, int>();
         var configuration = new FishboneConfiguration().AddBuiltIn("values", values);
 
-        FishboneEngine.Run("values[123] = \"8\";", configuration);
+        FishboneProgram.Run("values[123] = \"8\";", configuration);
 
         Assert.Equal(8, values["123"]);
     }
@@ -52,7 +52,7 @@ let result = values[1];
             .AddBuiltIn("list", list)
             .AddBuiltIn("dictionary", dictionary);
 
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 list[1] = 9;
 dictionary["new"] = 3;
 let listValue = list[1];
@@ -70,7 +70,7 @@ let dictionaryValue = dictionary["new"];
             .AddBuiltIn("sample", new ReadOnlyIndexer());
 
         Exception exception = Assert.ThrowsAny<Exception>(() =>
-            FishboneEngine.Run("sample[0] = 10;", configuration));
+            FishboneProgram.Run("sample[0] = 10;", configuration));
 
         Assert.Contains("read-only", exception.Message);
     }
@@ -82,7 +82,7 @@ let dictionaryValue = dictionary["new"];
             .AddBuiltIn("sample", new CustomIndexer());
 
         Exception exception = Assert.ThrowsAny<Exception>(() =>
-            FishboneEngine.Run("sample[0] = [1];", configuration));
+            FishboneProgram.Run("sample[0] = [1];", configuration));
 
         Assert.Contains("not compatible", exception.Message);
     }
@@ -111,7 +111,7 @@ let dictionaryValue = dictionary["new"];
                 return 42;
             }));
 
-        FishboneEngine.Run("getTarget()[getIndex()] = getValue();", configuration);
+        FishboneProgram.Run("getTarget()[getIndex()] = getValue();", configuration);
 
         Assert.Equal(42, values[0]);
         Assert.Equal(1, targetCalls);

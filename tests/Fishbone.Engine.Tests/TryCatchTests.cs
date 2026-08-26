@@ -10,7 +10,7 @@ public class TryCatchTests
         var config = new FishboneConfiguration()
             .AddBuiltIn("boom", new Action(() => throw new InvalidOperationException("delegate failed")));
 
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let message = "";
 let typeName = "";
 try { boom(); }
@@ -28,7 +28,7 @@ catch (e)
     [Fact]
     public void Run_CatchHandlesRuntimeErrors_AndScriptContinues()
     {
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let handled = false;
 try
 {
@@ -46,7 +46,7 @@ let after = "still running";
     [Fact]
     public void Run_FinallyRuns_OnSuccessAndOnCaughtException()
     {
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let log = [];
 try { log.Add("ok"); } finally { log.Add("f1"); }
 try { throw "x"; } catch { log.Add("caught"); } finally { log.Add("f2"); }
@@ -63,7 +63,7 @@ try { throw "x"; } catch { log.Add("caught"); } finally { log.Add("f2"); }
         var config = new FishboneConfiguration()
             .AddBuiltIn("record", new Action<string>(log.Add));
 
-        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneEngine.Run("""
+        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run("""
 try { throw "escaping"; }
 finally { record("cleanup"); }
 """, config));
@@ -75,7 +75,7 @@ finally { record("cleanup"); }
     [Fact]
     public void Run_ThrownNonExceptionValue_IsWrappedAndExposesValue()
     {
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let message = "";
 let value = 0;
 try { throw 42; }
@@ -96,7 +96,7 @@ catch (e)
         var config = new FishboneConfiguration()
             .AddBuiltIn("boom", new Action(() => throw new InvalidOperationException("original")));
 
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let outer = "";
 try
 {
@@ -113,14 +113,14 @@ catch (e) { outer = e.Message; }
     public void Run_BareThrowOutsideCatch_IsRuntimeError()
     {
         var exception = Assert.Throws<FishboneRuntimeException>(
-            () => FishboneEngine.Run("""throw;""", new FishboneConfiguration()));
+            () => FishboneProgram.Run("""throw;""", new FishboneConfiguration()));
         Assert.Contains("only valid inside a catch block", exception.Message);
     }
 
     [Fact]
     public void Run_ControlFlow_IsNotInterceptedByCatch_ButTriggersFinally()
     {
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let log = [];
 
 func f()
@@ -147,7 +147,7 @@ for (i in 0, 5)
     [Fact]
     public void Run_CatchBindingIsScopedToCatchBlock()
     {
-        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneEngine.Run("""
+        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run("""
 try { throw "x"; } catch (e) { }
 let leaked = e;
 """, new FishboneConfiguration()));

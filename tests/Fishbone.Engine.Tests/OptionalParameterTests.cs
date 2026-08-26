@@ -17,35 +17,35 @@ public class OptionalParameterTests
     [Fact]
     public void OmittingTrailingOptionals_FillsTheirDefaults()
     {
-        var env = FishboneEngine.Run("let r = g.Join(\"x\");", ConfigWithGreeter());
+        var env = FishboneProgram.Run("let r = g.Join(\"x\");", ConfigWithGreeter());
         Assert.Equal("x-!", env.GetValue("r"));
     }
 
     [Fact]
     public void OmittingSomeOptionals_FillsOnlyTheMissingOnes()
     {
-        var env = FishboneEngine.Run("let r = g.Join(\"x\", \"+\");", ConfigWithGreeter());
+        var env = FishboneProgram.Run("let r = g.Join(\"x\", \"+\");", ConfigWithGreeter());
         Assert.Equal("x+!", env.GetValue("r"));
     }
 
     [Fact]
     public void SupplyingAllArguments_UsesNoDefaults()
     {
-        var env = FishboneEngine.Run("let r = g.Join(\"x\", \"+\", \"?\");", ConfigWithGreeter());
+        var env = FishboneProgram.Run("let r = g.Join(\"x\", \"+\", \"?\");", ConfigWithGreeter());
         Assert.Equal("x+?", env.GetValue("r"));
     }
 
     [Fact]
     public void ExactArityOverload_IsPreferredOverDefaultFilledOne()
     {
-        var env = FishboneEngine.Run("let r = g.Pick(7);", ConfigWithGreeter());
+        var env = FishboneProgram.Run("let r = g.Pick(7);", ConfigWithGreeter());
         Assert.Equal(1, env.GetValue("r"));
     }
 
     [Fact]
     public void TwoArguments_SelectTheTwoParameterOverload()
     {
-        var env = FishboneEngine.Run("let r = g.Pick(7, 8);", ConfigWithGreeter());
+        var env = FishboneProgram.Run("let r = g.Pick(7, 8);", ConfigWithGreeter());
         Assert.Equal(2, env.GetValue("r"));
     }
 
@@ -53,7 +53,7 @@ public class OptionalParameterTests
     public void TooManyArguments_StillFails()
     {
         Assert.ThrowsAny<Exception>(() =>
-            FishboneEngine.Run("let r = g.Join(\"a\", \"b\", \"c\", \"d\");", ConfigWithGreeter()));
+            FishboneProgram.Run("let r = g.Join(\"a\", \"b\", \"c\", \"d\");", ConfigWithGreeter()));
     }
 
     [Fact]
@@ -62,6 +62,6 @@ public class OptionalParameterTests
         var config = new FishboneConfiguration()
             .AddBuiltIn("g", new Greeter());
 
-        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("let r = g.Join();", config));
+        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("let r = g.Join();", config));
     }
 }

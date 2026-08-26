@@ -28,7 +28,7 @@ public class FishboneConfigurationTests
     [Fact]
     public void BuiltIns_UsesOrdinalKeyComparison()
     {
-        var config = new FishboneConfiguration(injectDefaults: false)
+        var config = new FishboneConfiguration()
             .AddBuiltIn("Name", 1)
             .AddBuiltIn("name", 2);
 
@@ -41,7 +41,7 @@ public class FishboneConfigurationTests
     public void Clone_CarriesBuiltInsValuesAndTypeConverters()
     {
         var converter = new Func<object, object>(o => o);
-        var source = new FishboneConfiguration(injectDefaults: false)
+        var source = new FishboneConfiguration()
             .AddBuiltIn("answer", 42)
             .AddValue("seed", 7)
             .AddTypeConverter(typeof(Uri), converter);
@@ -58,7 +58,7 @@ public class FishboneConfigurationTests
     [Fact]
     public void Clone_IsIndependentOfSource()
     {
-        var source = new FishboneConfiguration(injectDefaults: false).AddBuiltIn("a", 1);
+        var source = new FishboneConfiguration().AddBuiltIn("a", 1);
 
         var clone = source.Clone();
         clone.AddBuiltIn("b", 2);

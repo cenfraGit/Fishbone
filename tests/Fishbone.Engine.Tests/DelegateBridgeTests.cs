@@ -9,7 +9,7 @@ public class DelegateBridgeTests
             .AddBuiltIn("formatValue", new Func<double, int, string>((val, precision) =>
                 val.ToString($"F{precision}")));
 
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let scriptResult = formatValue(42, 3);
 """, config);
 
@@ -22,7 +22,7 @@ let scriptResult = formatValue(42, 3);
         var config = new FishboneConfiguration()
             .AddBuiltIn("doubleValue", new Func<int, int>(value => value * 2));
 
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let scriptResult = doubleValue(21);
 """, config);
 
@@ -35,7 +35,7 @@ let scriptResult = doubleValue(21);
         var config = new FishboneConfiguration()
             .AddBuiltIn("add", new Func<int, int, int>((left, right) => left + right));
 
-        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("""
+        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("""
 let scriptResult = add(1);
 """, config));
     }
@@ -46,7 +46,7 @@ let scriptResult = add(1);
         var config = new FishboneConfiguration()
             .AddBuiltIn("explode", new Func<int>(() => throw new InvalidOperationException("boom")));
 
-        var exception = Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("""
+        var exception = Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("""
 let scriptResult = explode();
 """, config));
 
@@ -61,7 +61,7 @@ let scriptResult = explode();
             .AddBuiltIn("tryParse", new TryParseDelegate(TryParse))
             .AddBuiltIn("increment", new IncrementDelegate(Increment));
 
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let ok = tryParse("42", out parsed);
 let value = 10;
 increment(ref value);

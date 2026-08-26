@@ -5,7 +5,7 @@ public class CastExpressionTests
     [Fact]
     public void Run_CastConvertibleValues_ReturnsConvertedValue()
     {
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let fromString = "42" as int;
 let fromDouble = 2.0 as int;
 let toDouble = "3.5" as double;
@@ -23,7 +23,7 @@ let toBool = "true" as bool;
     [Fact]
     public void Run_CastFailures_ReturnNull()
     {
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let notANumber = "oops" as int;
 let fromNull = null as int;
 """, new FishboneConfiguration());
@@ -40,7 +40,7 @@ let fromNull = null as int;
             .AddValue("known", new Widget())
             .AddValue("unrelated", "just a string");
 
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let same = known as Widget;
 let mismatch = unrelated as Widget;
 """, config);
@@ -56,7 +56,7 @@ let mismatch = unrelated as Widget;
             .AddType<Widget>()
             .AddTypeConverter(typeof(Widget), value => new Widget { Size = (int)value });
 
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let widget = 5 as Widget;
 let size = widget.Size;
 """, config);
@@ -67,14 +67,14 @@ let size = widget.Size;
     [Fact]
     public void Run_CastToUnknownTypeName_RaisesRuntimeError()
     {
-        var exception = Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("""let x = 1 as NoSuchType;""", new FishboneConfiguration()));
+        var exception = Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("""let x = 1 as NoSuchType;""", new FishboneConfiguration()));
         Assert.Contains("not a type", exception.Message);
     }
 
     [Fact]
     public void Run_CastBindsTighterThanComparison()
     {
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let inRange = "5" as int < 10;
 let sum = 1 + 2 as double;
 """, new FishboneConfiguration());

@@ -8,7 +8,7 @@ public class OutRefArgumentTests
     [Fact]
     public void Run_OutArgument_IntroducesNewVariable()
     {
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let ok = sample.TryGet("answer", out result);
 """, Config());
 
@@ -19,7 +19,7 @@ let ok = sample.TryGet("answer", out result);
     [Fact]
     public void Run_OutArgument_WritesThroughToExistingVariable()
     {
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let result = 5;
 sample.TryGet("answer", out result);
 """, Config());
@@ -30,7 +30,7 @@ sample.TryGet("answer", out result);
     [Fact]
     public void Run_RefArgument_UpdatesExistingVariable()
     {
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let value = 10;
 sample.Increment(ref value);
 """, Config());
@@ -41,13 +41,13 @@ sample.Increment(ref value);
     [Fact]
     public void Run_RefArgument_OnUndefinedVariable_Throws()
     {
-        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("sample.Increment(ref missing);", Config()));
+        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("sample.Increment(ref missing);", Config()));
     }
 
     [Fact]
     public void Run_ByRefParameter_WithoutKeyword_Throws()
     {
-        var exception = Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("""
+        var exception = Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("""
 let value = 0;
 sample.Increment(value);
 """, Config()));
@@ -58,7 +58,7 @@ sample.Increment(value);
     [Fact]
     public void Run_ValueParameter_WithByRefKeyword_Throws()
     {
-        var exception = Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("""
+        var exception = Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("""
 let value = 1;
 let echoed = sample.Echo(out value);
 """, Config()));
@@ -69,7 +69,7 @@ let echoed = sample.Echo(out value);
     [Fact]
     public void Run_ByRefKeyword_OnFishboneFunction_Throws()
     {
-        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("""
+        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("""
 func identity(a) { return a; }
 let result = identity(out x);
 """, Config()));

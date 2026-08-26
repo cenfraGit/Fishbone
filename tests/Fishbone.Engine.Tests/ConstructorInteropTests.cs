@@ -8,7 +8,7 @@ public class ConstructorInteropTests
         var config = new FishboneConfiguration()
             .AddType<Point>();
 
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let p = Point(3, 4);
 let x = p.X;
 let y = p.Y;
@@ -28,7 +28,7 @@ let sum = p.Sum();
         var config = new FishboneConfiguration()
             .AddType<Point>();
 
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let single = Point(5);
 let label = single.Label;
 let x = single.X;
@@ -46,7 +46,7 @@ let y = single.Y;
         var config = new FishboneConfiguration()
             .AddType<Point>();
 
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let p = Point(3.0, 4.0);
 let x = p.X;
 """, config);
@@ -60,7 +60,7 @@ let x = p.X;
         var config = new FishboneConfiguration()
             .AddType<Point>("Vec");
 
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let v = Vec(1, 2);
 let sum = v.Sum();
 """, config);
@@ -68,7 +68,7 @@ let sum = v.Sum();
         Assert.Equal(3, env.GetValue("sum"));
 
         // The default type name is not registered when a custom name is given.
-        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("let p = Point(1, 2);", config));
+        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("let p = Point(1, 2);", config));
     }
 
     [Fact]
@@ -77,7 +77,7 @@ let sum = v.Sum();
         var config = new FishboneConfiguration()
             .AddType<Point>();
 
-        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("let p = Point(1, 2, 3);", config));
+        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("let p = Point(1, 2, 3);", config));
     }
 
     [Fact]
@@ -86,7 +86,7 @@ let sum = v.Sum();
         var config = new FishboneConfiguration()
             .AddType<Hidden>();
 
-        var exception = Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("let h = Hidden();", config));
+        var exception = Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("let h = Hidden();", config));
         Assert.Contains("constructor", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 

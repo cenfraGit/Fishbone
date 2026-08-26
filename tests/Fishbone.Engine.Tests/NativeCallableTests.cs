@@ -52,7 +52,7 @@ public class NativeCallableTests
     {
         var config = new FishboneConfiguration().AddBuiltIn("divmod", Divmod());
 
-        var env = FishboneEngine.Run("divmod(17, 5, out q, out r);", config);
+        var env = FishboneProgram.Run("divmod(17, 5, out q, out r);", config);
 
         Assert.Equal(3, env.GetValue("q"));
         Assert.Equal(2, env.GetValue("r"));
@@ -66,7 +66,7 @@ public class NativeCallableTests
             args => { args[0] = (int)args[0]! + 1; return null; });
         var config = new FishboneConfiguration().AddBuiltIn("bump", callable);
 
-        var env = FishboneEngine.Run("let x = 10; bump(ref x); bump(ref x);", config);
+        var env = FishboneProgram.Run("let x = 10; bump(ref x); bump(ref x);", config);
 
         Assert.Equal(12, env.GetValue("x"));
     }
@@ -82,7 +82,7 @@ public class NativeCallableTests
             args => (int)args[0]! + (int)args[1]!);
         var config = new FishboneConfiguration().AddBuiltIn("add", callable);
 
-        var env = FishboneEngine.Run("let s = add(2, 3);", config);
+        var env = FishboneProgram.Run("let s = add(2, 3);", config);
 
         Assert.Equal(5, env.GetValue("s"));
     }
@@ -100,7 +100,7 @@ public class NativeCallableTests
             .AddTypeConverter(typeof(Boxed), v => new Boxed(Convert.ToInt32(v)), v => ((Boxed)v).Value)
             .AddBuiltIn("produce", callable);
 
-        var env = FishboneEngine.Run("produce(41, out made);", config);
+        var env = FishboneProgram.Run("produce(41, out made);", config);
 
         Assert.Equal(42, env.GetValue("made"));
     }
@@ -110,7 +110,7 @@ public class NativeCallableTests
     {
         var config = new FishboneConfiguration().AddBuiltIn("divmod", Divmod());
 
-        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("divmod(17, 5, q, r);", config));
+        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("divmod(17, 5, q, r);", config));
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public class NativeCallableTests
             args => args[0]);
         var config = new FishboneConfiguration().AddBuiltIn("echo", callable);
 
-        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("let s = echo(out x);", config));
+        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("let s = echo(out x);", config));
     }
 
     [Fact]
@@ -129,6 +129,6 @@ public class NativeCallableTests
     {
         var config = new FishboneConfiguration().AddBuiltIn("divmod", Divmod());
 
-        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("divmod(17, 5, out q);", config));
+        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("divmod(17, 5, out q);", config));
     }
 }

@@ -9,7 +9,7 @@ public class RunDebuggableAsyncTests
     [Fact]
     public async Task RunDebuggableAsync_NoClientAttaches_FallsBackToHeadless()
     {
-        var program = FishboneProgram.ParseSource("let result = 21 * 2;");
+        var program = FishboneProgram.FromSourceCode("let result = 21 * 2;");
 
         var result = await program.RunDebuggableAsync(new FishboneConfiguration(), new FishboneDebugOptions
         {
@@ -26,7 +26,7 @@ public class RunDebuggableAsyncTests
     [Fact]
     public async Task RunDebuggableAsync_InvokesIdeLauncherWithEndpoint_ThenFallsBackWhenNobodyAttaches()
     {
-        var program = FishboneProgram.ParseSource("let x = 7;");
+        var program = FishboneProgram.FromSourceCode("let x = 7;");
         IPEndPoint? launchedEndpoint = null;
 
         var result = await program.RunDebuggableAsync(new FishboneConfiguration(), new FishboneDebugOptions
@@ -46,7 +46,7 @@ public class RunDebuggableAsyncTests
     [Fact]
     public async Task RunDebuggableAsync_HeadlessFallback_SeesInjectedConfiguration()
     {
-        var program = FishboneProgram.ParseSource("let doubled = seed * 2;");
+        var program = FishboneProgram.FromSourceCode("let doubled = seed * 2;");
         var config = new FishboneConfiguration().AddValue("seed", 50);
 
         var result = await program.RunDebuggableAsync(config, new FishboneDebugOptions

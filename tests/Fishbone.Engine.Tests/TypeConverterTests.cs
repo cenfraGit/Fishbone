@@ -31,7 +31,7 @@ public class TypeConverterTests
         var config = ConfigWithBoxedConverter()
             .AddBuiltIn("unwrap", new Func<Boxed, int>(box => box.Value * 2));
 
-        var env = FishboneEngine.Run("let result = unwrap(21);", config);
+        var env = FishboneProgram.Run("let result = unwrap(21);", config);
 
         Assert.Equal(42, env.GetValue("result"));
     }
@@ -44,7 +44,7 @@ public class TypeConverterTests
         var config = ConfigWithBoxedConverter()
             .AddBuiltIn("produce", new ProduceDelegate((int seed, out Boxed result) => result = new Boxed(seed + 1)));
 
-        var env = FishboneEngine.Run("produce(41, out made);", config);
+        var env = FishboneProgram.Run("produce(41, out made);", config);
 
         Assert.Equal(42, env.GetValue("made"));
     }
@@ -58,7 +58,7 @@ public class TypeConverterTests
 
         // produce(10, out b) -> b is the script int 10 (from-direction); unwrap(b) converts it back
         // to a Boxed (to-direction) and reads it out again
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 produce(10, out b);
 let result = unwrap(b);
 """, config);
@@ -74,6 +74,6 @@ let result = unwrap(b);
         var config = new FishboneConfiguration()
             .AddBuiltIn("unwrap", new Func<Boxed, int>(box => box.Value));
 
-        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("let result = unwrap(21);", config));
+        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("let result = unwrap(21);", config));
     }
 }

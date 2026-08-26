@@ -7,7 +7,7 @@ var internalDict = new Dictionary<string, object>
     { "InternalValue", 0 }
 };
 
-var config = new FishboneConfiguration(injectDefaults: true);
+var config = new FishboneConfiguration();
 
 config.AddBuiltIn("InternalDict", internalDict);
 

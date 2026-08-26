@@ -7,7 +7,7 @@ public class ErrorTypingTests
     [Fact]
     public void Run_LanguageDiagnosedError_IsRuntimeExceptionWithLocationAndNoInner()
     {
-        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneEngine.Run(
+        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run(
             "let a = 1;\nlet b = missing;", new FishboneConfiguration()));
 
         Assert.Null(exception.InnerException);
@@ -22,7 +22,7 @@ public class ErrorTypingTests
             .AddBuiltIn("boom", new Action(() => throw new InvalidOperationException("host failure")));
 
         var exception = Assert.Throws<FishboneRuntimeException>(
-            () => FishboneEngine.Run("boom();", config));
+            () => FishboneProgram.Run("boom();", config));
 
         Assert.IsType<InvalidOperationException>(exception.InnerException);
         Assert.Equal(1, exception.Line);
@@ -31,7 +31,7 @@ public class ErrorTypingTests
     [Fact]
     public void Run_ScriptCatch_BindsLocatedRuntimeExceptionForLanguageErrors()
     {
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let typeName = "";
 let line = 0;
 try
@@ -55,7 +55,7 @@ catch (e)
     {
         // double declaration comes from FishboneEnvironment (Fishbone.Core) rather than
         // the interpreter, and must surface as the same exception type
-        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneEngine.Run(
+        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run(
             "let a = 1;\nlet a = 2;", new FishboneConfiguration()));
 
         Assert.Null(exception.InnerException);

@@ -8,7 +8,7 @@ public class OverloadResolutionTests
         var config = new FishboneConfiguration()
             .AddBuiltIn("sample", new OverloadSample());
 
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let fromInt = sample.Number(5);
 let fromDouble = sample.Number(5.0);
 """, config);
@@ -24,7 +24,7 @@ let fromDouble = sample.Number(5.0);
         var config = new FishboneConfiguration()
             .AddBuiltIn("sample", new OverloadSample());
 
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let exactString = sample.Describe("hello");
 let assignableObject = sample.Describe(5);
 """, config);
@@ -41,7 +41,7 @@ let assignableObject = sample.Describe(5);
         var config = new FishboneConfiguration()
             .AddBuiltIn("sample", new OverloadSample());
 
-        var exception = Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("""
+        var exception = Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("""
 let result = sample.Ambiguous(1, 2);
 """, config));
 
@@ -54,7 +54,7 @@ let result = sample.Ambiguous(1, 2);
         var config = new FishboneConfiguration()
             .AddBuiltIn("sample", new OverloadSample());
 
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let none = sample.Greet();
 let one = sample.Greet("there");
 """, config);

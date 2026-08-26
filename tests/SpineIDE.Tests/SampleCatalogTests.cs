@@ -34,7 +34,7 @@ public class SampleCatalogTests
             Assert.False(string.IsNullOrWhiteSpace(sample.DisplayName));
             string code = SampleCatalog.Load(sample.FileName);
             Assert.False(string.IsNullOrWhiteSpace(code));
-            FishboneProgram.ParseSource(code); // throws if a sample has syntax-rotted
+            FishboneProgram.FromSourceCode(code); // throws if a sample has syntax-rotted
         }
     }
 
@@ -51,7 +51,7 @@ public class SampleCatalogTests
         var output = new StringBuilder();
         var configuration = CreateOutputConfiguration(output);
 
-        FishboneEngine.Run(code, configuration);
+        FishboneProgram.Run(code, configuration);
 
         Assert.Contains("3, 12, 21, 54, 89", output.ToString());
     }
@@ -64,7 +64,7 @@ public class SampleCatalogTests
         var configuration = CreateOutputConfiguration(output);
         configuration.AddBuiltIn("input", new Func<string>(() => "2"));
 
-        FishboneEngine.Run(code, configuration);
+        FishboneProgram.Run(code, configuration);
 
         Assert.Contains("12.566", output.ToString());
     }

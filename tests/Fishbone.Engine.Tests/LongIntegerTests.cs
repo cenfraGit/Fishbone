@@ -7,7 +7,7 @@ public class LongIntegerTests
     [Fact]
     public void Run_LargeIntegerLiteral_PromotesToLong()
     {
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let big = 999_999_999_999;
 let small = 42;
 """, new FishboneConfiguration());
@@ -20,7 +20,7 @@ let small = 42;
     [Fact]
     public void Run_LongArithmeticAndComparisons_Work()
     {
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let big = 4_000_000_000;
 let sum = big + 1;
 let product = big * 2;
@@ -41,7 +41,7 @@ let equalsInt = 5_000_000_000 - 4_999_999_958 == 42;
     [Fact]
     public void Run_LongIsTruthy_AndInterpolates()
     {
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let big = 5_000_000_000;
 let truthy = false;
 if (big) { truthy = true; }
@@ -56,7 +56,7 @@ let msg = $"big={big}";
     public void Parse_LiteralTooLargeForLong_IsParseError()
     {
         var exception = Assert.Throws<FishboneParseException>(
-            () => FishboneEngine.Run("let x = 99_999_999_999_999_999_999;", new FishboneConfiguration()));
+            () => FishboneProgram.Run("let x = 99_999_999_999_999_999_999;", new FishboneConfiguration()));
 
         Assert.Contains("too large for a 64-bit integer", exception.Message);
     }

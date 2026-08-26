@@ -9,7 +9,7 @@ public class MemberAccessConfigTests
     {
         var config = new FishboneConfiguration { EnableMemberAccess = false };
 
-        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneEngine.Run("""
+        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run("""
 let xs = [1, 2, 3];
 let n = xs.Count;
 """, config));
@@ -24,7 +24,7 @@ let n = xs.Count;
         var config = new FishboneConfiguration { EnableMemberAccess = false };
 
         var exception = Assert.Throws<FishboneRuntimeException>(
-            () => FishboneEngine.Run("""let s = "abc".ToUpper();""", config));
+            () => FishboneProgram.Run("""let s = "abc".ToUpper();""", config));
 
         Assert.Contains("disabled by the host configuration", exception.Message);
     }
@@ -36,7 +36,7 @@ let n = xs.Count;
         var config = new FishboneConfiguration { EnableMemberAccess = false }
             .AddBuiltIn("count", new Func<List<object>, int>(xs => xs.Count));
 
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let xs = [10, 20, 30];
 let total = 0;
 foreach (x in xs) { total += x; }

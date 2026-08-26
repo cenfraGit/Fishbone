@@ -5,7 +5,7 @@ public class StringVariantTests
     [Fact]
     public void Run_RawString_IsVerbatim()
     {
-        var env = FishboneEngine.Run(""""
+        var env = FishboneProgram.Run(""""
 let path = @"C:\temp\new";
 let quoted = @"say ""hi""";
 """", new FishboneConfiguration());
@@ -17,7 +17,7 @@ let quoted = @"say ""hi""";
     [Fact]
     public void Run_InterpolatedString_EvaluatesHoles()
     {
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let name = "Fishbone";
 let age = 2;
 let msg = $"hello {name}, next year: {age + 1}";
@@ -29,7 +29,7 @@ let msg = $"hello {name}, next year: {age + 1}";
     [Fact]
     public void Run_InterpolatedString_NullBecomesEmpty_AndNumbersUseInvariantCulture()
     {
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let nothing = null;
 let msg = $"[{nothing}] pi={3.14}";
 """, new FishboneConfiguration());
@@ -40,7 +40,7 @@ let msg = $"[{nothing}] pi={3.14}";
     [Fact]
     public void Run_InterpolatedString_HoleMayCallMethodsAndIndex()
     {
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let d = {"key": "value"};
 let xs = [10, 20];
 let msg = $"d={d["key"]} x={xs[1]} up={"abc".ToUpper()}";
@@ -52,7 +52,7 @@ let msg = $"d={d["key"]} x={xs[1]} up={"abc".ToUpper()}";
     [Fact]
     public void Run_InterpolatedString_DoubledBracesAndEscapes()
     {
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let msg = $"{{literal}}\t{1 + 1}";
 """, new FishboneConfiguration());
 
@@ -62,7 +62,7 @@ let msg = $"{{literal}}\t{1 + 1}";
     [Fact]
     public void Run_NestedInterpolatedString_InsideHole()
     {
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let inner = "world";
 let msg = $"outer {$"inner {inner}"}!";
 """, new FishboneConfiguration());

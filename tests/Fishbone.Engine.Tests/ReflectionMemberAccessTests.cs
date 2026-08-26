@@ -8,7 +8,7 @@ public class ReflectionMemberAccessTests
         var config = new FishboneConfiguration()
             .AddBuiltIn("sample", new ReflectionSample());
 
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let fieldValue = sample.PublicField;
 let propertyValue = sample.Name;
 let childName = sample.Child.Name;
@@ -27,7 +27,7 @@ let itemName = sample.Items[0].Name;
         var config = new FishboneConfiguration()
             .AddBuiltIn("sample", new ReflectionSample());
 
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let description = sample.Describe();
 let size = sample.Resize(3, 4);
 let childName = sample.GetChild().Name;
@@ -50,7 +50,7 @@ let scaled = sample.Scale(2);
         var config = new FishboneConfiguration()
             .AddBuiltIn("sample", new ReflectionSample());
 
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let ok = sample.TryGetNumber("answer", out result);
 let value = 10;
 sample.Increment(ref value);
@@ -67,15 +67,15 @@ sample.Increment(ref value);
         var config = new FishboneConfiguration()
             .AddBuiltIn("sample", new ReflectionSample());
 
-        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("let value = sample.Missing;", config));
-        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("let value = null; let name = value.Name;", config));
-        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("let value = sample.Resize(1);", config));
-        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("let value = sample.Name();", config));
-        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("""let value = sample.Resize("wide", "high");""", config));
+        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("let value = sample.Missing;", config));
+        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("let value = null; let name = value.Name;", config));
+        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("let value = sample.Resize(1);", config));
+        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("let value = sample.Name();", config));
+        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("""let value = sample.Resize("wide", "high");""", config));
         // Out parameter called without the 'out' keyword
-        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("""let ok = sample.TryGetNumber("answer", missing);""", config));
+        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("""let ok = sample.TryGetNumber("answer", missing);""", config));
         // 'out' given, but the target is not a plain variable
-        Assert.ThrowsAny<Exception>(() => FishboneEngine.Run("""let value = 0; let ok = sample.TryGetNumber("answer", out [value][0]);""", config));
+        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("""let value = 0; let ok = sample.TryGetNumber("answer", out [value][0]);""", config));
     }
 
     private sealed class ReflectionSample

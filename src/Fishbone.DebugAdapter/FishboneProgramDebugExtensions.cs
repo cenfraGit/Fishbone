@@ -29,7 +29,7 @@ public static class FishboneProgramDebugExtensions
 
         var serverOptions = new FishboneDebugServerOptions
         {
-            SourceCode = program.Source,
+            SourceCode = program.SourceCode,
             SourceName = options.SourceName ?? program.SourceName,
             SourceIdentity = program.SourceIdentity,
             Configuration = configuration,
@@ -60,7 +60,7 @@ public static class FishboneProgramDebugExtensions
         {
             // nobody attached in time, tear the server down and run headless
             await session.StopAsync().ConfigureAwait(false);
-            var headlessEnvironment = program.Run(configuration, cancellationToken);
+            var headlessEnvironment = program.Run(configuration, null, cancellationToken);
             return new FishboneRunResult(headlessEnvironment, error: null, debuggerAttached: false, wasCancelled: false);
         }
 

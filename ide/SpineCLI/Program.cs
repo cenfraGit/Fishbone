@@ -74,7 +74,7 @@ internal class Program
         FishboneEnvironment env;
         try
         {
-            env = FishboneEngine.Run(contents, config);
+            env = FishboneProgram.Run(contents, config);
         }
         catch (FishboneParseException ex)
         {

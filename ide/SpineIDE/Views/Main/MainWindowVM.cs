@@ -209,7 +209,7 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
             catch (OperationCanceledException)
             {
                 if (executionVersion == Volatile.Read(ref _executionVersion))
-                    _outputPanel.AppendLine("[FishboneEngine] Execution cancelled.");
+                    _outputPanel.AppendLine("[FishboneProgram] Execution cancelled.");
             }
             catch (Exception ex)
             {
@@ -326,7 +326,7 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
                 try
                 {
                     return new ScriptExecutionResult(
-                        FishboneEngine.Run(scriptCode, configuration, cancellationToken),
+                        FishboneProgram.Run(scriptCode, configuration, cancellationToken:cancellationToken),
                         null);
                 }
                 catch (OperationCanceledException)

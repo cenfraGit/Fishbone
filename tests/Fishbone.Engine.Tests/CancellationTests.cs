@@ -9,6 +9,6 @@ public class CancellationTests
         cancellation.Cancel();
 
         Assert.Throws<OperationCanceledException>(() =>
-            FishboneEngine.Run("let value = 42;", new FishboneConfiguration(), cancellation.Token));
+            FishboneProgram.Run("let value = 42;", new FishboneConfiguration(), null, cancellation.Token));
     }
 }

@@ -8,7 +8,7 @@ public class DebuggerEngineTests
     [Fact]
     public void RunWithoutDebuggerRetainsExistingBehavior()
     {
-        var environment = FishboneEngine.Run("let answer = 42;", new FishboneConfiguration());
+        var environment = FishboneProgram.Run("let answer = 42;", new FishboneConfiguration());
         Assert.Equal(42, environment.GetValue("answer"));
     }
 
@@ -16,7 +16,7 @@ public class DebuggerEngineTests
     public void RunPublishesExecutionLifecycle()
     {
         var debugger = new LifecycleDebugger();
-        FishboneEngine.Run("let answer = 42;", new FishboneConfiguration(), debugger: debugger);
+        FishboneProgram.Run("let answer = 42;", new FishboneConfiguration(), debugger: debugger);
         Assert.Equal(["started", "completed"], debugger.Events);
     }
 
