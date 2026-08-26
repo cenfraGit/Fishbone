@@ -1,95 +1,152 @@
 // --------------------------------------------------------------------------------
 // FishboneProgram.cs
 //
-// a parsed script that can run multiple times.
+// the entry point for fishbone code execution.
 // --------------------------------------------------------------------------------
 
-using System.Security.Cryptography;
-using System.Text;
 using Fishbone.Core;
 using Fishbone.Debugging;
 using Fishbone.Interpreter;
 using Fishbone.Parser;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Fishbone.Engine;
 
 /// <summary>
-/// A parsed, immutable Fishbone program. Parse once, execute many: each <see cref="Run"/> builds a
-/// fresh environment, so the same program can be reused across runs (and threads) while the data
-/// around it changes.
+/// A Fishbone program that can be executed one or multiple times.
 /// </summary>
 public sealed class FishboneProgram
 {
-    private readonly AstNode _ast;
+    // --------------------------------------------------------------------------------
+    // fields and properties
+    // --------------------------------------------------------------------------------
 
-    private FishboneProgram(AstNode ast, string source, string sourceName)
+    private readonly AstNode? _ast;
+
+    public string SourceCode { get; } = string.Empty;
+    public string SourceName { get; } = string.Empty;    // display name for source
+    public string SourceIdentity { get; } = string.Empty; // SHA256 for program
+
+    // --------------------------------------------------------------------------------
+    // constructors
+    //
+    // note: there's commonly only two ways to initialize a program:
+    //
+    // - by passing source code
+    // - by specifying a file to read code from
+    //
+    // therefore, we'd like two constructors that can achieve
+    // this. but since both the sourceCode and filePath are of type
+    // "string", we can't achieve this cleanly with constructors
+    //
+    // so we'll have a single private constructor, and use static
+    // factory methods (explicitly named) to instantiate a program via
+    // either source code or a file path.
+    // --------------------------------------------------------------------------------
+
+    private FishboneProgram(string sourceCode)
     {
-        _ast = ast;
-        Source = source;
-        SourceName = sourceName;
-        SourceIdentity = ComputeIdentity(source);
+        _ast = FromSourceCodeCode(sourceCode);
+        SourceCode = sourceCode;
+        SourceName = "New";
+        SourceIdentity = ComputeIdentity(sourceCode);
     }
 
-    // the original source text
-    public string Source { get; }
-
-    // display name for source
-    public string SourceName { get; }
-
-    public string SourceIdentity { get; }
-
-    /// <summary>Parses source text into a reusable program.</summary>
-    public static FishboneProgram ParseSource(string source, string sourceName = "script")
+    public static FishboneProgram FromSourceCode(string sourceCode)
     {
-        ArgumentNullException.ThrowIfNull(source);
-        var ast = ASTParser.Parse(source);
-        return new FishboneProgram(ast, source, sourceName);
+        return new FishboneProgram(sourceCode);
     }
+
+    public static FishboneProgram FromFile(string filePath)
+    {
+        var sourceCode = ReadFile(filePath);
+        return new FishboneProgram(sourceCode);
+    }
+
+    // --------------------------------------------------------------------------------
+    // methods
+    // --------------------------------------------------------------------------------
 
     /// <summary>
-    /// Reads a script file as UTF-8 and parses it. The file name becomes
-    /// the program's <see cref="SourceName"/>.
+    /// Executes the program and returns the FishboneEnvironment after evaluation.
     /// </summary>
-    public static FishboneProgram ParseFile(string path)
+    public FishboneEnvironment Run(FishboneConfiguration? configuration = null,
+                                   IFishboneDebugger? debugger = null,
+                                   CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        var source = File.ReadAllText(path, Encoding.UTF8);
-        return ParseSource(source, Path.GetFileName(path));
-    }
+        // create new environment used for this run
+        var env = new FishboneEnvironment();
 
-    /// <summary>
-    /// Executes the program against a fresh environment seeded from <paramref name="configuration"/>.
-    /// Built-ins are added as ambient names; values are declared as script variables.
-    /// </summary>
-    public FishboneEnvironment Run(
-        FishboneConfiguration configuration,
-        CancellationToken cancellationToken = default,
-        IFishboneDebugger? debugger = null)
-    {
-        ArgumentNullException.ThrowIfNull(configuration);
+        if (_ast is null)
+            return env;
 
-        var envRoot = new FishboneEnvironment();
-        foreach (var builtIn in configuration.BuiltIns)
-            envRoot.AddBuiltIn(builtIn.Key, builtIn.Value);
-        foreach (var value in configuration.Values)
-            envRoot.Declare(value.Key, value.Value);
+        // if configuration is set, seed
+        if (configuration is not null)
+        {
+            foreach (var builtIn in configuration.BuiltIns)
+                env.AddBuiltIn(builtIn.Key, builtIn.Value);
 
+            foreach (var val in configuration.Values)
+                env.Declare(val.Key, val.Value);
+        }
+
+        // determine debugger
         var activeDebugger = debugger ?? NullFishboneDebugger.Instance;
-        var interpreter = new FishboneInterpreter(
-            cancellationToken, activeDebugger, configuration.TypeConverters, configuration.EnableMemberAccess);
-        activeDebugger.OnExecutionStarted(_ast, envRoot);
+
+        // initialize interpreter
+        var interpreter = new FishboneInterpreter(cancellationToken,
+                                                  activeDebugger,
+                                                  configuration.TypeConverters,
+                                                  configuration.EnableMemberAccess);
+
+        // start execution
+        activeDebugger.OnExecutionStarted(_ast, env);
+
         try
         {
-            interpreter.Evaluate(envRoot, _ast);
+            interpreter.Evaluate(env, _ast);
         }
         finally
         {
-            activeDebugger.OnExecutionCompleted(envRoot);
+            activeDebugger.OnExecutionCompleted(env);
         }
 
-        return envRoot;
+        return env;
     }
 
+    /// <summary>
+    /// Directly executes the source code in the string, returning 
+    /// a FishboneEnvironment.
+    /// </summary>
+    public static FishboneEnvironment Run(string sourceCode,
+                                          FishboneConfiguration? configuration = null,
+                                          IFishboneDebugger? debugger = null,
+                                          CancellationToken cancellationToken = default)
+    {
+        var program = FishboneProgram.FromSourceCode(sourceCode);
+        return program.Run(configuration, debugger, cancellationToken);
+    }
+
+    // --------------------------------------------------------------------------------
+    // helper methods
+    // --------------------------------------------------------------------------------
+
+    internal static AstNode FromSourceCodeCode(string sourceCode)
+    {
+        ArgumentNullException.ThrowIfNull(sourceCode);
+        var ast = ASTParser.Parse(sourceCode);
+        return ast;
+    }
+
+    internal static string ReadFile(string filePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+        return File.ReadAllText(filePath, Encoding.UTF8);
+    }
+
+    // 64-character hex string used for cache invalidation. different
+    // source texts produce different identities (even if same AST)
     private static string ComputeIdentity(string source) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source)));
 }
