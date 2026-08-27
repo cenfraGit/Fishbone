@@ -21,7 +21,7 @@ public class FishboneConfiguration
 
     /// <summary>
     /// Functions, types, or constants that the script has access to.
-    /// Cannot be overwritten (but can be shadowed by Values).
+    /// Cannot be overwritten (but can be shadowed by Value).
     /// Also not shown in debugger variable section.
     /// </summary>
     public Dictionary<string, object> BuiltIns { get; } = new(StringComparer.Ordinal);

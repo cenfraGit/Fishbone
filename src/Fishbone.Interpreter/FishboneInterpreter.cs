@@ -140,27 +140,8 @@ public class FishboneInterpreter
         // eval right side
         object rawValue = Evaluate(env, node.Value);
 
-        // if declaring single var, skip deconstruction
-        // prevents collections from being unpacked
-        if (node.Names.Count == 1)
-        {
-            env.Declare(node.Names[0], rawValue);
-            return rawValue;
-        }
-
-        // right side is always handled as list
-        List<object> valueList = rawValue is List<object> list
-            ? list
-            : new List<object> { rawValue };
-
-        // deconstruct and assign
-        for (int i = 0; i < node.Names.Count; i++)
-        {
-            string name = node.Names[i];
-            object elementValue = i < valueList.Count ? valueList[i] : null!;
-
-            env.Declare(name, elementValue);
-        }
+        // declare
+        env.Declare(node.Name, rawValue);
 
         return rawValue;
     }
@@ -170,26 +151,8 @@ public class FishboneInterpreter
         // eval right side
         object rawValue = Evaluate(env, node.Value);
 
-        // if declaring single var, skip deconstruction
-        // prevents collections from being unpacked
-        if (node.Names.Count == 1)
-        {
-            env.Assign(node.Names[0], rawValue);
-            return rawValue;
-        }
-
-        // right side is always handled as list
-        List<object> valueList = rawValue is List<object> list
-            ? list
-            : new List<object> { rawValue };
-
-        // deconstruct and assign
-        for (int i = 0; i < node.Names.Count; i++)
-        {
-            string name = node.Names[i];
-            object elementValue = i < valueList.Count ? valueList[i] : null!;
-            env.Assign(name, elementValue);
-        }
+        // assign
+        env.Assign(node.Name, rawValue);
 
         return rawValue;
     }
@@ -484,15 +447,11 @@ public class FishboneInterpreter
     internal object EvaluateReturn(FishboneEnvironment env, ReturnNode node)
     {
         // return;
-        if (node.ReturnValues.Count == 0)
-            throw new ReturnException(null!);
+        if (node.ReturnValue is null)
+            throw new ReturnException(null);
 
-        // return expr, expr;
-        var returnValues = new List<object>();
-        for (int i = 0; i < node.ReturnValues.Count; i++)
-            returnValues.Add(Evaluate(env, node.ReturnValues[i]));
-
-        throw new ReturnException(returnValues);
+        // return expr;
+        throw new ReturnException(Evaluate(env, node.ReturnValue));
     }
 
     internal object EvaluateBreak(FishboneEnvironment env, BreakNode node)
