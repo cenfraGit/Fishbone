@@ -1,111 +1,94 @@
-# Fishbone
+
+# <span style="display: inline-flex; align-items: center; gap: 10px;"><img src="misc/fb_icon.png" width="60" height="60" alt="Logo"> Fishbone</span>
 
 [![CI](https://github.com/cenfraGit/Fishbone/actions/workflows/ci.yml/badge.svg)](https://github.com/cenfraGit/Fishbone/actions/workflows/ci.yml)
 
-**A small, debuggable scripting language designed for native .NET interop**
+**A small, debuggable scripting language designed for .NET interop**
 
-Fishbone is a small scripting language that can interface with your
-.NET types and objects. You can:
+Fishbone is a simple scripting language that can interface with .NET types and objects. You can:
 
 - Instantiate new objects via constructor call
 - Call methods from those objects
 - Call C# delegates as if they were simple functions
 - Create functions, loops, and more within the script
 
-All Fishbone variables are underlying .NET objects and types by
-design.
-
-## Quick look at the language
+All Fishbone variables are underlying .NET objects and types by design. Therefore, a script can call methods, read properties, index collections, etc. all as if it were C# (because it is).
 
 ```csharp
 // sample.fb
 
-let name = "Fishbone";
-let area = PI * pow(3, 2);
-let path = @"C:\raw\strings\too";
+let projectName = "Fishbone";
+let projectVersion = 0.1;
 
-println($"hello from {name}, area is {area}");
+let user = {"name": "Carter", "id": 0};
+user.Add("location", "N.O.");
+user["id"] = 17;
 
-func add(a, b)
-{
-    return a + b;
+MyCSharpObject.Register(user);
+
+func greeting(name) {
+    return $"Hello {name}";
 }
 
-for (i in 0, 5) // 0, 1, 2, 3, 4
-{
-    if (i % 2 == 0)
-        println(i);
+let success = MyCSharpObject.TryGetUserName(17, out userName);
+if (success) {
+    println($"{greeting(userName)} from {projectName} v{projectVersion}!");
 }
-
-// using lists (underneath uses a List<object>)
-let xs = [3, 1, 2];
-foreach (x in xs) { println(x); }
-
-// using dictionaries (underneath uses a Dictionary<object, object>)
-let user = {"name": "Ada", "id": 7};
-println(user["name"]);
-
-// everything is a C#/.NET object, so you can access members directly
-let count = xs.Count;
 ```
 
-A handful of built-ins come preconfigured: constants (`PI`, `E`), I/O
-(`print`, `println`, `input`), math (`abs`, `round`, `min`, `max`,
-`pow`, `sqrt`), and conversions (`int`, `double`, `string`). See the
-[language specification](docs/fishbone-spec.md) for the full grammar
-and semantics, and [samples/](samples/) for sample programs.
+See the [language specification](docs/fishbone-spec.md) for the full grammar and semantics, and [samples/](samples/) for sample programs.
 
-The cross-platform [SpineIDE](ide/SpineIDE/) allows you to write, run and debug
-Fishbone programs more easily:
+## What Fishbone is not
 
-![Image of IDE running Fishbone script](docs/images/Image1.png)
+Fishbone is **not** trying to be Python or Lua for .NET, and it is not an independent CLR language. It does not compile to MSIL or run on the DLR. It's a deliberately small scripting layer whose runtime behavior is, by design, mostly just .NET's.
 
-## Brief overview on how to embed
+## How to use?
 
-1. Parse the source code (or source file) to create a program
-2. Create a `FishboneConfiguration` object, injecting your C# types, objects and delegates
-3. Run!
+1. Create a `FishboneConfiguration` object, injecting your C# types, objects and delegates:
 
 ```csharp
-// parse the script once (can be reused, cache invalidation is yours to handle)
-var program = FishboneProgram.ParseSource(scriptSource);
-
-// configuration object used to set up the Fishbone environment
 var config = new FishboneConfiguration();
 
-// inject some C# objects
+// inject instances of your C# objects
 config.AddValue("image", currentImage);
-config.AddBuiltIn("camera", myCamera);
+config.AddValue("camera", myCamera);
 
 // register a type which can be instantiated from within the script
 config.AddType<Point>();
 
-// create callable functions from C# via delegates
-config.AddFunction("log", new Action<string>(Console.WriteLine));
-
-// run
-var env = program.Run(config);
+// register a C# delegate which can be called from the script
+config.AddBuiltIn("log", new Action<string>(Console.WriteLine));
 ```
 
-Then you can use these within a Fishbone script:
+2. Create your Fishbone script (in either a file or in a string):
 
 ```csharp
-// sample2.fb
-
+// sample.fb
 let p = Point(3, 4);          // constructs a Point object
-camera.Focus();               // calls a method from the built-in camera object
-log("focused at " + p.X);     // calls the registered function
+camera.Focus();               // calls a method from the camera object
+log($"focused at {p.X}");     // calls the C# delegate
 let w = image.Width;          // access fields/properties from objects
 ```
 
-Then you can either run headless:
+3. Create a FishboneProgram from the file path or from the source code string directly:
 
 ```csharp
-var env = program.Run(config);   // returns the environment directly
+var program = FishboneProgram.FromFile("sample.fb");
 ```
 
-or run the debug server so you can step through the code with SpineIDE
-(or any debug client that supports DAP):
+```csharp
+var program = FishboneProgram.FromSourceCode("// here goes the code");
+```
+
+4. Run the script in either headless or in debug mode. Both give you access to the resulting `FishboneEnvironment` which has the variables table after execution.
+
+```csharp
+var env = program.Run(config);
+
+env.GetValue("p");     // the Point object
+env.GetValue("w");     // whatever image.Width was
+env.GetValue("image"); // the injected "currentImage" variable
+```
 
 ```csharp
 var result = await program.RunDebuggableAsync(config, new FishboneDebugOptions
@@ -113,125 +96,67 @@ var result = await program.RunDebuggableAsync(config, new FishboneDebugOptions
     OpenIde       = true, // launch SpineIDE and wait for it to attach
     AttachTimeout = TimeSpan.FromSeconds(10),
 });
+
 var env = result.Environment;
+env.GetValue("p");     // the Point object
+env.GetValue("w");     // whatever image.Width was
+env.GetValue("image"); // the injected "currentImage" variable
 ```
 
-(will break at the first line until a debugger has connected to the
-server).
-
-![Alt Text](docs/images/GIF1.gif)
+(the `RunDebuggableAsync` path will break execution at the first line until a debugger attaches. If `OpenIde` is set to true, SpineIDE (see below) will be launched and it'll attach automatically to the debug server).
 
 See [docs/quickstart.md](docs/quickstart.md) for the full embedding guide.
 
----
+## SpineIDE
 
-## Why Fishbone
+The cross-platform [SpineIDE](ide/SpineIDE/) app allows you to easily write, run and debug Fishbone programs. It can be used for standalone Fishbone development, or can be used to launch a debug session from your app automatically.
 
-- **Native .NET interop.** Fishbone uses .NET types directly. A script
-  calls methods, reads properties, indexes collections, and construct
-  types as if it were C# because it is.
-- **Step-debugging.** Fishbone uses DAP to allow users to set
-  breakpoints, step through script lines and inspect the script's
-  environment variables, whether attaching from SpineIDE or any DAP
-  client.
-- **Simple to set up.** The core engine has no heavy dependencies. The
-  debugger lives in a separate package and you only reference it if
-  you want it.
+![Image of IDE running Fishbone script](docs/images/Image1.png)
 
-## What Fishbone is not
+Fishbone uses DAP to allow users to set breakpoints, step through script lines and inspect the script's environment variables, whether attaching from SpineIDE or any DAP client.
 
-Fishbone is **not** trying to be Python or Lua for .NET, and it is not
-a CLR language. It does not compile to MSIL or run on the DLR. It's a
-deliberately small scripting layer whose runtime behavior is, by
-design, mostly just .NET's.
+![Alt Text](docs/images/GIF1.gif)
 
 ---
 
 ## Plugins
 
-A plugin packages reusable types, functions, and services so any
-script can use them without the host wiring them up by hand. A plugin
-is just a .NET class library that implements `IFishbonePlugin`.
+A plugin packages reusable builtins, values, types, etc. so that any script can use them without the host having to wire them up by hand. A plugin consists of a .NET class that implements `IFishbonePlugin`.
 
-All a plugin does is hook into an existing config and inject these new
-types/values/builtins (same as just setting up a config normaly),
-except that the `IFishbonePlugin` interface makes this "reusable and
-shareable" intention explicit:
+All a plugin does is hook into an existing `FishboneConfiguration` and inject these builtins/values/types into that config. For example (taken directly from [Fishbone.Plugins.Math](plugins/Fishbone.Plugins.Math)):
 
 ```csharp
-using Fishbone.Engine;
+namespace Fishbone.Plugins.Math;
 
-public sealed class GeometryPlugin : IFishbonePlugin
+public sealed class MathPlugin : IFishbonePlugin
 {
     public void Register(FishboneConfiguration config)
     {
-        config.AddType<Point>();
-        config.AddFunction("distance", new Func<Point, Point, double>(Point.Distance));
+        config.BuiltIns["PI"] = System.Math.PI;
+        config.BuiltIns["E"] = System.Math.E;
+
+        config.BuiltIns["abs"] = new Func<double, double>(System.Math.Abs);
+        config.BuiltIns["round"] = new Func<double, int, double>(System.Math.Round);
+        config.BuiltIns["min"] = new Func<double, double, double>(System.Math.Min);
+        config.BuiltIns["max"] = new Func<double, double, double>(System.Math.Max);
+        config.BuiltIns["pow"] = new Func<double, double, double>(System.Math.Pow);
+        config.BuiltIns["sqrt"] = new Func<double, double>(System.Math.Sqrt);
     }
 }
 ```
 
-`Register` receives the same `FishboneConfiguration` you'd configure
-by hand, so a plugin can do anything the host can: `AddType`,
-`AddFunction`, `AddBuiltIn`, `AddValue`.
-
-**Installing a plugin.** Build the class library (make sure you
-PUBLISH it so all its dependencies are also packaged in the `publish/`
-folder) and drop its output into a subfolder of the plugins directory.
-For plugins with native dependencies (like Fishbone.Plugins.OpenCv),
-publish for the target platform (`dotnet publish -r win-x64` or
-`-r linux-x64`) so the right native libraries land next to the
-plugin assembly:
-
-```
-~/.fishbone/plugins/
-  GeometryPlugin/
-    GeometryPlugin.dll
-    <possibly other dependency .dlls>
-```
-
-SpineIDE, SpineCLI, and the DAP host each load every plugin from
-`~/.fishbone/plugins` on startup: each immediate subfolder is scanned
-for assemblies, and any `IFishbonePlugin` found is instantiated and
-registered. Drop a plugin in, restart, and its API is available to
-every script, no recompiling the host.
-
-**Loading plugins in your own host.** If you embed Fishbone yourself,
-load them wherever you like and inspect what was registered:
+To use a plugin, all the host has to do is call `config.AddPlugin` when setting up the `FishboneConfiguration`:
 
 ```csharp
+using Fishbone;
+using Fishbone.Plugins.Math;
+
 var config = new FishboneConfiguration();
-var loaded = FishbonePluginLoader.LoadPlugins(
-    FishbonePluginLoader.DefaultPluginsDirectory, config);
+config.AddPlugin(new MathPlugin());
 ```
 
-> You could take a look at
-> [Fishbone.Plugins.OpenCv](plugins/Fishbone.Plugins.OpenCv) for an
-> example, it exposes a `Mat` type and image operations.
-
 ---
-
-## Packages
-
-| Package | Reference it for |
-|---------|------------------|
-| `Fishbone.Engine` | Parsing and running scripts, exposing your objects (minimal headless embedding surface) |
-| `Fishbone.DebugAdapter` | `RunDebuggableAsync` and the DAP server for attaching a debugger. |
-
-The remaining projects `Fishbone.Core`, `Fishbone.Parser`,
-`Fishbone.Interpreter`, `Fishbone.Debugging` are just internal layers.
-
----
-
-## Note
-
-This project is in early stage and although no major breaking changes
-are planned for now, I can't guarantee that syntax will remain the
-same. (e.g. don't know if variable-list unpacking will remain, since
-methods already support `out`).
-
----
-
-## License
 
 [MIT](LICENSE) © 2026 cenfraGit
+
+Fishbone Icon by [@aaronrzt](https://github.com/aaronrzt) <img src="https://github.com/aaronrzt.png" width="24" height="24" style="border-radius: 50%; vertical-align: middle;" alt="Avatar"> / [@aramireztaf](https://github.com/aramireztaf) <img src="https://github.com/aramireztaf.png" width="24" height="24" style="border-radius: 50%; vertical-align: middle;" alt="Avatar">
