@@ -76,21 +76,21 @@ public sealed class FishboneProgram
                                    IFishboneDebugger? debugger = null,
                                    CancellationToken cancellationToken = default)
     {
+        // an empty config is a valid run: the script just gets no built-ins or values
+        configuration ??= new FishboneConfiguration();
+
         // create new environment used for this run
         var env = new FishboneEnvironment();
 
         if (_ast is null)
             return env;
 
-        // if configuration is set, seed
-        if (configuration is not null)
-        {
-            foreach (var builtIn in configuration.BuiltIns)
-                env.AddBuiltIn(builtIn.Key, builtIn.Value);
+        // seed the environment from the config
+        foreach (var builtIn in configuration.BuiltIns)
+            env.AddBuiltIn(builtIn.Key, builtIn.Value);
 
-            foreach (var val in configuration.Values)
-                env.Declare(val.Key, val.Value);
-        }
+        foreach (var val in configuration.Values)
+            env.Declare(val.Key, val.Value);
 
         // determine debugger
         var activeDebugger = debugger ?? NullFishboneDebugger.Instance;

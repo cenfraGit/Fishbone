@@ -11,7 +11,6 @@ statement
     | assignmentStat SEMI
     | indexedAssignmentStat SEMI
     | compoundAssignmentStat SEMI
-    | ID (COMMA ID)* ASSIGN expr SEMI
     | expr SEMI
     | functionDefinitionStat
     | ifStat

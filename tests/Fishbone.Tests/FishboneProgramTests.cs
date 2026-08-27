@@ -1,3 +1,4 @@
+using Fishbone.Core;
 using System.Text;
 
 namespace Fishbone.Tests;
@@ -141,5 +142,24 @@ let number = values[7];
 
         Assert.Equal("Fishbone", env.GetValue("name"));
         Assert.Equal("seven", env.GetValue("number"));
+    }
+
+    [Fact]
+    public void Run_WithoutConfiguration_RunsAgainstAnEmptyEnvironment()
+    {
+        var program = FishboneProgram.FromSourceCode("let answer = 6 * 7;");
+
+        var env = program.Run();
+
+        Assert.Equal(42, env.GetValue("answer"));
+    }
+
+    [Fact]
+    public void Run_WithoutConfiguration_HasNoBuiltIns()
+    {
+        // a bare run seeds nothing, so a name the host never registered is undefined
+        var program = FishboneProgram.FromSourceCode("println(\"hello\");");
+
+        Assert.Throws<FishboneRuntimeException>(() => program.Run());
     }
 }

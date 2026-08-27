@@ -160,4 +160,14 @@ continue;
 
         Assert.Equal(expectedAst, ast);
     }
+
+    [Theory]
+    [InlineData("a, b = 1;")]
+    [InlineData("let a, b = 1;")]
+    [InlineData("return 1, 2;")]
+    public void Parse_UnpackingSyntax_IsRejected(string code)
+    {
+        // unpacking was removed from the language, so these are plain syntax errors now
+        Assert.Throws<FishboneParseException>(() => ASTParser.Parse(code));
+    }
 }
