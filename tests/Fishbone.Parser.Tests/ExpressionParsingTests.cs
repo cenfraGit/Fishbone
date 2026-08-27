@@ -34,10 +34,10 @@ let boolValue = true;
 
         var expectedAst = new ProgramNode(new List<AstNode>
         {
-            new DeclarationNode(["integerValue"], new LiteralNode(10)),
-            new DeclarationNode(["floatValue"], new LiteralNode(3.5)),
-            new DeclarationNode(["stringValue"], new LiteralNode("hello")),
-            new DeclarationNode(["boolValue"], new LiteralNode(true))
+            new DeclarationNode("integerValue", new LiteralNode(10)),
+            new DeclarationNode("floatValue", new LiteralNode(3.5)),
+            new DeclarationNode("stringValue", new LiteralNode("hello")),
+            new DeclarationNode("boolValue", new LiteralNode(true))
         });
 
         Assert.Equal(expectedAst, ast);
@@ -51,7 +51,7 @@ let boolValue = true;
         var expectedAst = new ProgramNode(new List<AstNode>
         {
             new DeclarationNode(
-                ["result"],
+                "result",
                 new BinaryOpNode(
                     "==",
                     new BinaryOpNode(
@@ -79,7 +79,7 @@ let boolValue = true;
         var expectedAst = new ProgramNode(new List<AstNode>
         {
             new DeclarationNode(
-                ["total"],
+                "total",
                 new BinaryOpNode(
                     "*",
                     new BinaryOpNode("+", new IdentifierNode("x"), new IdentifierNode("y")),
@@ -98,7 +98,7 @@ let boolValue = true;
 
         var expectedAst = new ProgramNode(new List<AstNode>
         {
-            new DeclarationNode(["inverted"], new UnaryOpNode("not", new IdentifierNode("basicTrue")))
+            new DeclarationNode("inverted", new UnaryOpNode("not", new IdentifierNode("basicTrue")))
         });
 
         Assert.Equal(expectedAst, ast);
@@ -113,7 +113,7 @@ let boolValue = true;
         var expectedAst = new ProgramNode(new List<AstNode>
         {
             new DeclarationNode(
-                ["result"],
+                "result",
                 new UnaryOpNode(
                     "not",
                     new BinaryOpNode("==", new IdentifierNode("value"), new LiteralNode(1))
@@ -133,7 +133,7 @@ let boolValue = true;
         var expectedAst = new ProgramNode(new List<AstNode>
         {
             new DeclarationNode(
-                ["result"],
+                "result",
                 new BinaryOpNode(
                     "and",
                     new UnaryOpNode("not", new IdentifierNode("left")),
@@ -154,7 +154,7 @@ let boolValue = true;
         var expectedAst = new ProgramNode(new List<AstNode>
         {
             new DeclarationNode(
-                ["result"],
+                "result",
                 new BinaryOpNode(
                     "or",
                     new IdentifierNode("a"),
@@ -179,19 +179,19 @@ let combined = a < b and c != d;
         var expectedAst = new ProgramNode(new List<AstNode>
         {
             new DeclarationNode(
-                ["conjunction"],
+                "conjunction",
                 new BinaryOpNode("and", new IdentifierNode("left"), new IdentifierNode("right"))
             ),
             new DeclarationNode(
-                ["disjunction"],
+                "disjunction",
                 new BinaryOpNode("or", new IdentifierNode("left"), new IdentifierNode("right"))
             ),
             new DeclarationNode(
-                ["exclusive"],
+                "exclusive",
                 new BinaryOpNode("xor", new IdentifierNode("left"), new IdentifierNode("right"))
             ),
             new DeclarationNode(
-                ["combined"],
+                "combined",
                 new BinaryOpNode(
                     "and",
                     new BinaryOpNode("<", new IdentifierNode("a"), new IdentifierNode("b")),
@@ -211,7 +211,7 @@ let combined = a < b and c != d;
         var expectedAst = new ProgramNode(new List<AstNode>
         {
             new DeclarationNode(
-                ["formatted"],
+                "formatted",
                 new CallNode(
                     new IdentifierNode("formatValue"),
                     [new LiteralNode(42), new IdentifierNode("precision")]
@@ -234,9 +234,9 @@ let nested = [[1, 2], [3, 4]];
 
         var expectedAst = new ProgramNode(new List<AstNode>
         {
-            new DeclarationNode(["empty"], new ListNode([])),
+            new DeclarationNode("empty", new ListNode([])),
             new DeclarationNode(
-                ["mixed"],
+                "mixed",
                 new ListNode([
                     new LiteralNode(1),
                     new LiteralNode("two"),
@@ -244,7 +244,7 @@ let nested = [[1, 2], [3, 4]];
                 ])
             ),
             new DeclarationNode(
-                ["expressions"],
+                "expressions",
                 new ListNode([
                     new IdentifierNode("x"),
                     new BinaryOpNode("+", new IdentifierNode("x"), new LiteralNode(1)),
@@ -252,7 +252,7 @@ let nested = [[1, 2], [3, 4]];
                 ])
             ),
             new DeclarationNode(
-                ["nested"],
+                "nested",
                 new ListNode([
                     new ListNode([new LiteralNode(1), new LiteralNode(2)]),
                     new ListNode([new LiteralNode(3), new LiteralNode(4)])
@@ -275,9 +275,9 @@ let nested = {"list": [1, 2], "dict": {"inner": 3}};
 
         var expectedAst = new ProgramNode(new List<AstNode>
         {
-            new DeclarationNode(["empty"], new DictionaryNode([])),
+            new DeclarationNode("empty", new DictionaryNode([])),
             new DeclarationNode(
-                ["mixed"],
+                "mixed",
                 new DictionaryNode([
                     new KeyValuePairNode(new LiteralNode("one"), new LiteralNode(1)),
                     new KeyValuePairNode(new LiteralNode(2), new LiteralNode("two")),
@@ -285,7 +285,7 @@ let nested = {"list": [1, 2], "dict": {"inner": 3}};
                 ])
             ),
             new DeclarationNode(
-                ["expressions"],
+                "expressions",
                 new DictionaryNode([
                     new KeyValuePairNode(
                         new IdentifierNode("key"),
@@ -298,7 +298,7 @@ let nested = {"list": [1, 2], "dict": {"inner": 3}};
                 ])
             ),
             new DeclarationNode(
-                ["nested"],
+                "nested",
                 new DictionaryNode([
                     new KeyValuePairNode(
                         new LiteralNode("list"),
@@ -330,22 +330,22 @@ let expressionIndex = values[i + 1];
         var expectedAst = new ProgramNode(new List<AstNode>
         {
             new DeclarationNode(
-                ["first"],
+                "first",
                 new IndexingNode(new IdentifierNode("values"), new LiteralNode(0))
             ),
             new DeclarationNode(
-                ["keyed"],
+                "keyed",
                 new IndexingNode(new IdentifierNode("values"), new LiteralNode("name"))
             ),
             new DeclarationNode(
-                ["nested"],
+                "nested",
                 new IndexingNode(
                     new IndexingNode(new IdentifierNode("matrix"), new LiteralNode(0)),
                     new LiteralNode(1)
                 )
             ),
             new DeclarationNode(
-                ["expressionIndex"],
+                "expressionIndex",
                 new IndexingNode(
                     new IdentifierNode("values"),
                     new BinaryOpNode("+", new IdentifierNode("i"), new LiteralNode(1))
@@ -370,18 +370,18 @@ let method = obj.Resize(100, 200);
         var expectedAst = new ProgramNode(new List<AstNode>
         {
             new DeclarationNode(
-                ["property"],
+                "property",
                 new MemberAccessNode(new IdentifierNode("obj"), "Name")
             ),
             new DeclarationNode(
-                ["chain"],
+                "chain",
                 new MemberAccessNode(
                     new MemberAccessNode(new IdentifierNode("obj"), "Child"),
                     "Name"
                 )
             ),
             new DeclarationNode(
-                ["indexed"],
+                "indexed",
                 new MemberAccessNode(
                     new IndexingNode(
                         new MemberAccessNode(new IdentifierNode("obj"), "Items"),
@@ -391,7 +391,7 @@ let method = obj.Resize(100, 200);
                 )
             ),
             new DeclarationNode(
-                ["called"],
+                "called",
                 new MemberAccessNode(
                     new CallNode(
                         new MemberAccessNode(new IdentifierNode("obj"), "GetChild"),
@@ -401,7 +401,7 @@ let method = obj.Resize(100, 200);
                 )
             ),
             new DeclarationNode(
-                ["method"],
+                "method",
                 new CallNode(
                     new MemberAccessNode(new IdentifierNode("obj"), "Resize"),
                     [new LiteralNode(100), new LiteralNode(200)]

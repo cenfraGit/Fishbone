@@ -22,7 +22,7 @@ func getAnswer()
         Assert.Equal(
             new BlockNode(new List<AstNode>
             {
-                new ReturnNode([new LiteralNode(42)])
+                new ReturnNode(new LiteralNode(42))
             }),
             definition.Body
         );
@@ -46,9 +46,9 @@ func add(left, right)
         Assert.Equal(
             new BlockNode(new List<AstNode>
             {
-                new ReturnNode([
+                new ReturnNode(
                     new BinaryOpNode("+", new IdentifierNode("left"), new IdentifierNode("right"))
-                ])
+                )
             }),
             definition.Body
         );

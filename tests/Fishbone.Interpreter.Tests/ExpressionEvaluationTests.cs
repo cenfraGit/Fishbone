@@ -78,13 +78,7 @@ let nonZeroIsTruthy = not 3;
     public void Evaluate_Truthiness_HandlesNullBooleansNumbersAndStrings()
     {
         var env = InterpreterTestHelpers.Run("""
-func oneValue()
-{
-    return 1;
-}
-
-let value, missing = oneValue();
-let nullIsFalsey = not missing;
+let nullIsFalsey = not null;
 let falseIsFalsey = not false;
 let trueIsTruthy = not true;
 let zeroDoubleIsFalsey = not 0.0;
@@ -182,17 +176,6 @@ let nested = [[1, 2], [3]];
         var nested = Assert.IsType<List<object>>(env.GetValue("nested"));
         Assert.Equal([1, 2], Assert.IsType<List<object>>(nested[0]));
         Assert.Equal([3], Assert.IsType<List<object>>(nested[1]));
-    }
-
-    [Fact]
-    public void Evaluate_ListExpressions_CanBeDestructured()
-    {
-        var env = InterpreterTestHelpers.Run("""
-let first, second = [1, 2];
-""");
-
-        Assert.Equal(1, env.GetValue("first"));
-        Assert.Equal(2, env.GetValue("second"));
     }
 
     [Fact]
