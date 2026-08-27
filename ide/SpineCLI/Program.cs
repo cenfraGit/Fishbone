@@ -70,6 +70,10 @@ internal class Program
         _loadedPlugins.AddRange(FishbonePluginLoader.LoadPlugins(
             FishbonePluginLoader.DefaultPluginsDirectory, config));
 
+        config.AddBuiltIn("print", new Action<object?>(Console.Write));
+        config.AddBuiltIn("println", new Action<object?>(Console.WriteLine));
+        config.AddBuiltIn("input", new Func<string>(() => Console.ReadLine() ?? string.Empty));
+
         FishboneEnvironment env;
         try
         {
