@@ -1,54 +1,57 @@
 # Fishbone Specification
 
-## Introduction
+The grammar and semantics of the language. If you want to embed Fishbone in an app instead, read the [embedding quickstart](quickstart.md).
 
-### What Fishbone is
+**Contents**
 
-Fishbone is a scripting language written in C# with .NET interop in
-mind. It aims to provide an easy way to interface with .NET objects
-dynamically at runtime without the need for
-recompilation. Fundamentally, the Fishbone runtime is just plain .NET
-with little to no runtime behavior variations.
+1. [What Fishbone is](#what-fishbone-is)
+2. [What Fishbone is not](#what-fishbone-is-not)
+3. [Writing a script](#writing-a-script)
+4. [Values](#values)
+5. [Expressions and operators](#expressions-and-operators)
+6. [Statements](#statements)
+7. [Functions](#functions)
+8. [Errors](#errors)
+9. [Talking to .NET](#talking-to-net)
+10. [What the host gives you](#what-the-host-gives-you)
+11. [Security](#security)
 
-Fishbone doesn't necessarily need to interface with .NET types, as it
-can be used to add a simple scripting layer to existing .NET
-applications. But even in those cases, the runtime behavior of
-Fishbone is mostly defined by the .NET runtime. Note that Fishbone is
-**not a sandbox** — see the [Security](#security) section.
+---
 
-### What Fishbone is not
+## What Fishbone is
 
-Fishbone is not a "Python/Lua/Javascript" for .NET. Do not expect
-similar behaviors to any of those languages. It is also not a language
-that is expected to exist outside of .NET; Fishbone's entire purpose
-is to interface with .NET types at runtime. That "interfacing" lies on
-the fact that Fishbone's interpreter is written in C#, and its runtime
-deliberately uses .NET types directly without trying to wrap them.
+Fishbone is a scripting language written in C#, built for .NET interop. It lets you work with .NET objects at runtime without recompiling anything.
 
-Fishbone is also **not** a standalone CLR language, nor does it
-compile to MSIL or run on the DLR.
+The runtime is plain .NET, with little to no behavior of its own. Fishbone values *are* .NET objects, so when a script adds two numbers or calls a method, what happens is whatever C# would have done.
 
-## Lexical structure
+You don't have to use it for interop. It works fine as a plain scripting layer bolted onto an existing app. But even then, its behavior is mostly the .NET runtime's behavior.
 
-A Fishbone source file consists of UTF-8 encoded text. The parser
-skips spaces (`\u0020`), tabs (`\u0009`), line feed (`\u000A`) and
-carriage return (`\u000D`).
+Fishbone is **not** a sandbox. See [Security](#security).
+
+## What Fishbone is not
+
+Fishbone is **not** trying to be Python or Lua for .NET. Don't expect any similar behavior to those languages.
+
+It's also not meant to exist outside .NET. Interfacing with .NET types is the entire point, and that interfacing comes from the fact that the interpreter is written in C# and uses .NET types directly instead of wrapping them.
+
+It is not a standalone CLR language either. It does not compile to MSIL and it does not run on the DLR.
+
+---
+
+## Writing a script
+
+A source file is UTF-8 text. The parser skips spaces (`\u0020`), tabs (`\u0009`), line feeds (`\u000A`) and carriage returns (`\u000D`).
 
 ### Comments
 
-Comments are used to either document the code or to disable sections
-of it. There are two ways of declaring comments:
+Two kinds, both like C#:
 
-- Line comments: start with `//` and encompass everything until line
-  feed or carriage return
-- Block comments: start with `/*`, end with `*/`, and encompass
-  everything within it
+- Line comments start with `//` and run to the end of the line
+- Block comments start with `/*` and end with `*/`
 
 ```csharp
 // this is a line comment
-```
 
-```csharp
 /*
     this is
     a block
@@ -58,69 +61,19 @@ of it. There are two ways of declaring comments:
 
 ### Identifiers
 
-An identifier may reference a variable or a function. It consists of
-one or more characters, where the first character must be a letter
-(`[a-zA-Z]`) and the rest of characters can be either a letter, a
-number, or underscore (`[a-zA-Z0-9_]*`).
+An identifier names a variable or a function. The first character is a letter or an underscore, and the rest can be letters, digits or underscores (`[a-zA-Z_][a-zA-Z0-9_]*`).
+
+Identifiers are case sensitive, and they can't collide with a reserved keyword.
 
 ### Reserved keywords
 
-An identifier's name must also not collide with the reserved keywords,
-which include:
+There are 25 of them:
 
-- `let`
-- `null`
-- `true`
-- `false`
-- `if`
-- `else`
-- `while`
-- `foreach`
-- `for`
-- `break`
-- `continue`
-- `try`
-- `catch`
-- `finally`
-- `throw`
-- `in`
-- `as`
-- `func`
-- `return`
-- `and`
-- `or`
-- `xor`
-- `not`
-- `out`
-- `ref`
+`let` `null` `true` `false` `if` `else` `while` `foreach` `for` `break` `continue` `try` `catch` `finally` `throw` `in` `as` `func` `return` `and` `or` `xor` `not` `out` `ref`
 
-### Operators and punctuation
+### Integer literals
 
-| Token(s)                    | Description                                       |
-|-----------------------------|---------------------------------------------------|
-| `+` `-` `*` `/` `%`         | Arithmetic operators                              |
-| `==` `!=` `<` `>` `<=` `>=` | Comparison operators                              |
-| `and` `or` `xor` `not`      | Boolean operators                                 |
-| `=`                         | Assignment                                        |
-| `+=` `-=` `*=` `/=` `%=`    | Compound assignment                               |
-| `.`                         | Member access                                     |
-| `[` `]`                     | Indexing / list and dictionary construction       |
-| `(` `)`                     | Grouping / call expressions                       |
-| `{` `}`                     | Block delimiters                                  |
-| `;`                         | Statement terminator                              |
-| `:`                         | Key-value separator in dictionary literals        |
-| `,`                         | Separator in lists, parameters, and destructuring |
-
-### Literals
-
-Literals in Fishbone are string representations of a value in the
-source code. Fishbone supports integer, double, string, boolean, and
-null literals.
-
-#### Integer literals
-
-Integer literals support underscores to aid readability (underscores
-are removed by the parser). Here are some examples of valid integers:
+An integer literal may use underscores to stay readable (the parser strips them):
 
 ```csharp
 // 1
@@ -128,15 +81,11 @@ are removed by the parser). Here are some examples of valid integers:
 // 1_000_000
 ```
 
-Like C#, an integer literal has the smallest integer type that fits
-its value: `int` (32-bit), then `long` (64-bit). A literal too large
-for a `long` is a parse error.
+Like C#, an integer literal takes the smallest type that fits: `int` (32-bit) first, then `long` (64-bit). A literal too large for a `long` is a parse error.
 
 ### Double literals
 
-A double literal consists of an integer part, a decimal point, and a
-fractional part. The integer part can be omitted, but the decimal
-point is always required. Here are some examples:
+An integer part, a decimal point, and a fractional part. The integer part is optional, but the decimal point never is:
 
 ```csharp
 // 1.0
@@ -147,17 +96,19 @@ point is always required. Here are some examples:
 
 ### String literals
 
-String literals are enclosed in double quotes. Escape sequences follow
-C# conventions. The supported set is `\"`, `\'`, `\\`, `\0`, `\a`,
-`\b`, `\f`, `\n`, `\r`, `\t`, `\v`, and `\uXXXX` (four hexadecimal
-digits). Any other character after a backslash is a parse error, as is
-a literal (unescaped) line break inside a string.
+Strings go in double quotes, and escape sequences follow C# conventions. The supported set is `\"`, `\'`, `\\`, `\0`, `\a`, `\b`, `\f`, `\n`, `\r`, `\t`, `\v`, and `\uXXXX` (four hex digits).
 
-#### Raw (verbatim) strings
+Any other character after a backslash is a parse error, and so is an unescaped line break inside a string.
 
-A string prefixed with `@` is taken verbatim: backslashes are ordinary
-characters, a doubled quote (`""`) produces one literal quote, and the
-string may span multiple lines.
+```csharp
+// "hello"
+// "this is one line \nthis is another line"
+// "this is \"also\" another example"
+```
+
+#### Raw strings
+
+Prefix a string with `@` and it's taken verbatim. Backslashes are ordinary characters, a doubled quote (`""`) gives you one literal quote, and the string can span lines:
 
 ```csharp
 let path = @"C:\Users\me\file.txt";
@@ -166,9 +117,7 @@ let quoted = @"she said ""hi""";
 
 #### Interpolated strings
 
-A string prefixed with `$` may embed expressions in `{ }` holes. Each
-hole holds a full Fishbone expression; `{{` and `}}` produce literal
-braces. Escape sequences work as in regular strings.
+Prefix a string with `$` and you can embed expressions in `{ }` holes. Each hole holds a full Fishbone expression, and `{{` / `}}` give you literal braces. Escape sequences work the same as in a regular string:
 
 ```csharp
 let msg = $"hello {name}, next year you are {age + 1}";
@@ -176,103 +125,83 @@ let entry = $"value: {d["key"]}";
 let braces = $"{{literal braces}}";
 ```
 
-Hole values are converted to text with the invariant culture; `null`
-produces an empty string. Unlike C#, format specifiers and alignment
-(`{x:F2}`, `{x,10}`) are not supported (a hole is always a plain
-expression) and the combined `$@"..."` form is not available.
+Hole values are converted to text with the invariant culture, and `null` gives you an empty string.
 
-```csharp
-// "hello"
-// "this is one line \nthis is another line"
-// "this is \"also\" another example"
-```
+Two differences from C#: format specifiers and alignment (`{x:F2}`, `{x,10}`) aren't supported, so a hole is always just an expression. And the combined `$@"..."` form doesn't exist.
 
-### Boolean literals
+### Boolean and null literals
 
-- `true`
-- `false`
+`true` and `false`, plus `null`, which is a plain .NET null reference.
 
-### Null literal
+---
 
-The `null` literal simply represents a null reference from .NET.
+## Values
 
-## Types & values
-
-Fishbone is dynamically typed. Every value is one of the following:
+Fishbone is dynamically typed. Every value is one of these:
 
 | Type         | Examples                | Notes                                                 |
 |--------------|-------------------------|-------------------------------------------------------|
 | `int`        | `42`, `-1`, `1_000_000` | 32-bit signed integer (wraps on overflow)             |
-| `long`       | `999_999_999_999`       | 64-bit signed integer; literals too large for `int` promote to `long` |
+| `long`       | `999_999_999_999`       | 64-bit signed integer. Literals too big for `int` promote to `long` |
 | `double`     | `3.14`, `.5`, `-2.0`    | 64-bit double-precision float                         |
 | `string`     | `"hello"`, `""`         | Unicode text                                          |
 | `bool`       | `true`, `false`         |                                                       |
-| `null`       | `null`                  | Represents the absence of a value                     |
-| `list`       | `[1, 2, 3]`             | Ordered, mutable collection                           |
-| `dictionary` | `{"x": 1, "y": 2}`      | Key-value collection. Keys and values can be any type |
+| `null`       | `null`                  | The absence of a value                                |
+| list         | `[1, 2, 3]`             | Ordered and mutable                                   |
+| dictionary   | `{"x": 1, "y": 2}`      | Key-value pairs. Keys and values can be any type      |
 | function     | `func f(x) { ... }`     | First-class closure                                   |
-| .NET object  | any CLR type            | See Interop section                                   |
+| .NET object  | any CLR type            | See [Talking to .NET](#talking-to-net)                |
 
 ### Truthiness
 
-When a value is used in a boolean context (`if`, `while`, `and`, `or`,
-`not`), it is considered truthy or falsy as follows:
+When a value lands in a boolean context (`if`, `while`, `and`, `or`, `not`), here's how it's read:
 
 - `null` is falsy
-- `bool` is its own value
-- `int` is falsy if zero, truthy otherwise
-- `double` is falsy if zero, truthy otherwise
-- `string` is falsy if empty, truthy otherwise
-- Everything else is truthy
+- `bool` is itself
+- `int` and `double` are falsy at zero, truthy otherwise
+- `string` is falsy when empty, truthy otherwise
+- everything else is truthy
 
-## Blocks
+---
 
-A block is a sequence of zero or more statements enclosed in `{`
-`}`. Blocks create a new lexical scope.
+## Expressions and operators
 
-```csharp
-{
-    let x = 1;
-    let y = 2;
-    x + y
-}
-```
+| Token(s)                    | What it is                                  |
+|-----------------------------|---------------------------------------------|
+| `+` `-` `*` `/` `%`         | Arithmetic operators                        |
+| `==` `!=` `<` `>` `<=` `>=` | Comparison operators                        |
+| `and` `or` `xor` `not`      | Boolean operators                           |
+| `=`                         | Assignment                                  |
+| `+=` `-=` `*=` `/=` `%=`    | Compound assignment                         |
+| `.`                         | Member access                               |
+| `[` `]`                     | Indexing, and list construction             |
+| `(` `)`                     | Grouping, and call expressions              |
+| `{` `}`                     | Block delimiters, and dictionary construction |
+| `;`                         | Statement terminator                        |
+| `:`                         | Key-value separator in a dictionary literal |
+| `,`                         | Separator in lists, dictionaries, parameters, arguments, and `for` ranges |
 
-## Scoping
+The expression forms:
 
-Fishbone uses lexical scoping.
-
-- `let` declares a new variable in the current block scope.
-- Assignment (`x = ...`) walks up the scope chain to find an existing
-  binding and updates it. If no binding is found, an error is raised.
-- Each block `{ }` creates a child scope.
-- Functions close over their definition environment.
-- Variables declared in an outer scope are visble and can be shadowed
-  by a new `let` declaration.
-
-## Expressions
-
-Fishbone supports the following expression forms:
-
-| Expression     | Syntax                                                       | Description                                        |
+| Expression     | Syntax                                                       | What it does                                       |
 |----------------|--------------------------------------------------------------|----------------------------------------------------|
 | Literal        | `42`, `"hello"`, `true`                                      | Integer, double, string, bool, null                |
-| Identifier     | `x`, `myVar`                                                 | Reference to a variable or function                |
+| Identifier     | `x`, `myVar`                                                 | References a variable or function                  |
 | Parenthesized  | `( expr )`                                                   | Explicit grouping                                  |
 | Unary          | `- expr`, `not expr`                                         | Numeric negation, boolean negation                 |
-| Multiplicative | `expr * expr`, `expr / expr`, `expr % expr`                  | `int / int` returns `double`; `%` is the remainder |
+| Multiplicative | `expr * expr`, `expr / expr`, `expr % expr`                  | `int / int` gives a `double`. `%` is the remainder |
 | Additive       | `expr + expr`, `expr - expr`                                 | `+` also concatenates strings                      |
-| Cast           | `expr as identifier`                                         | Safe conversion; `null` when not convertible       |
-| Comparison     | `expr < expr`, `expr > expr`, `expr <= expr`, `expr >= expr` | Returns `bool`                                     |
-| Equality       | `expr == expr`, `expr != expr`                               | Returns `bool`                                     |
-| Boolean        | `expr and expr`, `expr or expr`, `expr xor expr`             | Short-circuiting `and`/`or`                        |
-| List           | `[ expr , expr , ... ]`                                      | Creates a list                                     |
-| Dictionary     | `{ key : value , ... }`                                      | Creates a dictionary                               |
-| Call           | `expr ( expr , ... )`                                        | Function/method call                               |
-| Member access  | `expr . identifier`                                          | Access .NET property, field, or method group       |
+| Cast           | `expr as identifier`                                         | Safe conversion. `null` when it doesn't work       |
+| Comparison     | `expr < expr`, `expr > expr`, `expr <= expr`, `expr >= expr` | Returns a `bool`                                   |
+| Equality       | `expr == expr`, `expr != expr`                               | Returns a `bool`                                   |
+| Boolean        | `expr and expr`, `expr or expr`, `expr xor expr`             | `and` and `or` short-circuit, `xor` can't          |
+| List           | `[ expr , expr , ... ]`                                      | Builds a list                                      |
+| Dictionary     | `{ key : value , ... }`                                      | Builds a dictionary                                |
+| Call           | `expr ( expr , ... )`                                        | Calls a function, method, or registered type       |
+| Member access  | `expr . identifier`                                          | Reads a .NET property, field, or method group      |
 | Indexing       | `expr [ expr ]`                                              | List index, dictionary key, or .NET indexer        |
 
-Operator precedence, from highest to lowest:
+Precedence, highest first:
 
 1. Unary (`-`, `not`)
 2. Multiplicative (`*`, `/`, `%`)
@@ -282,98 +211,76 @@ Operator precedence, from highest to lowest:
 6. Equality (`==`, `!=`)
 7. Boolean (`and`, `or`, `xor`)
 
-### Arithmetic semantics
+### Arithmetic
 
-- `+`, `-`, `*` preserve `int` when both operands are `int`, and
-  produce a `double` when either operand is a `double`.
-- `/` is true division: it always produces a `double`, regardless of
-  operand types, so `5 / 2` is `2.5` and `4 / 2` is `2.0`. Integer
-  division by zero therefore yields `double` infinity rather than an
-  error. There is no dedicated floor-division operator; use `int(a /
-  b)` when an integer quotient is required.
-- `%` is the remainder operator. It preserves `int` when both operands
-  are `int` (only `/` promotes to `double`), and follows the C#
-  truncated convention where the sign of the result follows the
-  dividend: `-5 % 3` is `-2` and `5 % -3` is `2`. Integer remainder by
-  zero raises an error; `double` remainder by zero yields `NaN`.
+- `+`, `-` and `*` keep `int` when both sides are `int`, and give you a `double` as soon as either side is one
+- `/` is always true division. It gives a `double` no matter what the operands are, so `5 / 2` is `2.5` and `4 / 2` is `2.0`. Integer division by zero therefore produces `double` infinity rather than an error. There's no floor-division operator, so use `int(a / b)` when you need an integer quotient (assuming the host registered an `int` function, see [What the host gives you](#what-the-host-gives-you))
+- `%` is the remainder. It keeps `int` when both sides are `int` (only `/` promotes), and follows C#'s truncated convention, where the sign follows the dividend. So `-5 % 3` is `-2` and `5 % -3` is `2`. Integer remainder by zero raises an error, and `double` remainder by zero gives you `NaN`
 
-### Equality and comparison semantics
+### Equality and comparison
 
-- `==` and `!=` are **total**: they never raise an error, whatever the
-  operand types. Numbers compare by value across `int`/`double` (`1 ==
-  1.0` is `true`); everything else uses value equality, which means
-  operands of different or otherwise incompatible types are simply not
-  equal (`1 == "1"` is `false`, not an error). Equality on .NET
-  objects honors that type's own `Equals` (so records and other
-  value-equal types compare by value); a type that does not define
-  equality falls back to reference identity.
-- `<`, `>`, `<=`, `>=` require operands that can be ordered (the
-  numeric types, or any .NET type that defines the relevant
-  comparison). Unlike equality, comparing values that have no ordering
-  relationship — for example a number and a string — raises an error
-  rather than returning a result, because there is no meaningful
-  answer.
+`==` and `!=` are **total**. They never raise an error, whatever you throw at them. Numbers compare by value across `int`, `long` and `double` (`1 == 1.0` is `true`), and everything else uses value equality, so mismatched types are simply not equal. `1 == "1"` is `false`, not an error.
 
-### Cast expressions (`as`)
+Equality on a .NET object honors that type's own `Equals`, so records and other value-equal types compare by value. A type that doesn't define equality falls back to reference identity.
 
-`expr as TypeName` is a **safe cast**: it evaluates to the value
-converted to the named type, or `null` when the conversion is not
-possible. It never raises an error for a failed conversion (only for
-an unknown type name).
+`<`, `>`, `<=` and `>=` need operands that can actually be ordered: the numeric types, or any .NET type defining the relevant comparison. Unlike equality, comparing two things with no ordering relationship (a number and a string, say) raises an error instead of returning something. There's no meaningful answer to give.
+
+### Casts
+
+`expr as TypeName` is a **safe cast**. It gives you the value converted to the named type, or `null` when the conversion isn't possible. A failed conversion is never an error, though an unknown type name is:
 
 ```csharp
 let n = "42" as int;       // 42
 let bad = "oops" as int;   // null
-let p = value as Point;    // the same instance if value is a Point, else null
+let p = value as Point;    // the same instance if value is a Point, otherwise null
 let x = null as int;       // null
 ```
 
-The type name is resolved at runtime, in order:
+The type name resolves at runtime, in this order:
 
-1. A registered type — anything the host exposed through
-   `AddType<T>()` (or any environment value that is a .NET
-   `System.Type`).
-2. The built-in primitive names `int`, `double`, `string`, `bool`.
-   (These names normally resolve to the conversion *functions*, so
-   they are special-cased as cast targets.)
+1. A registered type, meaning anything the host exposed through `AddType<T>()`, or any environment value that happens to be a .NET `System.Type`
+2. The primitive names `int`, `double`, `string` and `bool`, which are special-cased so they work as cast targets even though nothing registered them
 
-If the name matches neither, the cast raises a runtime error.
+If neither matches, the cast raises a runtime error.
 
-Conversion uses the same rules as .NET method-argument interop: if
-the value is already an instance of the target type it is returned
-unchanged; otherwise a host-registered `TypeConverter` for the target
-type is tried, then enum conversion, then `Convert.ChangeType` (with
-the invariant culture) for `IConvertible` values. Note that numeric
-conversion follows .NET rounding (`3.7 as int` is `4`), unlike a C#
-cast which truncates.
+The conversion itself uses the same rules as .NET method-argument interop. A value already of the target type comes back unchanged. Otherwise a host-registered `TypeConverter` for that type is tried, then enum conversion, then `Convert.ChangeType` with the invariant culture for `IConvertible` values.
 
-`as` differs from the conversion builtins (`int(x)`, `double(x)`,
-`string(x)`) in its failure mode: the builtins return a default value
-(`0`, `0.0`, `""`) when the conversion fails, while `as` returns
-`null` so the failure is observable.
+Note that numeric conversion follows .NET rounding, so `3.7 as int` is `4`. A C# cast would have truncated it to `3`.
+
+---
 
 ## Statements
 
-Fishbone programs are sequences of statements. Each statement ends
-with a semicolon (`;`), except block statements and control flow
-bodies.
+A program is a sequence of statements. Each one ends with a semicolon, except blocks and control flow bodies.
 
-### Variable declaration/definition
+### Blocks and scoping
 
-```csharp
-let x = 42;
-let a, b = functionThatReturnsTwoValues();
-```
-
-### Assignment
+A block is zero or more statements inside `{ }`, and it opens a new scope:
 
 ```csharp
-x = 10;
-a, b = functionThatReturnsTwoValues();
+{
+    let x = 1;
+    let y = 2;
+    x + y;
+}
 ```
 
-Updates an existing variable. Assignment walks up the scope chain to
-find the binding.
+Scoping is lexical:
+
+- `let` declares a new variable in the current scope
+- assignment (`x = ...`) walks up the scope chain looking for an existing binding and updates it. If there isn't one, that's an error
+- every `{ }` creates a child scope
+- functions close over the environment they were defined in
+- outer-scope variables are visible, and a new `let` can shadow them
+
+### Declaration and assignment
+
+```csharp
+let x = 42;   // declares
+x = 10;       // assigns to an existing binding
+```
+
+One name per statement. Fishbone has no unpacking, so `let a, b = f();` is a syntax error.
 
 ### Indexed assignment
 
@@ -382,7 +289,7 @@ list[0] = 10;
 dict["key"] = value;
 ```
 
-Assigns a value to a list index, dictionary key, or .NET indexer.
+Writes to a list index, a dictionary key, or a .NET indexer.
 
 ### Compound assignment
 
@@ -396,19 +303,13 @@ list[i] += 1;
 dict["key"] *= 2;
 ```
 
-The compound assignment operators `+=`, `-=`, `*=`, `/=`, `%=` are
-syntactic sugar. `target op= value` is exactly equivalent to `target =
-target op value`, and the result follows the same arithmetic semantics
-as the underlying operator (for example `x /= 2` always produces a
-`double`). The target must be a variable or an indexed target; any
-other target is a parse error.
+`+=`, `-=`, `*=`, `/=` and `%=` are sugar. `target op= value` is exactly `target = target op value`, and the result follows the same arithmetic rules as the operator underneath, so `x /= 2` always produces a `double`.
 
-For an indexed target such as `list[i] += 1`, the index expression is
-evaluated twice — once to read the current value and once to write the
-result. Avoid index expressions with side effects in a compound
-assignment.
+The target has to be a variable or an indexed target. Anything else is a parse error.
 
-### Expression statement
+(one caveat with an indexed target like `list[i] += 1`. The index expression is evaluated twice, once to read and once to write, so keep side effects out of it.)
+
+### Expression statements
 
 ```csharp
 42;
@@ -417,18 +318,14 @@ println("hello");
 
 ### Statement bodies
 
-The body of an `if`, `else`, `while`, `foreach`, or `for` is a single
-statement. That statement is usually a `{ }` block, but the braces may
-be omitted when the body is one statement:
+The body of an `if`, `else`, `while`, `foreach` or `for` is a single statement. Usually that's a `{ }` block, but you can drop the braces for a one-statement body:
 
 ```csharp
 if (x > 0)
     println("positive");
 ```
 
-A single-statement body behaves exactly like a one-statement block: a
-`let` inside it is scoped to the body. An `else` binds to the nearest
-unmatched `if`.
+A braceless body behaves exactly like a one-statement block, so a `let` inside it is scoped to the body. An `else` binds to the nearest unmatched `if`.
 
 ### If
 
@@ -438,7 +335,7 @@ if (expr) { } else { }
 if (expr) { } else if (expr) { } else { }
 ```
 
-(`else if` is simply an `else` whose statement is another `if`.)
+(`else if` isn't a construct of its own. It's just an `else` whose statement happens to be another `if`.)
 
 ### While
 
@@ -452,8 +349,7 @@ while (expr) { }
 foreach (item in collection) { }
 ```
 
-Iterates over a list, dictionary (iterates keys), or any .NET
-`IEnumerable`.
+Iterates a list, a dictionary (you get the keys), or any .NET `IEnumerable`.
 
 ### For
 
@@ -464,33 +360,50 @@ for (i in 10, 0) { }       // i = 10, 9, ..., 1
 for (i in 10, 0, -2) { }   // i = 10, 8, 6, 4, 2
 ```
 
-Iterates over a numeric range. The syntax is `for (identifier in
-start, end)` or `for (identifier in start, end, step)`. The step
-defaults to `1` or `-1` depending on direction. The range is exclusive
-of `end`. The loop variable is scoped to the loop body.
+A numeric range. The syntax is `for (identifier in start, end)` or `for (identifier in start, end, step)`. The step defaults to `1` or `-1` depending on which way you're going, `end` is exclusive, and the loop variable is scoped to the body.
 
-### Break / Continue
+### Break and continue
 
 ```csharp
 break;
 continue;
 ```
 
-`break` exits the innermost loop. `continue` skips to the next
-iteration.
+`break` leaves the innermost loop, `continue` skips to its next iteration.
 
 ### Return
 
 ```csharp
 return;
 return expr;
-return expr1, expr2;
 ```
 
-Exits the current Fishbone function. Single return yields the
-value. Returning multiple values yields a list of values.
+Exits the current Fishbone function. A bare `return;` yields `null`.
 
-### Try / Catch / Finally / Throw
+Returning more than one value isn't supported, so `return a, b;` is a syntax error. Return a list if you need to hand back several things.
+
+---
+
+## Functions
+
+```csharp
+func name(param1, param2) {
+    statements
+}
+```
+
+Functions are first class. You can assign them to variables, pass them as arguments, and return them from other functions.
+
+- Parameters are passed by value
+- A function with no `return` implicitly returns `null`
+- Functions close over the environment they were defined in, so an inner function can reach outer-scope variables
+- The argument count at the call site has to match the parameter count
+
+---
+
+## Errors
+
+### Try, catch, finally, throw
 
 ```csharp
 try { } catch { }
@@ -501,142 +414,67 @@ throw expr;
 throw;      // rethrow, only valid inside a catch block
 ```
 
-A `try` statement requires at least one of `catch`/`finally`, and the
-blocks require braces. There is a single, untyped `catch` clause; the
-optional `(name)` binds the exception for the catch block's scope.
+A `try` needs at least one of `catch` or `finally`, and both require braces. There's a single untyped `catch` clause, and the optional `(name)` binds the exception for that block's scope.
 
-Because the Fishbone runtime is .NET's, the caught value **is the
-actual .NET exception object**, inspect it with ordinary member
-access (`e.Message`, `e.GetType().Name`, `e.InnerException`, ...).
-There are no typed catch clauses or filters; a script that needs to
-discriminate checks the exception itself.
-
-`throw expr` throws the value: if it already is a .NET `Exception` it
-is thrown as-is, otherwise it is wrapped in a `FishboneScriptException`
-whose `Message` is the value's text and whose `Value` property holds
-the original value. A bare `throw;` rethrows the exception bound by
-the nearest enclosing catch.
-
-Not catchable by a script: host cancellation and the internal
-control-flow signals — `return`, `break`, and `continue` inside a
-`try` behave normally (and still trigger `finally`) rather than being
-intercepted by `catch`.
-
-Debugger note: an exception raised inside a `try` is not reported as
-an unhandled runtime error; if the `try` has no `catch`, it is
-reported once it escapes the statement ("break on unhandled"
-semantics).
-
-### Error types
-
-Every Fishbone error is one of three exception types:
-
-- `FishboneParseException`: the script could not be parsed. Carries
-  the list of syntax errors with line/column positions.
-- `FishboneRuntimeException`: any error while the script runs,
-  carrying the `Line`/`Column` of the failing statement or
-  expression. Its `InnerException` tells the two cases apart: **null**
-  means the language itself diagnosed the error (undefined variable,
-  indexing null, an impossible conversion, ...); **non-null** means a
-  .NET call made by the script threw, and the inner exception is that
-  original exception. This is the type an embedding host catches.
-- `FishboneScriptException`: a script `throw` of a non-exception
-  value (see above).
-
-Inside a script `catch (e)`, the binding follows the same split: for
-a language-diagnosed error `e` is the `FishboneRuntimeException`
-itself (with `Line`/`Column`); for a failed .NET call `e` is the
-original exception the call threw.
-
-## Functions
-
-### Function declaration
+Because the runtime is .NET's, the value you catch **is the actual .NET exception object**. Inspect it with ordinary member access:
 
 ```csharp
-func name(param1, param2) {
-    statements
+try {
+    risky();
+} catch (e) {
+    println(e.Message);
+    println(e.GetType().Name);
 }
 ```
 
-Fishbone functions can be assigned to variables, passed as arguments,
-and returned from other functions.
+There are no typed catch clauses and no filters, so a script that needs to tell exceptions apart checks the exception itself.
 
-### Parameters and return
+`throw expr` throws the value. If it's already a .NET `Exception` it goes as-is, otherwise it's wrapped in a `FishboneScriptException` whose `Message` is the value's text and whose `Value` property holds the original. A bare `throw;` rethrows whatever the nearest enclosing catch bound.
 
-- Parameters are passed by value.
-- A function without a `return` statement implicitly returns `null`.
-- Multi-return uses the syntax `return a, b;` and produces a list.
-- The caller can destructure the result with `let a, b = func();`.
+Two things a script can't catch: host cancellation, and the internal control-flow signals. A `return`, `break` or `continue` inside a `try` behaves normally and still triggers `finally`, rather than being intercepted by `catch`.
 
-### Closures
+(a debugger note. An exception raised inside a `try` isn't reported as an unhandled runtime error. If that `try` has no `catch`, it gets reported once it escapes the statement, which is standard "break on unhandled" behavior.)
 
-Functions close over the environment in which they are defined. Inner
-functions can access variables from outer scopes.
+### The three exception types
 
-### Arity
+Every Fishbone error is one of these:
 
-The number of arguments at the call site must match the number of
-parameters in the definition.
+- **`FishboneParseException`**, meaning the script couldn't be parsed. Carries the list of syntax errors with their line and column
+- **`FishboneRuntimeException`**, meaning something went wrong while the script ran. Carries the `Line` and `Column` of the failing statement or expression. This is the one an embedding host catches
+- **`FishboneScriptException`**, meaning a script threw a value that wasn't an exception
 
-## Builtins & interop
+`FishboneRuntimeException.InnerException` tells you which of two situations you're in. **Null** means the language itself diagnosed the problem: an undefined variable, indexing into null, an impossible conversion. **Non-null** means a .NET call the script made threw, and the inner exception is that original exception.
 
-### Built-in functions
+Inside a script's `catch (e)`, the binding follows the same split. For a language-diagnosed error, `e` is the `FishboneRuntimeException` itself, with its `Line` and `Column`. For a failed .NET call, `e` is the original exception that call threw.
 
-Fishbone provides the following built-in functions available in every
-script:
+---
 
-| Function           | Description                             |
-|--------------------|-----------------------------------------|
-| `print(value)`     | Prints value without a trailing newline |
-| `println(value)`   | Prints value followed by a newline      |
-| `input()`          | Reads a line from stdin                 |
-| `abs(x)`           | Absolute value                          |
-| `round(x, digits)` | Rounds `x` to `digits` decimal places   |
-| `min(a, b)`        | Returns the smaller of two values       |
-| `max(a, b)`        | Returns the larger of two values        |
-| `pow(x, y)`        | `x` raised to the power of `y`          |
-| `sqrt(x)`          | Square root                             |
-| `int(value)`       | Converts to integer                     |
-| `double(value)`    | Converts to double                      |
-| `string(value)`    | Converts to string                      |
+## Talking to .NET
 
-### Built-in constants
+This is the part Fishbone exists for. A script can reach any .NET object at runtime.
 
-- `PI` — 3.141592653589793
-- `E` — 2.718281828459045
+### Member access
 
-### .NET interop
-
-Fishbone can interface with any .NET object at runtime.
-
-**Member access** — The `.` operator accesses properties, fields, and
-methods on any .NET object:
+The `.` operator reads properties and fields, and calls methods, on any .NET object:
 
 ```csharp
 let list = [1, 2, 3];
 let count = list.Count;
 ```
 
-**Method calls** — Methods are resolved at runtime. When a method has
-overloads, Fishbone filters to those whose parameters can accept the
-supplied arguments, then selects the *best* match: each argument is
-scored by how closely it matches the parameter type — an exact
-runtime-type match ranks above a reference/interface assignment (such
-as `int` to `object`), which ranks above a value conversion (such as
-`int` to `double`, or an enum from a string). The overload with the
-highest total score wins. If two overloads tie for the best score, the
-one that filled fewer optional parameters from their defaults wins; if
-they still tie, the call is rejected as ambiguous rather than silently
-choosing one.
+### Method calls
 
-**Optional parameters** — Fishbone has no optional parameters of its
-own, but when calling a .NET method it may omit trailing arguments
-whose parameters declare default values; each omitted parameter is
-supplied from its default. Arguments are matched left to right, so
-only a contiguous tail may be omitted. Supplying more arguments than
-the method has parameters never binds, and a parameter without a
-default value must always be given. (`out`/`ref` parameters are never
-optional.)
+Methods resolve at runtime. When one has overloads, Fishbone first filters to the ones whose parameters could accept your arguments, then picks the *best* match.
+
+Each argument is scored by how closely it matches the parameter type. An exact runtime-type match ranks above a reference or interface assignment (`int` to `object`), which ranks above a value conversion (`int` to `double`, or an enum from a string). Highest total score wins.
+
+If two overloads tie, the one that filled fewer optional parameters from their defaults wins. If they still tie, the call is rejected as ambiguous rather than silently picking one.
+
+### Optional parameters
+
+Fishbone has no optional parameters of its own. But when you call a .NET method, you may leave off trailing arguments whose parameters declare defaults, and each omitted one is filled from its default.
+
+Arguments match left to right, so only a contiguous tail can be omitted. Passing more arguments than the method has parameters never binds, and a parameter without a default always has to be given. (`out` and `ref` parameters are never optional.)
 
 ```csharp
 // void Canny(InputArray src, OutputArray dst, double t1, double t2, int aperture = 3, bool l2 = false)
@@ -644,27 +482,23 @@ canny(src, dst, 100, 200);          // aperture and l2 take their defaults
 canny(src, dst, 100, 200, 5);       // aperture = 5, l2 takes its default
 ```
 
-**Indexing** — The `[ ]` operator works with .NET indexers, `IList`,
-and `IDictionary`.
+### Indexing
 
-**Type conversions** — When calling .NET methods, Fishbone
-automatically converts values via `Convert.ChangeType`. Enum
-parameters accept both string names (`"Monday"`) and integer values,
-parsed via `Enum.Parse`.
+`[ ]` works with .NET indexers, `IList`, and `IDictionary`.
 
-**Custom type converters** — The automatic conversion above only
-covers types that are `IConvertible` or enums. For a .NET type that is
-neither (a wrapper such as a tuple or matrix type), a host can
-register a converter with
-`FishboneConfiguration.AddTypeConverter(type, toNet, fromNet?)`. The
-`toNet` direction is consulted wherever a value of that type is
-expected — by-value, `ref`, and `out` arguments alike — and ranks as
-an explicit conversion for overload resolution. The optional `fromNet`
-direction normalizes a value of that type back into a script value
-when it leaves a call as a return value or is written back through
-`out`/`ref`; omitting it leaves such values as opaque .NET
-objects. This lets a wrapped type be passed and received with ordinary
-script values:
+### Type conversions
+
+When you call a .NET method, Fishbone converts arguments automatically via `Convert.ChangeType`. Enum parameters take either a string name (`"Monday"`) or an integer value, parsed with `Enum.Parse`.
+
+### Custom type converters
+
+That automatic conversion only covers types that are `IConvertible` or enums. For a .NET type that's neither (a tuple or matrix wrapper, say), a host can register its own with `FishboneConfiguration.AddTypeConverter(type, toNet, fromNet?)`.
+
+The `toNet` direction is consulted anywhere a value of that type is expected, so by-value, `ref` and `out` arguments alike, and it ranks as an explicit conversion during overload resolution.
+
+The optional `fromNet` direction normalizes a value of that type back into a script value on its way out of a call, whether as a return value or through `out`/`ref`. Leave it off and such values stay opaque .NET objects.
+
+Together they let a wrapped type be passed and received as ordinary script values:
 
 ```csharp
 // host: config.AddTypeConverter(typeof(MyType),
@@ -674,10 +508,9 @@ my_func(some_input, out some_output, 10, 255);        // 10 and 255 convert to M
 some_other_func(some_output, out some_other_output);  // out MyType values come back as numbers
 ```
 
-**Construction** — A host can register a .NET type with
-`FishboneConfiguration.AddType<T>()` (optionally under a custom
-name). A registered type is bound as a callable whose name acts like a
-constructor — there is no `new` keyword:
+### Construction
+
+A host registers a .NET type with `FishboneConfiguration.AddType<T>()`, and optionally gives it a custom name. A registered type is bound as a callable whose name acts like a constructor, so there's no `new` keyword:
 
 ```csharp
 // host: config.AddType<Point>();
@@ -685,89 +518,86 @@ let p = Point(3, 4);   // invokes the Point(int, int) constructor
 let sum = p.X + p.Y;   // instances are ordinary .NET objects
 ```
 
-Constructor overloads are resolved with the same best-match rules as
-method calls. Calling a registered type with no matching constructor,
-or registering a type that exposes no public constructor, is an error.
+Constructor overloads resolve with the same best-match rules as method calls. Calling a registered type with no matching constructor is an error, and so is registering a type that exposes no public constructor.
 
-**By-reference arguments (`out` / `ref`)** — When a .NET method has
-`out` or `ref` parameters, the call site must mark the corresponding
-argument with the matching keyword, and the argument must be a plain
-variable:
+### Out and ref arguments
+
+When a .NET method has `out` or `ref` parameters, the call site has to mark the matching argument with the same keyword, and that argument has to be a plain variable:
 
 ```csharp
 // bool TryParse(string text, out int value)
 let ok = TryParse("42", out parsed);   // 'parsed' is introduced by the call
 // void Increment(ref int value)
 let n = 10;
-Increment(ref n);                      // 'n' must already exist; it is updated in place
+Increment(ref n);                      // 'n' must already exist, and gets updated in place
 ```
 
-- `out` does not require the variable to exist beforehand: if it is
-  undefined, the call declares it in the current scope; if it already
-  exists, the call writes through to it.
-- `ref` requires the variable to already be defined; its current value
-  is passed in and the updated value is written back.
-- Omitting the keyword on an `out`/`ref` parameter, using a keyword on
-  a by-value parameter, passing a non-variable expression with a
-  keyword, or using `out`/`ref` when calling a Fishbone function are
-  all errors.
+- `out` doesn't need the variable to exist first. If it's undefined the call declares it in the current scope, and if it does exist the call writes through to it
+- `ref` needs the variable to already be defined. Its current value goes in, and the updated value comes back out
 
-**Host callables with native signatures (`INativeCallable`)** —
-`out`/`ref` are not limited to reflected .NET methods. A host can
-expose a callable that is not a .NET method but still declares a typed
-`in`/`out`/`ref` signature, by registering an object implementing
-`INativeCallable` (its `Parameters` list gives each parameter a name,
-.NET type, and direction). The interpreter binds arguments
-positionally, converts inputs through the same registered-converter
-logic as a .NET call, invokes the host's implementation, and writes
-`out`/`ref` results back into the script's variables. This is how
-runtime-defined operations that have no backing .NET method are called:
+Four things are errors: omitting the keyword on an `out`/`ref` parameter, using a keyword on a by-value parameter, passing a non-variable expression with a keyword, and using `out`/`ref` when calling a Fishbone function.
+
+### Host callables with native signatures
+
+`out` and `ref` aren't limited to reflected .NET methods. A host can expose a callable that isn't a .NET method at all but still declares a typed `in`/`out`/ `ref` signature, by registering an object implementing `INativeCallable`. Its `Parameters` list gives each parameter a name, a .NET type and a direction.
+
+The interpreter binds arguments positionally, converts inputs through the same registered-converter logic as a real .NET call, invokes the host's implementation, and writes `out`/`ref` results back into the script's variables. This is how you call a runtime-defined operation that has no backing .NET method:
 
 ```csharp
-my_callable(image, out output1, out output2);  // inputs convert in; outputs come back as script values
+my_callable(image, out output1, out output2);  // inputs convert in, outputs come back as script values
 ```
 
-Because there is a single fixed signature there is no overload
-resolution; the argument count must match exactly, and the same
-keyword rules as above apply.
+There's one fixed signature, so there's no overload resolution. The argument count has to match exactly, and the same keyword rules as above apply.
 
-### Plugins
+---
 
-External .NET assemblies implementing `IFishbonePlugin` can be loaded
-to register custom builtins. Plugins are loaded from the
-`.fishbone/plugins/` directory at the user's home directory.
+## What the host gives you
+
+**Fishbone ships with no built-ins.** A fresh `FishboneConfiguration` is empty. There is no `println`, no `input`, no `sqrt`, no `PI`. The language gives you syntax, control flow, operators and .NET interop, and nothing else.
+
+Every name a script can see was put there by the host, in one of two ways.
+
+The host registers things directly:
+
+```csharp
+config.AddBuiltIn("println", new Action<object>(Console.WriteLine));
+config.AddValue("image", currentImage);
+config.AddType<Point>();
+```
+
+Or it loads a plugin, which is a .NET class implementing `IFishbonePlugin` that does the same registering on the host's behalf:
+
+```csharp
+config.AddPlugin(new MathPlugin());   // now the script has PI, sqrt, pow, and the rest
+```
+
+Plugins can also be discovered on disk. `FishbonePluginLoader.LoadPlugins` scans a directory (`~/.fishbone/plugins` by default) for DLLs exporting `IFishbonePlugin` types with a parameterless constructor. This is what SpineIDE, SpineCLI and the DAP host all do.
+
+So what a script can actually call depends entirely on who is running it. Under SpineIDE or SpineCLI you get `print`, `println` and `input`, because those hosts register them. Under your own host you get exactly what you registered.
+
+The three plugins in this repo are [Math](../plugins/Fishbone.Plugins.Math), [OpenCv](../plugins/Fishbone.Plugins.OpenCv) and [Halcon24111](../plugins/Fishbone.Plugins.Halcon24111). See the [quickstart](quickstart.md#5-plugins) for how to wire one up, and the [README](../README.md#plugins) for how to write one.
+
+---
+
 ## Security
 
-Fishbone scripts execute **with the full trust of the host process**.
-This is a deliberate consequence of the design: because member access
-uses reflection on real .NET objects, a script can reach anything the
-host itself can reach (from any object, `GetType()` leads to `Type`,
-`Assembly`, and the rest of the reflection API). There is no in-process
-sandbox, and Fishbone does not claim to provide one. Treat script
-authors as having the same privileges as code contributors, and only
-run scripts you trust.
+Fishbone scripts run **with the full trust of the host process**.
 
-For hosts that must run scripts from untrusted authors, the
-configuration offers a coarse but effective switch:
+That's a deliberate consequence of the design. Member access uses reflection on real .NET objects, so a script can reach anything the host can reach. From any object, `GetType()` leads to `Type`, then `Assembly`, then the rest of the reflection API. There is no in-process sandbox and Fishbone doesn't claim to offer one. Treat script authors as having the same privileges as code contributors, and only run scripts you trust.
+
+If you have to run scripts from untrusted authors, the config offers one coarse but effective switch:
 
 ```csharp
 var config = new FishboneConfiguration { EnableMemberAccess = false };
 ```
 
-With member access disabled, the `.` operator is rejected at runtime
-entirely (no property or field reads and no method calls on any
-object) which closes the reflection surface. Scripts are then limited
-to host-registered functions, operators, control flow, and
-list/dictionary indexing, so the host curates the entire API surface
-through `AddFunction`/`AddBuiltIn`. When designing for this mode,
-expose helpers for anything scripts would otherwise reach through
-members (e.g. a `count(xs)` function instead of `xs.Count`).
+With member access off, the `.` operator is rejected at runtime entirely. No property or field reads, no method calls on any object, which closes the reflection surface. Scripts are then limited to host-registered functions, operators, control flow, and list/dictionary indexing, so you curate the whole API surface through `AddBuiltIn` and `AddValue`.
 
-Even with member access disabled, remember that every injected
-function runs with full host privileges (the security of this mode is
-exactly the security of the API you register). Also consider the other
-denial-of-service axes for untrusted scripts: pass a
-`CancellationToken` with a timeout to bound runaway loops, and be
-aware that scripts can allocate (e.g. by growing lists) like any other
-code in your process. For true isolation, run scripts in a separate
-process.
+When you design for this mode, expose a helper for anything a script would otherwise reach through a member. A `count(xs)` function instead of `xs.Count`, for example.
+
+Two things to keep in mind even with member access off:
+
+- Every function you inject still runs with full host privileges. The security of this mode is exactly the security of the API you registered
+- Denial of service has other axes. Pass a `CancellationToken` with a timeout to bound a runaway loop, and remember that a script can allocate (by growing a list, say) like any other code in your process
+
+For real isolation, run scripts in a separate process.
