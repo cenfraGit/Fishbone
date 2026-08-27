@@ -4,7 +4,21 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- the host already has Fishbone loaded; reference it for the IFishbonePlugin
+         contract but do NOT ship a second copy -->
+    <ProjectReference Include="..\..\src\Fishbone\Fishbone.csproj">
+      <Private>false</Private>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\Fishbone.Interpreter\Fishbone.Interpreter.csproj">
+      <Private>false</Private>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </ProjectReference>
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Fishbone\Fishbone.csproj" />
