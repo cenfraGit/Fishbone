@@ -17,6 +17,7 @@
     <Project Path="ide/SpineIDE/SpineIDE.csproj" />
   </Folder>
   <Folder Name="/Plugins/">
+    <Project Path="plugins/Fishbone.Plugins.Halcon24111/Fishbone.Plugins.Halcon24111.csproj" />
     <Project Path="plugins/Fishbone.Plugins.Math/Fishbone.Plugins.Math.csproj" />
     <Project Path="plugins/Fishbone.Plugins.OpenCv/Fishbone.Plugins.OpenCv.csproj" />
   </Folder>
