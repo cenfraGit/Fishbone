@@ -1,16 +1,14 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Data.Core.Plugins;
-using System.Linq;
 using Avalonia.Markup.Xaml;
-using SpineIDE.Views.Main;
-using Microsoft.Extensions.DependencyInjection;
-using CommunityToolkit.Mvvm.Messaging;
-using SpineIDE.Services;
-using System;
-using SpineIDE.Panels;
-using Fishbone.DebugClient;
 using Avalonia.Threading;
+using CommunityToolkit.Mvvm.Messaging;
+using Fishbone.DebugClient;
+using Microsoft.Extensions.DependencyInjection;
+using SpineIDE.Panels;
+using SpineIDE.Services;
+using SpineIDE.Views.Main;
+using System;
 
 namespace SpineIDE;
 

@@ -1,6 +1,6 @@
-using System.Collections.Generic;
 using Fishbone.Core;
 using Fishbone.DebugClient;
+using System.Collections.Generic;
 
 namespace SpineIDE.Models.Messages;
 

@@ -1,9 +1,9 @@
-using System.Collections.Generic;
-using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Media;
 using AvaloniaEdit.CodeCompletion;
+using System.Collections.Generic;
+using System.ComponentModel;
 
 namespace SpineIDE.Views.Editor;
 

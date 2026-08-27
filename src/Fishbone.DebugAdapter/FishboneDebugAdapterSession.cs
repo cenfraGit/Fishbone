@@ -1,10 +1,10 @@
-using System.Threading.Channels;
 using Fishbone.Debugging;
 using MediatR;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Events;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Models;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Requests;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Server;
+using System.Threading.Channels;
 using DapThread = OmniSharp.Extensions.DebugAdapter.Protocol.Models.Thread;
 
 namespace Fishbone.DebugAdapter;

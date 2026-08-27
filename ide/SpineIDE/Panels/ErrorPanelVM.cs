@@ -1,8 +1,8 @@
+using SpineIDE.Services;
 using System;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Linq;
-using SpineIDE.Services;
 
 namespace SpineIDE.Panels;
 

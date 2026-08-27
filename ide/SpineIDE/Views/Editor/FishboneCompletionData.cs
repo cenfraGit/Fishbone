@@ -1,8 +1,8 @@
-using System;
 using Avalonia.Media;
 using AvaloniaEdit.CodeCompletion;
 using AvaloniaEdit.Document;
 using AvaloniaEdit.Editing;
+using System;
 
 namespace SpineIDE.Views.Editor;
 

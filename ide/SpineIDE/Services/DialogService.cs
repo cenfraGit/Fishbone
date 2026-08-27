@@ -1,15 +1,15 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using SpineIDE.Models;
 using SpineIDE.Panels;
+using SpineIDE.Views.Attach;
 using SpineIDE.Views.Input;
 using SpineIDE.Views.Variables;
-using SpineIDE.Views.Attach;
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace SpineIDE.Services;
 

@@ -1,5 +1,5 @@
-using System.Collections;
 using HalconDotNet;
+using System.Collections;
 
 namespace Fishbone.Plugins.Halcon24111;
 

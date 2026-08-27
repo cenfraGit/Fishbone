@@ -1,6 +1,6 @@
-using System.Collections;
 using Fishbone.Debugging;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Models;
+using System.Collections;
 
 namespace Fishbone.DebugAdapter;
 

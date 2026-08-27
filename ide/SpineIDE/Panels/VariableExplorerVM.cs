@@ -1,15 +1,15 @@
-using Dock.Model.Mvvm.Controls;
-using System;
-using System.Collections.ObjectModel;
-using System.Collections;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
+using Dock.Model.Mvvm.Controls;
 using Fishbone.DebugClient;
 using SpineIDE.Models.Messages;
+using System;
+using System.Collections;
+using System.Collections.ObjectModel;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace SpineIDE.Panels;
 

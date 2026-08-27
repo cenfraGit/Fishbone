@@ -1,6 +1,6 @@
-using System.Collections.Generic;
 using AvaloniaEdit.Document;
 using AvaloniaEdit.Folding;
+using System.Collections.Generic;
 
 namespace SpineIDE.Views.Editor;
 

@@ -1,5 +1,5 @@
-using System.Collections;
 using OpenCvSharp;
+using System.Collections;
 
 namespace Fishbone.Plugins.OpenCv;
 

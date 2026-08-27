@@ -3,17 +3,17 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Styling;
+using Avalonia.Threading;
 using AvaloniaEdit;
 using AvaloniaEdit.CodeCompletion;
 using AvaloniaEdit.Document;
 using AvaloniaEdit.Folding;
 using AvaloniaEdit.TextMate;
-using Avalonia.Threading;
+using CommunityToolkit.Mvvm.Messaging;
+using SpineIDE.Models.Messages;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using SpineIDE.Models.Messages;
-using CommunityToolkit.Mvvm.Messaging;
 
 namespace SpineIDE.Views.Editor;
 

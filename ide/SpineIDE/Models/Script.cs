@@ -1,5 +1,3 @@
-using System.IO;
-
 namespace SpineIDE.Models;
 
 public class Script

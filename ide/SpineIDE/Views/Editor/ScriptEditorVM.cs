@@ -1,14 +1,13 @@
-using System;
-using System.IO;
-using System.Collections.Generic;
-using System.Linq;
 using AvaloniaEdit.Document;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Messaging;
 using Dock.Model.Mvvm.Controls;
-using SpineIDE.Models;
-using SpineIDE.Models.Messages;
 using Fishbone.DebugClient;
+using SpineIDE.Models.Messages;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 
 namespace SpineIDE.Views.Editor;
 

@@ -1,11 +1,11 @@
-using System;
-using System.Collections.Generic;
 using Dock.Model.Controls;
 using Dock.Model.Core;
 using Dock.Model.Mvvm;
 using Dock.Model.Mvvm.Controls;
 using SpineIDE.Panels;
 using SpineIDE.Views.Editor;
+using System;
+using System.Collections.Generic;
 
 namespace SpineIDE.Models.Layout;
 

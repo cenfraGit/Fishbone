@@ -13,7 +13,6 @@
 // --------------------------------------------------------------------------------
 
 using Antlr4.Runtime;
-using Antlr4.Runtime.Misc;
 
 namespace Fishbone.Parser;
 
