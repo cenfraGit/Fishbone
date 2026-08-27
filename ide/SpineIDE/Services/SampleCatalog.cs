@@ -30,7 +30,7 @@ public static class SampleCatalog
         string resourceName = ResourcePrefix + fileName;
         using Stream? stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName);
         if (stream is null)
-            throw new FileNotFoundException($"Sample \"{fileName}\" was not found.", fileName);
+            throw new FileNotFoundException($"Sample '{fileName}' was not found.", fileName);
 
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();

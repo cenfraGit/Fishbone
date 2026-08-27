@@ -14,7 +14,7 @@ public partial class SaveConfirmationWindow : Window
     public SaveConfirmationWindow(string fileName)
     {
         InitializeComponent();
-        MessageTextBlock.Text = $"Do you want to save changes to \"{fileName}\"?";
+        MessageTextBlock.Text = $"Do you want to save changes to '{fileName}'?";
         KeyDown += OnWindowKeyDown;
     }
 

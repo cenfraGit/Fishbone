@@ -38,7 +38,7 @@ public class ErrorPanelVMTests
         var errorService = new ErrorService();
         var panel = new ErrorPanelVM(errorService);
 
-        errorService.AddError(new ScriptExecutionError("Undefined variable \"x\".", 3, 5));
+        errorService.AddError(new ScriptExecutionError("Undefined variable 'x'.", 3, 5));
         errorService.AddError(new ScriptExecutionError("Object is not callable.", 10, null));
         errorService.AddError(new ScriptExecutionError("No location error.", null, null));
 
@@ -53,7 +53,7 @@ public class ErrorPanelVMTests
         Assert.False(panel.Errors[2].HasLocation);
         Assert.Equal(string.Empty, panel.Errors[2].LocationDisplay);
 
-        Assert.Contains("Line 3, column 5: Undefined variable \"x\".", panel.PanelText);
+        Assert.Contains("Line 3, column 5: Undefined variable 'x'.", panel.PanelText);
         Assert.Contains("Line 10: Object is not callable.", panel.PanelText);
         Assert.Contains("No location error.", panel.PanelText);
     }

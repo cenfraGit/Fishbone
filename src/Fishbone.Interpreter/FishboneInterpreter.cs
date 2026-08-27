@@ -309,7 +309,7 @@ public class FishboneInterpreter
             return primitive;
 
         throw new FishboneRuntimeException(
-            $"\"{node.TypeName}\" is not a type; casting requires a registered type (AddType) or one of: {string.Join(", ", PrimitiveTypeNames.Keys)}.",
+            $"'{node.TypeName}' is not a type; casting requires a registered type (AddType) or one of: {string.Join(", ", PrimitiveTypeNames.Keys)}.",
             node.Line, node.Column);
     }
 
@@ -397,7 +397,7 @@ public class FishboneInterpreter
         {
             IDictionary dictionary => dictionary.Keys,
             IEnumerable enumerable when enumerable is not string => enumerable,
-            _ => throw new FishboneRuntimeException($"Object of type \"{iterable.GetType().Name}\" is not iterable.")
+            _ => throw new FishboneRuntimeException($"Object of type '{iterable.GetType().Name}' is not iterable.")
         };
 
         var loopEnv = new FishboneEnvironment(env);
@@ -609,7 +609,7 @@ public class FishboneInterpreter
         if (callee is null)
             throw new FishboneRuntimeException("Cannot call null. Only functions and methods are callable.");
 
-        throw new FishboneRuntimeException($"Object of type \"{callee.GetType().Name}\" is not callable.");
+        throw new FishboneRuntimeException($"Object of type '{callee.GetType().Name}' is not callable.");
     }
 
     internal object InvokeBoundMethod(FishboneEnvironment env, BoundMethod boundMethod, IReadOnlyList<ArgumentNode> argumentNodes) =>
@@ -622,7 +622,7 @@ public class FishboneInterpreter
     {
         var constructors = ReflectionCache.GetConstructors(registeredType.Type);
         if (constructors.Length == 0)
-            throw new FishboneRuntimeException($"Type \"{registeredType.Type.Name}\" has no public constructor to call.");
+            throw new FishboneRuntimeException($"Type '{registeredType.Type.Name}' has no public constructor to call.");
 
         return InvokeBestOverload(env, target: null, constructors, argumentNodes, registeredType.Type.Name);
     }
@@ -654,9 +654,9 @@ public class FishboneInterpreter
             {
                 case ParameterDirection.Out:
                     if (argument.Modifier != ArgumentModifier.Out)
-                        throw new FishboneRuntimeException($"Parameter \"{parameter.Name}\" is an out parameter; pass the argument with 'out'.");
+                        throw new FishboneRuntimeException($"Parameter '{parameter.Name}' is an out parameter; pass the argument with 'out'.");
                     if (argument.Value is not IdentifierNode outTarget)
-                        throw new FishboneRuntimeException($"Out argument \"{parameter.Name}\" must be a variable.");
+                        throw new FishboneRuntimeException($"Out argument '{parameter.Name}' must be a variable.");
                     // an out parameter introduces or overwrites the variable; pass a default placeholder
                     args[i] = GetDefaultValue(parameter.Type);
                     writeBacks.Add((outTarget.Name, i, true));
@@ -664,9 +664,9 @@ public class FishboneInterpreter
 
                 case ParameterDirection.Ref:
                     if (argument.Modifier != ArgumentModifier.Ref)
-                        throw new FishboneRuntimeException($"Parameter \"{parameter.Name}\" is a ref parameter; pass the argument with 'ref'.");
+                        throw new FishboneRuntimeException($"Parameter '{parameter.Name}' is a ref parameter; pass the argument with 'ref'.");
                     if (argument.Value is not IdentifierNode)
-                        throw new FishboneRuntimeException($"Ref argument \"{parameter.Name}\" must be a variable.");
+                        throw new FishboneRuntimeException($"Ref argument '{parameter.Name}' must be a variable.");
                     var refRaw = Evaluate(env, argument.Value);
                     if (ConvertArgument(refRaw, parameter.Type, out var refConverted) == ArgumentMatch.None)
                         throw new FishboneRuntimeException(DescribeConversionFailure(i, refRaw, parameter.Name, parameter.Type));
@@ -676,7 +676,7 @@ public class FishboneInterpreter
 
                 default: // In
                     if (argument.Modifier != ArgumentModifier.None)
-                        throw new FishboneRuntimeException($"Parameter \"{parameter.Name}\" is passed by value; remove '{argument.Modifier.ToString().ToLowerInvariant()}'.");
+                        throw new FishboneRuntimeException($"Parameter '{parameter.Name}' is passed by value; remove '{argument.Modifier.ToString().ToLowerInvariant()}'.");
                     var raw = Evaluate(env, argument.Value);
                     if (ConvertArgument(raw, parameter.Type, out var converted) == ArgumentMatch.None)
                         throw new FishboneRuntimeException(DescribeConversionFailure(i, raw, parameter.Name, parameter.Type));
@@ -810,17 +810,17 @@ public class FishboneInterpreter
         {
             if (deferredDiagnostic is not null)
                 throw new FishboneRuntimeException(deferredDiagnostic);
-            throw new FishboneRuntimeException($"No overload of \"{methodName}\" accepts {argumentNodes.Count} argument(s).");
+            throw new FishboneRuntimeException($"No overload of '{methodName}' accepts {argumentNodes.Count} argument(s).");
         }
 
         if (ambiguous)
-            throw new FishboneRuntimeException($"Call to \"{methodName}\" with {argumentNodes.Count} argument(s) is ambiguous between multiple overloads.");
+            throw new FishboneRuntimeException($"Call to '{methodName}' with {argumentNodes.Count} argument(s) is ambiguous between multiple overloads.");
 
         return best switch
         {
             ConstructorInfo constructor => InvokeConstructor(env, constructor, bestArgs!, bestWriteBacks!),
             MethodInfo method => InvokeMethod(env, target, method, bestArgs!, bestWriteBacks!),
-            _ => throw new FishboneRuntimeException($"Cannot invoke member \"{methodName}\".")
+            _ => throw new FishboneRuntimeException($"Cannot invoke member '{methodName}'.")
         };
     }
 
@@ -862,7 +862,7 @@ public class FishboneInterpreter
             {
                 if (!parameter.HasDefaultValue)
                 {
-                    diagnostic ??= $"No argument supplied for parameter \"{parameter.Name}\", which has no default value.";
+                    diagnostic ??= $"No argument supplied for parameter '{parameter.Name}', which has no default value.";
                     return false;
                 }
 
@@ -882,13 +882,13 @@ public class FishboneInterpreter
             {
                 if (argument.Modifier != ArgumentModifier.Out)
                 {
-                    diagnostic = $"Parameter \"{parameter.Name}\" is an out parameter; pass the argument with 'out'.";
+                    diagnostic = $"Parameter '{parameter.Name}' is an out parameter; pass the argument with 'out'.";
                     return false;
                 }
 
                 if (argument.Value is not IdentifierNode outTarget)
                 {
-                    diagnostic = $"Out argument \"{parameter.Name}\" must be a variable.";
+                    diagnostic = $"Out argument '{parameter.Name}' must be a variable.";
                     return false;
                 }
 
@@ -903,13 +903,13 @@ public class FishboneInterpreter
             {
                 if (argument.Modifier != ArgumentModifier.Ref)
                 {
-                    diagnostic = $"Parameter \"{parameter.Name}\" is a ref parameter; pass the argument with 'ref'.";
+                    diagnostic = $"Parameter '{parameter.Name}' is a ref parameter; pass the argument with 'ref'.";
                     return false;
                 }
 
                 if (argument.Value is not IdentifierNode refTarget)
                 {
-                    diagnostic = $"Ref argument \"{parameter.Name}\" must be a variable.";
+                    diagnostic = $"Ref argument '{parameter.Name}' must be a variable.";
                     return false;
                 }
 
@@ -928,7 +928,7 @@ public class FishboneInterpreter
 
             if (argument.Modifier != ArgumentModifier.None)
             {
-                diagnostic = $"Parameter \"{parameter.Name}\" is passed by value; remove '{argument.Modifier.ToString().ToLowerInvariant()}'.";
+                diagnostic = $"Parameter '{parameter.Name}' is passed by value; remove '{argument.Modifier.ToString().ToLowerInvariant()}'.";
                 return false;
             }
 
@@ -948,8 +948,8 @@ public class FishboneInterpreter
 
     // builds the diagnostic shown when an argument cannot be converted to its parameter type
     private static string DescribeConversionFailure(int index, object? rawArg, string parameterName, Type targetType) =>
-        $"Argument {index + 1} of type \"{rawArg?.GetType().Name ?? "null"}\" is not compatible with parameter " +
-        $"\"{parameterName}\" of type \"{targetType.Name}\".";
+        $"Argument {index + 1} of type '{rawArg?.GetType().Name ?? "null"}' is not compatible with parameter " +
+        $"'{parameterName}' of type '{targetType.Name}'.";
 
     private void WriteBackByRefArguments(
         FishboneEnvironment env,
@@ -1115,7 +1115,7 @@ public class FishboneInterpreter
         if (target is IList list)
         {
             if (!TryConvertArgument(index, typeof(int), out object? convertedIndex))
-                throw new FishboneRuntimeException($"Index for type \"{target.GetType().Name}\" must be compatible with Int32.");
+                throw new FishboneRuntimeException($"Index for type '{target.GetType().Name}' must be compatible with Int32.");
 
             return list[(int)convertedIndex!]!;
         }
@@ -1124,12 +1124,12 @@ public class FishboneInterpreter
             return dictionary[index!]!;
 
         if (indexers.Any(indexer => !indexer.CanRead))
-            throw new FishboneRuntimeException($"Indexer on type \"{target.GetType().Name}\" is write-only.");
+            throw new FishboneRuntimeException($"Indexer on type '{target.GetType().Name}' is write-only.");
 
         if (indexers.Length > 0)
-            throw new FishboneRuntimeException($"No readable indexer on type \"{target.GetType().Name}\" accepts the supplied index.");
+            throw new FishboneRuntimeException($"No readable indexer on type '{target.GetType().Name}' accepts the supplied index.");
 
-        throw new FishboneRuntimeException($"Object of type \"{target.GetType().Name}\" is not indexable.");
+        throw new FishboneRuntimeException($"Object of type '{target.GetType().Name}' is not indexable.");
     }
 
     private void SetIndexedValue(object? target, object? index, object? value)
@@ -1171,12 +1171,12 @@ public class FishboneInterpreter
         if (target is IList list)
         {
             if (!TryConvertArgument(index, typeof(int), out object? convertedIndex))
-                throw new FishboneRuntimeException($"Index for type \"{target.GetType().Name}\" must be compatible with Int32.");
+                throw new FishboneRuntimeException($"Index for type '{target.GetType().Name}' must be compatible with Int32.");
 
             object? convertedValue = value;
             Type? elementType = target.GetType().GetElementType();
             if (elementType is not null && !TryConvertArgument(value, elementType, out convertedValue))
-                throw new FishboneRuntimeException($"Value is not compatible with element type \"{elementType.Name}\".");
+                throw new FishboneRuntimeException($"Value is not compatible with element type '{elementType.Name}'.");
 
             list[(int)convertedIndex!] = convertedValue;
             return;
@@ -1189,15 +1189,15 @@ public class FishboneInterpreter
         }
 
         if (compatibleReadOnlyIndexer)
-            throw new FishboneRuntimeException($"Indexer on type \"{target.GetType().Name}\" is read-only.");
+            throw new FishboneRuntimeException($"Indexer on type '{target.GetType().Name}' is read-only.");
 
         if (compatibleIndex)
-            throw new FishboneRuntimeException($"Value is not compatible with a writable indexer on type \"{target.GetType().Name}\".");
+            throw new FishboneRuntimeException($"Value is not compatible with a writable indexer on type '{target.GetType().Name}'.");
 
         if (indexers.Length > 0)
-            throw new FishboneRuntimeException($"No writable indexer on type \"{target.GetType().Name}\" accepts the supplied index.");
+            throw new FishboneRuntimeException($"No writable indexer on type '{target.GetType().Name}' accepts the supplied index.");
 
-        throw new FishboneRuntimeException($"Object of type \"{target.GetType().Name}\" does not support indexed assignment.");
+        throw new FishboneRuntimeException($"Object of type '{target.GetType().Name}' does not support indexed assignment.");
     }
 
     private static PropertyInfo[] GetSingleParameterIndexers(Type type) =>
@@ -1211,11 +1211,11 @@ public class FishboneInterpreter
     {
         if (!_enableMemberAccess)
             throw new FishboneRuntimeException(
-                $"Member access (\".{node.MemberName}\") is disabled by the host configuration.");
+                $"Member access ('.{node.MemberName}') is disabled by the host configuration.");
 
         var target = Evaluate(env, node.Target);
         if (target is null)
-            throw new FishboneRuntimeException($"Cannot access member \"{node.MemberName}\" on null.");
+            throw new FishboneRuntimeException($"Cannot access member '{node.MemberName}' on null.");
 
         var type = target.GetType();
         var member = ReflectionCache.ResolveMember(type, node.MemberName);
@@ -1229,7 +1229,7 @@ public class FishboneInterpreter
         if (member.Methods is not null)
             return new BoundMethod(target, member.Methods);
 
-        throw new FishboneRuntimeException($"Type \"{type.Name}\" does not have a public member named \"{node.MemberName}\".");
+        throw new FishboneRuntimeException($"Type '{type.Name}' does not have a public member named '{node.MemberName}'.");
     }
 
     // --------------------------------------------------------------------------------
