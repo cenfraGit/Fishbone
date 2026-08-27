@@ -1,4 +1,4 @@
-namespace Fishbone.Engine.Tests;
+namespace Fishbone.Tests;
 
 /// <summary>
 /// Covers <see cref="FishboneConfiguration.AddTypeConverter"/>: a host can teach the interop path how

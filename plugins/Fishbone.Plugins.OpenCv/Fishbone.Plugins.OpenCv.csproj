@@ -9,9 +9,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- the host already has Fishbone.Engine loaded; reference it for the IFishbonePlugin
+    <!-- the host already has Fishbone loaded; reference it for the IFishbonePlugin
          contract but do NOT ship a second copy -->
-    <ProjectReference Include="..\..\src\Fishbone.Engine\Fishbone.Engine.csproj">
+    <ProjectReference Include="..\..\src\Fishbone\Fishbone.csproj">
       <Private>false</Private>
       <ExcludeAssets>runtime</ExcludeAssets>
     </ProjectReference>

@@ -1,6 +1,6 @@
 using Fishbone.Parser;
 
-namespace Fishbone.Engine.Tests;
+namespace Fishbone.Tests;
 
 public class LongIntegerTests
 {

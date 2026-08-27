@@ -3,7 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using Dock.Model.Controls;
 using Dock.Model.Core;
-using Fishbone.Engine;
+using Fishbone;
 using SpineIDE.Models;
 using SpineIDE.Panels;
 using SpineIDE.Services;

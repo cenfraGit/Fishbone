@@ -1,6 +1,6 @@
 using Fishbone.Interpreter;
 
-namespace Fishbone.Engine.Tests;
+namespace Fishbone.Tests;
 
 /// <summary>
 /// Covers <see cref="IManualCallable"/>: a host can expose a callable that declares an in/out/ref

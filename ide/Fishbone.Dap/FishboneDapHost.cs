@@ -1,6 +1,6 @@
 using System.Net;
 using Fishbone.DebugAdapter;
-using Fishbone.Engine;
+using Fishbone;
 
 namespace Fishbone.Dap;
 

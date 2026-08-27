@@ -1,5 +1,3 @@
-using Fishbone.Engine;
-using Fishbone.Plugins.OpenCv;
 using OpenCvSharp;
 
 namespace Fishbone.Plugins.OpenCv.Tests;
@@ -20,7 +18,7 @@ public class ReflectiveOpenCvTests
         using var src = new Mat(rows: 4, cols: 6, type: MatType.CV_8UC3, s: new Scalar(128, 64, 32));
         var config = ConfigWithOpenCv(src);
 
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let dst = Mat();
 cv_cvt_color(src, dst, "BGR2GRAY");
 """, config);
@@ -39,7 +37,7 @@ cv_cvt_color(src, dst, "BGR2GRAY");
         using var src = new Mat(rows: 4, cols: 6, type: MatType.CV_8UC1, s: Scalar.All(255));
         var config = ConfigWithOpenCv(src);
 
-        var env = FishboneEngine.Run("""
+        var env = FishboneProgram.Run("""
 let dst = Mat();
 cv_resize(src, dst, [3, 2]);
 """, config);
@@ -56,7 +54,7 @@ cv_resize(src, dst, [3, 2]);
         using var src = new Mat(rows: 2, cols: 2, type: MatType.CV_8UC1, s: Scalar.All(255));
         var config = ConfigWithOpenCv(src);
 
-        var env = FishboneEngine.Run("let n = cv_count_non_zero(src);", config);
+        var env = FishboneProgram.Run("let n = cv_count_non_zero(src);", config);
 
         Assert.Equal(4, Convert.ToInt32(env.GetValue("n")));
     }

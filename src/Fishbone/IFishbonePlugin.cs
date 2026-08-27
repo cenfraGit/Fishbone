@@ -7,7 +7,7 @@
 // be loaded dynamically using plugin architecture.
 // --------------------------------------------------------------------------------
 
-namespace Fishbone.Engine;
+namespace Fishbone;
 
 public interface IFishbonePlugin
 {

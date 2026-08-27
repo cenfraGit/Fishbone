@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using Fishbone.Core;
 using Fishbone.Debugging;
-using Fishbone.Engine;
+using Fishbone;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Models;
 using OmniSharp.Extensions.DebugAdapter.Server;
 

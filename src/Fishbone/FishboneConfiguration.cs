@@ -7,7 +7,7 @@
 using Fishbone.Interpreter;
 using System.Globalization;
 
-namespace Fishbone.Engine;
+namespace Fishbone;
 
 public class FishboneConfiguration
 {

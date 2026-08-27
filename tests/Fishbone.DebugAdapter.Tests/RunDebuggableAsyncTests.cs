@@ -1,5 +1,5 @@
 using System.Net;
-using Fishbone.Engine;
+using Fishbone;
 
 namespace Fishbone.DebugAdapter.Tests;
 

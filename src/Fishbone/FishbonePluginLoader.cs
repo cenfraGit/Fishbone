@@ -6,7 +6,7 @@
 
 using System.Reflection;
 
-namespace Fishbone.Engine;
+namespace Fishbone;
 
 public static class FishbonePluginLoader
 {

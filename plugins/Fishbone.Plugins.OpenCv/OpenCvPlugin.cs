@@ -2,7 +2,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
 using System.Text.RegularExpressions;
-using Fishbone.Engine;
+using Fishbone;
 using Fishbone.Interpreter;
 using OpenCvSharp;
 

@@ -11,7 +11,7 @@ using Fishbone.Parser;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace Fishbone.Engine;
+namespace Fishbone;
 
 /// <summary>
 /// A Fishbone program that can be executed one or multiple times.

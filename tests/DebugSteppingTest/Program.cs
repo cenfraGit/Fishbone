@@ -1,5 +1,5 @@
 using Fishbone.DebugAdapter;
-using Fishbone.Engine;
+using Fishbone;
 using System.Net;
 
 var internalDict = new Dictionary<string, object>

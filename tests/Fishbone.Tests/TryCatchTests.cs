@@ -1,6 +1,6 @@
 using Fishbone.Core;
 
-namespace Fishbone.Engine.Tests;
+namespace Fishbone.Tests;
 
 public class TryCatchTests
 {

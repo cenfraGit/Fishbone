@@ -1,7 +1,7 @@
 using Fishbone.Core;
 using Fishbone.Debugging;
 
-namespace Fishbone.Engine.Tests;
+namespace Fishbone.Tests;
 
 public class DebuggerEngineTests
 {

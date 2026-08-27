@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using Fishbone.Engine;
+using Fishbone;
 using Fishbone.Interpreter;
 
 namespace SpineIDE.Views.Editor;

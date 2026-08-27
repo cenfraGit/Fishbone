@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Fishbone.Engine\Fishbone.Engine.csproj" />
+    <ProjectReference Include="..\..\src\Fishbone\Fishbone.csproj" />
     <ProjectReference Include="..\..\plugins\Fishbone.Plugins.OpenCv\Fishbone.Plugins.OpenCv.csproj" />
   </ItemGroup>
 
