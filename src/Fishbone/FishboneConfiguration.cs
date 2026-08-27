@@ -5,7 +5,6 @@
 // --------------------------------------------------------------------------------
 
 using Fishbone.Interpreter;
-using System.Globalization;
 
 namespace Fishbone;
 
@@ -101,6 +100,18 @@ public class FishboneConfiguration
     public FishboneConfiguration AddType(Type type, string? name = null)
     {
         BuiltIns[name ?? type.Name] = new RegisteredType(type);
+        return this;
+    }
+
+    /// <summary>
+    /// Loads the contents of an IFishbonePlugin into this FishboneConfiguration.
+    /// </summary>
+    public FishboneConfiguration AddPlugin(IFishbonePlugin plugin)
+    {
+        // by "loading" we mean that this FishboneConfiguration (us)
+        // will have access to whatever the plugin adds to our built-ins,
+        // values, type converters, etc.
+        plugin.Register(this);
         return this;
     }
 

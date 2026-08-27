@@ -1,10 +1,11 @@
 // --------------------------------------------------------------------------------
 // IFishbonePlugin.cs
 //
-// plugins must register individual configuration objects that represent a plugin.
-//
-// in the end, fishbone plugins consist of FishboneConfiguration objects that can
-// be loaded dynamically using plugin architecture.
+// a plugin is a way to extend a FishboneConfiguration object with more
+// built-ins, values, type converters, etc. it itself doesn't hold a
+// FishboneConfiguration; it only has "instructions" on what to add
+// (that "what" being built-ins or values, for example) to whatever
+// FishboneConfiguration object its passed to the "Register" method
 // --------------------------------------------------------------------------------
 
 namespace Fishbone;
