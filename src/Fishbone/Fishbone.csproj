@@ -16,6 +16,8 @@
 
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\docs\*.md" Pack="true" PackagePath="docs\" />
+    <None Include="..\..\samples\*.fb" Pack="true" PackagePath="samples\" />
   </ItemGroup>
 
   <ItemGroup>

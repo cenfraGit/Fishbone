@@ -203,7 +203,7 @@ var loaded = FishbonePluginLoader.LoadPlugins(
 
 This is the path SpineIDE, SpineCLI and the DAP host all use, which is why [samples/edge_detect.fb](../samples/edge_detect.fb) works once you drop `Fishbone.Plugins.OpenCv` into that folder.
 
-The three plugins in this repo are [Math](../plugins/Fishbone.Plugins.Math), [OpenCv](../plugins/Fishbone.Plugins.OpenCv) and [Halcon24111](../plugins/Fishbone.Plugins.Halcon24111).
+The three plugins in this repo are [Math](https://github.com/cenfraGit/Fishbone/tree/main/plugins/Fishbone.Plugins.Math), [OpenCv](https://github.com/cenfraGit/Fishbone/tree/main/plugins/Fishbone.Plugins.OpenCv) and [Halcon24111](https://github.com/cenfraGit/Fishbone/tree/main/plugins/Fishbone.Plugins.Halcon24111).
 
 ---
 

@@ -188,12 +188,13 @@ The expression forms:
 | Literal        | `42`, `"hello"`, `true`                                      | Integer, double, string, bool, null                |
 | Identifier     | `x`, `myVar`                                                 | References a variable or function                  |
 | Parenthesized  | `( expr )`                                                   | Explicit grouping                                  |
-| Unary          | `- expr`, `not expr`                                         | Numeric negation, boolean negation                 |
+| Negation       | `- expr`                                                     | Numeric negation                                   |
 | Multiplicative | `expr * expr`, `expr / expr`, `expr % expr`                  | `int / int` gives a `double`. `%` is the remainder |
 | Additive       | `expr + expr`, `expr - expr`                                 | `+` also concatenates strings                      |
 | Cast           | `expr as identifier`                                         | Safe conversion. `null` when it doesn't work       |
 | Comparison     | `expr < expr`, `expr > expr`, `expr <= expr`, `expr >= expr` | Returns a `bool`                                   |
 | Equality       | `expr == expr`, `expr != expr`                               | Returns a `bool`                                   |
+| Not            | `not expr`                                                   | Boolean negation. Binds looser than equality       |
 | Boolean        | `expr and expr`, `expr or expr`, `expr xor expr`             | `and` and `or` short-circuit, `xor` can't          |
 | List           | `[ expr , expr , ... ]`                                      | Builds a list                                      |
 | Dictionary     | `{ key : value , ... }`                                      | Builds a dictionary                                |
@@ -201,15 +202,24 @@ The expression forms:
 | Member access  | `expr . identifier`                                          | Reads a .NET property, field, or method group      |
 | Indexing       | `expr [ expr ]`                                              | List index, dictionary key, or .NET indexer        |
 
-Precedence, highest first:
+Precedence, tightest first:
 
-1. Unary (`-`, `not`)
-2. Multiplicative (`*`, `/`, `%`)
-3. Additive (`+`, `-`)
-4. Cast (`as`)
-5. Comparison (`<`, `>`, `<=`, `>=`)
-6. Equality (`==`, `!=`)
-7. Boolean (`and`, `or`, `xor`)
+1. Call, member access, indexing (`f(x)`, `x.y`, `x[i]`)
+2. Negation (`-`)
+3. Multiplicative (`*`, `/`, `%`)
+4. Additive (`+`, `-`)
+5. Cast (`as`)
+6. Comparison (`<`, `>`, `<=`, `>=`)
+7. Equality (`==`, `!=`)
+8. `not`
+9. `and`
+10. `or`, `xor`
+
+Two of those are worth pointing at, because they differ from C#.
+
+**`not` binds loosely.** It sits below equality, not up with `-`. So `not a == b` is `not (a == b)`, and you rarely need parentheses around a comparison you are negating.
+
+**`and` binds tighter than `or` and `xor`**, the same way `*` binds tighter than `+`. So `a or b and c` is `a or (b and c)`. `or` and `xor` share a level and group left to right.
 
 ### Arithmetic
 
@@ -591,7 +601,7 @@ Plugins can also be discovered on disk. `FishbonePluginLoader.LoadPlugins` scans
 
 So what a script can actually call depends entirely on who is running it. Under SpineIDE or SpineCLI you get `print`, `println` and `input`, because those hosts register them. Under your own host you get exactly what you registered.
 
-The three plugins in this repo are [Math](../plugins/Fishbone.Plugins.Math), [OpenCv](../plugins/Fishbone.Plugins.OpenCv) and [Halcon24111](../plugins/Fishbone.Plugins.Halcon24111). See the [quickstart](quickstart.md#5-plugins) for how to wire one up, and the [README](../README.md#plugins) for how to write one.
+The three plugins in this repo are [Math](https://github.com/cenfraGit/Fishbone/tree/main/plugins/Fishbone.Plugins.Math), [OpenCv](https://github.com/cenfraGit/Fishbone/tree/main/plugins/Fishbone.Plugins.OpenCv) and [Halcon24111](https://github.com/cenfraGit/Fishbone/tree/main/plugins/Fishbone.Plugins.Halcon24111). See the [quickstart](quickstart.md#5-plugins) for how to wire one up, and the [README](../README.md#plugins) for how to write one.
 
 ---
 
