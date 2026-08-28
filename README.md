@@ -1,4 +1,4 @@
-<img src="misc/fb_icon.png" width="72" alt="Fishbone logo">
+<img src="https://raw.githubusercontent.com/cenfraGit/Fishbone/main/misc/fb_icon.png" width="72" alt="Fishbone logo">
 
 # Fishbone
 
@@ -37,7 +37,7 @@ if (success) {
 }
 ```
 
-See the [language specification](docs/fishbone-spec.md) for the full grammar and semantics, and [samples/](samples/) for sample programs.
+See the [language specification](https://github.com/cenfraGit/Fishbone/blob/main/docs/fishbone-spec.md) for the full grammar and semantics, and [samples/](https://github.com/cenfraGit/Fishbone/tree/main/samples) for sample programs.
 
 ## What Fishbone is not
 
@@ -106,17 +106,17 @@ env.GetValue("image"); // the injected "currentImage" variable
 
 (the `RunDebuggableAsync` path will break execution at the first line until a debugger attaches. If `OpenIde` is set to true, SpineIDE (see below) will be launched and it'll attach automatically to the debug server).
 
-See [docs/quickstart.md](docs/quickstart.md) for the full embedding guide.
+See [docs/quickstart.md](https://github.com/cenfraGit/Fishbone/blob/main/docs/quickstart.md) for the full embedding guide.
 
 ## SpineIDE
 
-The cross-platform [SpineIDE](ide/Fishbone.SpineIDE/) app allows you to easily write, run and debug Fishbone programs. It can be used for standalone Fishbone development, or can be used to launch a debug session from your app automatically.
+The cross-platform [SpineIDE](https://github.com/cenfraGit/Fishbone/tree/main/ide/Fishbone.SpineIDE) app allows you to easily write, run and debug Fishbone programs. It can be used for standalone Fishbone development, or can be used to launch a debug session from your app automatically.
 
-![Image of IDE running Fishbone script](docs/images/Image1.png)
+![Image of IDE running Fishbone script](https://raw.githubusercontent.com/cenfraGit/Fishbone/main/docs/images/Image1.png)
 
 Fishbone uses DAP to allow users to set breakpoints, step through script lines and inspect the script's environment variables, whether attaching from SpineIDE or any DAP client.
 
-![Alt Text](docs/images/GIF1.gif)
+![Alt Text](https://raw.githubusercontent.com/cenfraGit/Fishbone/main/docs/images/GIF1.gif)
 
 ---
 
@@ -124,7 +124,7 @@ Fishbone uses DAP to allow users to set breakpoints, step through script lines a
 
 A plugin packages reusable builtins, values, types, etc. so that any script can use them without the host having to wire them up by hand. A plugin consists of a .NET class that implements `IFishbonePlugin`.
 
-All a plugin does is hook into an existing `FishboneConfiguration` and inject these builtins/values/types into that config. For example (taken directly from [Fishbone.Plugins.Math](plugins/Fishbone.Plugins.Math)):
+All a plugin does is hook into an existing `FishboneConfiguration` and inject these builtins/values/types into that config. For example (taken directly from [Fishbone.Plugins.Math](https://github.com/cenfraGit/Fishbone/tree/main/plugins/Fishbone.Plugins.Math)):
 
 ```csharp
 namespace Fishbone.Plugins.Math;
@@ -158,6 +158,6 @@ config.AddPlugin(new MathPlugin());
 
 ---
 
-[MIT](LICENSE) © 2026 cenfraGit
+[MIT](https://github.com/cenfraGit/Fishbone/blob/main/LICENSE) © 2026 cenfraGit
 
 Fishbone Icon by [@aaronrzt](https://github.com/aaronrzt) <img src="https://github.com/aaronrzt.png" width="24" height="24" alt="Avatar"> / [@aramireztaf](https://github.com/aramireztaf) <img src="https://github.com/aramireztaf.png" width="24" height="24" alt="Avatar">
