@@ -1,7 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>spineide</AssemblyName>
+    <!-- the project moved to Fishbone.SpineIDE but the source namespaces did not,
+         so pin this rather than let it follow the new project name -->
+    <RootNamespace>SpineIDE</RootNamespace>
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
@@ -67,7 +71,7 @@
 
   <Target Name="CopyFishboneDapHost" AfterTargets="Build">
     <ItemGroup>
-      <FishboneDapHostFiles Include="$(MSBuildProjectDirectory)\..\Fishbone.Dap\bin\$(Configuration)\net10.0\**\*" />
+      <FishboneDapHostFiles Include="$(MSBuildProjectDirectory)\..\Fishbone.Dap\bin\$(Configuration)\$(TargetFramework)\**\*" />
     </ItemGroup>
     <Copy SourceFiles="@(FishboneDapHostFiles)"
           DestinationFiles="@(FishboneDapHostFiles->'$(OutDir)daphost\%(RecursiveDir)%(Filename)%(Extension)')"

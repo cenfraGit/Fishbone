@@ -1,0 +1,63 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- ================================================================================
+       Packs a published SpineIDE build as a content-only NuGet package, one per RID.
+
+         dotnet publish ide/Fishbone.SpineIDE -r win-x64 -o <dir>
+         dotnet pack ide/Fishbone.SpineIDE.Package -p:SpineRid=win-x64 -p:SpinePublishDir=<dir>
+
+       pack.sh does both. the package carries no assembly and no dependencies, it only
+       drops the IDE into the consumer's output so RunDebuggableAsync can find it with
+       no configuration at all.
+       ================================================================================ -->
+
+  <PropertyGroup>
+    <!-- netstandard2.0 so the package is usable from any consumer TFM. nothing is
+         compiled or referenced, this is only here to satisfy the SDK -->
+    <TargetFramework>netstandard2.0</TargetFramework>
+
+    <SpineRid Condition="'$(SpineRid)' == ''">win-x64</SpineRid>
+    <SpinePublishDir Condition="'$(SpinePublishDir)' == ''">$(MSBuildThisFileDirectory)..\Fishbone.SpineIDE\bin\publish\$(SpineRid)</SpinePublishDir>
+
+    <!-- versioned independently of the engine. this package declares no dependencies,
+         so nothing pins it to a Fishbone version and it can move on its own cadence.
+         the other packages cannot: Fishbone.DebugAdapter pins Fishbone by exact version,
+         so those five have to be published together -->
+    <SpineIdeVersionPrefix>0.1.0</SpineIdeVersionPrefix>
+    <SpineIdeVersionSuffix>alpha.1</SpineIdeVersionSuffix>
+    <Version Condition="'$(SpineIdeVersionSuffix)' != ''">$(SpineIdeVersionPrefix)-$(SpineIdeVersionSuffix)</Version>
+    <Version Condition="'$(SpineIdeVersionSuffix)' == ''">$(SpineIdeVersionPrefix)</Version>
+
+    <IsPackable>true</IsPackable>
+    <PackageId>Fishbone.SpineIDE.$(SpineRid)</PackageId>
+    <Description>SpineIDE for $(SpineRid). Drops the Fishbone script debugger into your application's output so RunDebuggableAsync can launch it with no installation or configuration.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>$(PackageTags);ide;debugger;tools</PackageTags>
+
+    <!-- content only: no lib folder, no dependencies, no compile output -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\misc\fb_icon.png" Pack="true" PackagePath="\" />
+    <!-- the targets file is what actually copies the IDE into a consumer's output.
+         NuGet imports build\$(PackageId).targets automatically, so the name must match -->
+    <None Include="build\Fishbone.SpineIDE.targets" Pack="true" PackagePath="build\$(PackageId).targets" />
+  </ItemGroup>
+
+  <Target Name="IncludePublishedIde" BeforeTargets="_GetPackageFiles">
+    <Error Condition="!Exists('$(SpinePublishDir)')"
+           Text="SpinePublishDir does not exist: $(SpinePublishDir). Publish SpineIDE for $(SpineRid) first, or run pack.sh." />
+    <ItemGroup>
+      <!-- pdbs are excluded deliberately. the SkiaSharp and HarfBuzz native symbols alone
+           are 100 MB, two thirds of the publish, and nobody consuming this needs them -->
+      <None Include="$(SpinePublishDir)\**\*" Exclude="$(SpinePublishDir)\**\*.pdb"
+            Pack="true" PackagePath="tools\spineide\" />
+    </ItemGroup>
+  </Target>
+
+</Project>

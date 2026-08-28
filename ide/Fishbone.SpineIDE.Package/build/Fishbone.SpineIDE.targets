@@ -1,0 +1,36 @@
+﻿<Project>
+
+  <!-- ================================================================================
+       Imported automatically by NuGet when a project references Fishbone.SpineIDE.<rid>.
+
+       Copies the IDE into a "spineide" subfolder of the consumer's output. A subfolder
+       rather than the output root on purpose: SpineIDE brings about 130 files including
+       Microsoft.VisualStudio.Threading and System.CommandLine, which would collide with
+       a host's own copies at different versions. Kept apart, it runs as its own process
+       from its own folder using its own deps.json.
+
+       Fishbone.DebugAdapter looks in exactly this folder, so RunDebuggableAsync with
+       OpenIde = true finds it with no configuration.
+
+       To leave it out of a particular build, set FishboneIncludeSpineIde to false:
+
+         <PropertyGroup>
+           <FishboneIncludeSpineIde Condition="'$(Configuration)' == 'Release'">false</FishboneIncludeSpineIde>
+         </PropertyGroup>
+       ================================================================================ -->
+
+  <PropertyGroup>
+    <FishboneIncludeSpineIde Condition="'$(FishboneIncludeSpineIde)' == ''">true</FishboneIncludeSpineIde>
+    <FishboneSpineIdeDir>$(MSBuildThisFileDirectory)..\tools\spineide\</FishboneSpineIdeDir>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(FishboneIncludeSpineIde)' == 'true'">
+    <FishboneSpineIdeFile Include="$(FishboneSpineIdeDir)**\*" />
+    <None Include="@(FishboneSpineIdeFile)">
+      <Link>spineide\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </None>
+  </ItemGroup>
+
+</Project>

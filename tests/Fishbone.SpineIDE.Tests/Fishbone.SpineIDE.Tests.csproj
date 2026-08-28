@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>SpineIDE.Tests</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
@@ -17,7 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Fishbone.DebugClient\Fishbone.DebugClient.csproj" />
     <ProjectReference Include="..\..\src\Fishbone.Debugging\Fishbone.Debugging.csproj" />
-    <ProjectReference Include="..\..\ide\SpineIDE\SpineIDE.csproj" />
+    <ProjectReference Include="..\..\ide\Fishbone.SpineIDE\Fishbone.SpineIDE.csproj" />
   </ItemGroup>
 
   <ItemGroup>

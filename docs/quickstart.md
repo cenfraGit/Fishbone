@@ -163,14 +163,29 @@ public sealed class FishboneRunResult
 
 ### Locating the IDE
 
-The default launcher looks for SpineIDE via the `SPINEIDE_PATH` environment variable, then next to the host application, then on `PATH`. It passes `--attach <port>`. You can replace it entirely:
+The easiest way to get SpineIDE onto a machine is the package for your platform:
+
+```
+dotnet add package Fishbone.SpineIDE.win-x64 --version 0.1.0-alpha.1
+```
+
+That drops the IDE into a `spineide` folder in your build output, which the launcher checks, so `OpenIde = true` then works with no configuration at all. There is one package per platform (`win-x64`, `linux-x64`) because Avalonia's native rendering binaries are platform specific. To leave it out of a particular build, set `FishboneIncludeSpineIde` to `false`.
+
+In full, the launcher looks for an executable named `spineide` in four places, in order:
+
+1. the path in the `SPINEIDE_PATH` environment variable
+2. next to the host application
+3. the `spineide` folder in the host's output, which is what the package populates
+4. anywhere on `PATH`
+
+It passes `--attach <port>`. You can replace the whole thing:
 
 ```csharp
 var options = new FishboneDebugOptions
 {
     OpenIde     = true,
     IdeLauncher = endpoint =>
-        Process.Start("SpineIDE", $"--attach {endpoint.Port}"),
+        Process.Start("spineide", $"--attach {endpoint.Port}"),
 };
 ```
 

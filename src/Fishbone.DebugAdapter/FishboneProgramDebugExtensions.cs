@@ -78,16 +78,27 @@ public static class FishboneProgramDebugExtensions
         });
     }
 
+    /// <summary>Subfolder of the host's output that the SpineIDE package populates.</summary>
+    internal const string SpineIdeFolderName = "spineide";
+
     private static string ResolveSpineIde()
     {
         var fromEnvironment = Environment.GetEnvironmentVariable("SPINEIDE_PATH");
         if (!string.IsNullOrWhiteSpace(fromEnvironment) && File.Exists(fromEnvironment))
             return fromEnvironment;
 
-        var executableName = OperatingSystem.IsWindows() ? "SpineIDE.exe" : "SpineIDE";
+        var executableName = OperatingSystem.IsWindows() ? "spineide.exe" : "spineide";
+
         var besideHost = Path.Combine(AppContext.BaseDirectory, executableName);
         if (File.Exists(besideHost))
             return besideHost;
+
+        // the Fishbone.SpineIDE.<rid> package drops the IDE into its own subfolder rather
+        // than next to the host, so its ~130 files cannot collide with the host's own
+        // dependencies. it still runs out of that folder using its own deps.json
+        var inSubfolder = Path.Combine(AppContext.BaseDirectory, SpineIdeFolderName, executableName);
+        if (File.Exists(inSubfolder))
+            return inSubfolder;
 
         // last resort is to let the OS resolve it on PATH
         return executableName;

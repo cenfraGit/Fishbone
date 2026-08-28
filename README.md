@@ -110,7 +110,7 @@ See [docs/quickstart.md](docs/quickstart.md) for the full embedding guide.
 
 ## SpineIDE
 
-The cross-platform [SpineIDE](ide/SpineIDE/) app allows you to easily write, run and debug Fishbone programs. It can be used for standalone Fishbone development, or can be used to launch a debug session from your app automatically.
+The cross-platform [SpineIDE](ide/Fishbone.SpineIDE/) app allows you to easily write, run and debug Fishbone programs. It can be used for standalone Fishbone development, or can be used to launch a debug session from your app automatically.
 
 ![Image of IDE running Fishbone script](docs/images/Image1.png)
 
