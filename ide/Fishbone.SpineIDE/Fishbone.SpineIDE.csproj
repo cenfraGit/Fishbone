@@ -6,6 +6,7 @@
     <!-- the project moved to Fishbone.SpineIDE but the source namespaces did not,
          so pin this rather than let it follow the new project name -->
     <RootNamespace>SpineIDE</RootNamespace>
+    <ApplicationIcon>Assets\fishbone.ico</ApplicationIcon>
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
