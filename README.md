@@ -1,5 +1,6 @@
+<img src="misc/fb_icon.png" width="72" alt="Fishbone logo">
 
-# <span style="display: inline-flex; align-items: center; gap: 10px;"><img src="misc/fb_icon.png" width="60" height="60" alt="Logo"> Fishbone</span>
+# Fishbone
 
 [![CI](https://github.com/cenfraGit/Fishbone/actions/workflows/ci.yml/badge.svg)](https://github.com/cenfraGit/Fishbone/actions/workflows/ci.yml)
 
@@ -159,4 +160,4 @@ config.AddPlugin(new MathPlugin());
 
 [MIT](LICENSE) © 2026 cenfraGit
 
-Fishbone Icon by [@aaronrzt](https://github.com/aaronrzt) <img src="https://github.com/aaronrzt.png" width="24" height="24" style="border-radius: 50%; vertical-align: middle;" alt="Avatar"> / [@aramireztaf](https://github.com/aramireztaf) <img src="https://github.com/aramireztaf.png" width="24" height="24" style="border-radius: 50%; vertical-align: middle;" alt="Avatar">
+Fishbone Icon by [@aaronrzt](https://github.com/aaronrzt) <img src="https://github.com/aaronrzt.png" width="24" height="24" alt="Avatar"> / [@aramireztaf](https://github.com/aramireztaf) <img src="https://github.com/aramireztaf.png" width="24" height="24" alt="Avatar">

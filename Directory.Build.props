@@ -21,6 +21,7 @@
     <RepositoryUrl>https://github.com/cenfraGit/Fishbone</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>scripting;language;interop;embedding;dotnet</PackageTags>
+    <PackageIcon>fb_icon.png</PackageIcon>
   </PropertyGroup>
 
 </Project>
