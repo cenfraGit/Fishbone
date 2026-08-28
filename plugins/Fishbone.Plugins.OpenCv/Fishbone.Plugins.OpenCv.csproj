@@ -2,30 +2,40 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
     <EnableDynamicLoading>true</EnableDynamicLoading>
+    <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
+
+    <IsPackable>true</IsPackable>
+    <PackageId>Fishbone.Plugins.OpenCv</PackageId>
+    <Description>OpenCV built-ins for Fishbone scripts, backed by OpenCvSharp.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>$(PackageTags);plugin;opencv;imaging</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- the host already has Fishbone loaded; reference it for the IFishbonePlugin
-         contract but do NOT ship a second copy -->
+    <!-- Private=false keeps a second copy of Fishbone out of the build output, which matters
+         when this is dropped into a plugins folder. packing is unaffected: it still becomes
+         an ordinary package dependency -->
     <ProjectReference Include="..\..\src\Fishbone\Fishbone.csproj">
       <Private>false</Private>
-      <ExcludeAssets>runtime</ExcludeAssets>
     </ProjectReference>
-    <ProjectReference Include="..\..\src\Fishbone.Interpreter\Fishbone.Interpreter.csproj">
+    <!-- ships inside the Fishbone package, so it must not become a dependency of its own -->
+    <ProjectReference Include="..\..\src\Fishbone.Interpreter\Fishbone.Interpreter.csproj" PrivateAssets="all">
       <Private>false</Private>
-      <ExcludeAssets>runtime</ExcludeAssets>
     </ProjectReference>
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260602" />
-    <!-- native runtimes: NuGet places each under runtimes/{rid}/native, and a RID-specific
-         publish (-r win-x64 / -r linux-x64) flattens the right one next to the plugin dll -->
+    <!-- native runtimes: NuGet places each under runtimes/{rid}/native, and these flow to a
+         consuming app as ordinary package dependencies -->
     <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.13.0.20260602" />
     <PackageReference Include="OpenCvSharp4.official.runtime.linux-x64" Version="4.13.0.20260602" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\misc\fb_icon.png" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>

@@ -2,25 +2,36 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <EnableDynamicLoading>true</EnableDynamicLoading>
     <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
+
+    <IsPackable>true</IsPackable>
+    <PackageId>Fishbone.Plugins.Halcon24111</PackageId>
+    <Description>HALCON operators and HDevelop procedures for Fishbone scripts, backed by MVTec.HalconDotNet 24.11.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>$(PackageTags);plugin;halcon;machine-vision</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Private=false keeps a second copy of Fishbone out of the build output, which matters
+         when this is dropped into a plugins folder. packing is unaffected: it still becomes
+         an ordinary package dependency -->
     <ProjectReference Include="..\..\src\Fishbone\Fishbone.csproj">
       <Private>false</Private>
-      <ExcludeAssets>runtime</ExcludeAssets>
     </ProjectReference>
+    <!-- ships inside the Fishbone package, so it must not become a dependency of its own -->
     <ProjectReference Include="..\..\src\Fishbone.Interpreter\Fishbone.Interpreter.csproj" PrivateAssets="all">
       <Private>false</Private>
-      <ExcludeAssets>runtime</ExcludeAssets>
     </ProjectReference>
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="MVTec.HalconDotNet" Version="24111.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\misc\fb_icon.png" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>

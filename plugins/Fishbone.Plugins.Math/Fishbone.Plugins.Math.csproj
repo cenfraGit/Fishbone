@@ -2,26 +2,32 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <EnableDynamicLoading>true</EnableDynamicLoading>
+    <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
+
+    <IsPackable>true</IsPackable>
+    <PackageId>Fishbone.Plugins.Math</PackageId>
+    <Description>Math built-ins for Fishbone scripts: PI, E, abs, round, min, max, pow and sqrt.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>$(PackageTags);plugin;math</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- the host already has Fishbone loaded; reference it for the IFishbonePlugin
-         contract but do NOT ship a second copy -->
+    <!-- Private=false keeps a second copy of Fishbone out of the build output, which matters
+         when this is dropped into a plugins folder. packing is unaffected: it still becomes
+         an ordinary package dependency -->
     <ProjectReference Include="..\..\src\Fishbone\Fishbone.csproj">
       <Private>false</Private>
-      <ExcludeAssets>runtime</ExcludeAssets>
     </ProjectReference>
-    <ProjectReference Include="..\..\src\Fishbone.Interpreter\Fishbone.Interpreter.csproj">
+    <!-- ships inside the Fishbone package, so it must not become a dependency of its own -->
+    <ProjectReference Include="..\..\src\Fishbone.Interpreter\Fishbone.Interpreter.csproj" PrivateAssets="all">
       <Private>false</Private>
-      <ExcludeAssets>runtime</ExcludeAssets>
     </ProjectReference>
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Fishbone\Fishbone.csproj" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\misc\fb_icon.png" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>
