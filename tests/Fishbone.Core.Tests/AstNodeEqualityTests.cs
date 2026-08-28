@@ -1,3 +1,5 @@
+using Fishbone.Ast;
+
 namespace Fishbone.Core.Tests;
 
 public class AstNodeEqualityTests

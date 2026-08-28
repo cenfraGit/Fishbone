@@ -1,4 +1,4 @@
-using Fishbone.Core;
+using Fishbone;
 using Fishbone.DebugClient;
 using System.Collections.Generic;
 

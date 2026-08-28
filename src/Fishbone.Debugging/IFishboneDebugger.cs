@@ -1,6 +1,6 @@
-using Fishbone.Core;
+using Fishbone.Ast;
 
-namespace Fishbone.Debugging;
+namespace Fishbone;
 
 public interface IFishboneDebugger
 {

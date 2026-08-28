@@ -1,4 +1,5 @@
-using Fishbone.Core;
+using Fishbone;
+using Fishbone.Ast;
 using Fishbone.Debugging;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Models;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Requests;

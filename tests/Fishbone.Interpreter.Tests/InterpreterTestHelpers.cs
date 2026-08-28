@@ -1,4 +1,4 @@
-using Fishbone.Core;
+using Fishbone;
 using Fishbone.Parser;
 
 namespace Fishbone.Interpreter.Tests;

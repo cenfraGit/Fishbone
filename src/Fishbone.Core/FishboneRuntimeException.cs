@@ -10,7 +10,7 @@
 // ASTParser.
 // --------------------------------------------------------------------------------
 
-namespace Fishbone.Core;
+namespace Fishbone;
 
 public class FishboneRuntimeException : Exception
 {

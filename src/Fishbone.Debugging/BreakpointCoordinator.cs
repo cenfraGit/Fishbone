@@ -1,4 +1,5 @@
-using Fishbone.Core;
+using Fishbone;
+using Fishbone.Ast;
 using System.Collections.Immutable;
 
 namespace Fishbone.Debugging;

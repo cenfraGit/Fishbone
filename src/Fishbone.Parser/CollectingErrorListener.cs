@@ -16,8 +16,6 @@ using Antlr4.Runtime;
 
 namespace Fishbone.Parser;
 
-public readonly record struct ParseError(int Line, int Column, string Message, string? OffendingText);
-
 // implement both <IToken> and <int> error listener interfaces so it
 // can be registered on both the lexer and parser
 internal sealed class CollectingErrorListener : IAntlrErrorListener<IToken>, IAntlrErrorListener<int>

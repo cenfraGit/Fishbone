@@ -1,6 +1,5 @@
 ﻿using Fishbone;
-using Fishbone.Core;
-using Fishbone.Parser;
+using Fishbone;
 using System.CommandLine;
 
 namespace SpineCLI;

@@ -6,7 +6,8 @@
 // build the AST (normally starting with ProgramContext)
 // --------------------------------------------------------------------------------
 
-using Fishbone.Core;
+using Fishbone;
+using Fishbone.Ast;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;

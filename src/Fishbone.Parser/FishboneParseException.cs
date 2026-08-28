@@ -11,7 +11,7 @@
 // to whoever called it so that they can report errors to the user.
 // --------------------------------------------------------------------------------
 
-namespace Fishbone.Parser;
+namespace Fishbone;
 
 public class FishboneParseException : Exception
 {

@@ -15,7 +15,7 @@
 // values coming back).
 // --------------------------------------------------------------------------------
 
-namespace Fishbone.Interpreter;
+namespace Fishbone;
 
 /// <summary>
 /// A host-registered conversion between a script value and a .NET type that the generic interop

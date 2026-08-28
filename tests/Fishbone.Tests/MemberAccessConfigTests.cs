@@ -1,4 +1,4 @@
-using Fishbone.Core;
+using Fishbone;
 
 namespace Fishbone.Tests;
 

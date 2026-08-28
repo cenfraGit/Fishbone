@@ -4,7 +4,7 @@
 // the entry point for fishbone code execution.
 // --------------------------------------------------------------------------------
 
-using Fishbone.Core;
+using Fishbone.Ast;
 using Fishbone.Debugging;
 using Fishbone.Interpreter;
 using Fishbone.Parser;

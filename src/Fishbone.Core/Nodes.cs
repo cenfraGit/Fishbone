@@ -12,7 +12,7 @@
 
 using System.Collections.Immutable;
 
-namespace Fishbone.Core;
+namespace Fishbone.Ast;
 
 // --------------------------------------------------------------------------------
 // base

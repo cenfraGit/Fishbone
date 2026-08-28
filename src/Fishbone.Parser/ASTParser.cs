@@ -6,7 +6,8 @@
 // --------------------------------------------------------------------------------
 
 using Antlr4.Runtime;
-using Fishbone.Core;
+using Fishbone;
+using Fishbone.Ast;
 
 namespace Fishbone.Parser;
 

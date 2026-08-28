@@ -7,7 +7,8 @@
 // it to the correct Evaluate* method. it can be used to evaluate a whole program
 // --------------------------------------------------------------------------------
 
-using Fishbone.Core;
+using Fishbone;
+using Fishbone.Ast;
 using Fishbone.Debugging;
 using System.Collections;
 using System.Globalization;

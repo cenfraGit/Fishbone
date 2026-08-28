@@ -20,7 +20,7 @@
 // completely (although they can be mutated via methods)
 // --------------------------------------------------------------------------------
 
-namespace Fishbone.Core;
+namespace Fishbone;
 
 public class FishboneEnvironment
 {
