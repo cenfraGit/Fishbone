@@ -27,6 +27,15 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      # OpenCvSharp's linux-x64 native build links against the GTK3 stack. installing
+      # libgtk-3-0 pulls in atk, cairo, pango, harfbuzz and gdk-pixbuf with it, so this
+      # one package covers every dependency libOpenCvSharpExtern.so declares
+      - name: Install native OpenCV dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-0
+
       - name: Restore
         run: dotnet restore Fishbone.slnx
 
