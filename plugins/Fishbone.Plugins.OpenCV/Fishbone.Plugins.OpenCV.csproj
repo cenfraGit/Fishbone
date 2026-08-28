@@ -6,7 +6,7 @@
     <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
 
     <IsPackable>true</IsPackable>
-    <PackageId>Fishbone.Plugins.OpenCv</PackageId>
+    <PackageId>Fishbone.Plugins.OpenCV</PackageId>
     <Description>OpenCV built-ins for Fishbone scripts, backed by OpenCvSharp.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>$(PackageTags);plugin;opencv;imaging</PackageTags>

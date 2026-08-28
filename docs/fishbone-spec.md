@@ -601,7 +601,7 @@ Plugins can also be discovered on disk. `FishbonePluginLoader.LoadPlugins` scans
 
 So what a script can actually call depends entirely on who is running it. Under SpineIDE or SpineCLI you get `print`, `println` and `input`, because those hosts register them. Under your own host you get exactly what you registered.
 
-The three plugins in this repo are [Math](https://github.com/cenfraGit/Fishbone/tree/main/plugins/Fishbone.Plugins.Math), [OpenCv](https://github.com/cenfraGit/Fishbone/tree/main/plugins/Fishbone.Plugins.OpenCv) and [Halcon24111](https://github.com/cenfraGit/Fishbone/tree/main/plugins/Fishbone.Plugins.Halcon24111). See the [quickstart](quickstart.md#5-plugins) for how to wire one up, and the [README](../README.md#plugins) for how to write one.
+The three plugins in this repo are [Math](https://github.com/cenfraGit/Fishbone/tree/main/plugins/Fishbone.Plugins.Math), [OpenCV](https://github.com/cenfraGit/Fishbone/tree/main/plugins/Fishbone.Plugins.OpenCV) and [Halcon24111](https://github.com/cenfraGit/Fishbone/tree/main/plugins/Fishbone.Plugins.Halcon24111). See the [quickstart](quickstart.md#5-plugins) for how to wire one up, and the [README](../README.md#plugins) for how to write one.
 
 ---
 

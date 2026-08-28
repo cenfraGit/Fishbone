@@ -216,9 +216,9 @@ var loaded = FishbonePluginLoader.LoadPlugins(
 
 `DefaultPluginsDirectory` is `~/.fishbone/plugins`. Each plugin gets its own subfolder there, and every DLL in it is scanned for `IFishbonePlugin` types. Only plugins with a parameterless constructor are picked up this way (one that needs constructor arguments is meant to be built by the host and passed to `AddPlugin`). A DLL that fails to load is skipped rather than taking the whole loader down.
 
-This is the path SpineIDE, SpineCLI and the DAP host all use, which is why [samples/edge_detect.fb](../samples/edge_detect.fb) works once you drop `Fishbone.Plugins.OpenCv` into that folder.
+This is the path SpineIDE, SpineCLI and the DAP host all use, which is why [samples/edge_detect.fb](../samples/edge_detect.fb) works once you drop `Fishbone.Plugins.OpenCV` into that folder.
 
-The three plugins in this repo are [Math](https://github.com/cenfraGit/Fishbone/tree/main/plugins/Fishbone.Plugins.Math), [OpenCv](https://github.com/cenfraGit/Fishbone/tree/main/plugins/Fishbone.Plugins.OpenCv) and [Halcon24111](https://github.com/cenfraGit/Fishbone/tree/main/plugins/Fishbone.Plugins.Halcon24111).
+The three plugins in this repo are [Math](https://github.com/cenfraGit/Fishbone/tree/main/plugins/Fishbone.Plugins.Math), [OpenCV](https://github.com/cenfraGit/Fishbone/tree/main/plugins/Fishbone.Plugins.OpenCV) and [Halcon24111](https://github.com/cenfraGit/Fishbone/tree/main/plugins/Fishbone.Plugins.Halcon24111).
 
 ---
 

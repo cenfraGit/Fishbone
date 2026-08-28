@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.Loader;
 using System.Text.RegularExpressions;
 
-namespace Fishbone.Plugins.OpenCv;
+namespace Fishbone.Plugins.OpenCV;
 
 /// <summary>
 /// Exposes OpenCV's <see cref="Cv2"/> operations to Fishbone by reflection. Each public static
@@ -23,7 +23,7 @@ namespace Fishbone.Plugins.OpenCv;
 /// Size/Scalar/Point) are registered as Fishbone type converters; optional OpenCV parameters may be
 /// omitted and take their defaults.
 /// </summary>
-public sealed partial class OpenCvPlugin : IFishbonePlugin
+public sealed partial class OpenCVPlugin : IFishbonePlugin
 {
     private static int _nativeResolverRegistered;
     private static AssemblyDependencyResolver? _dependencyResolver;
@@ -41,12 +41,12 @@ public sealed partial class OpenCvPlugin : IFishbonePlugin
 
     private static void RegisterConverters(FishboneConfiguration config)
     {
-        config.AddTypeConverter(typeof(InputArray), OpenCvConverters.ToInputArray);
-        config.AddTypeConverter(typeof(OutputArray), OpenCvConverters.ToOutputArray);
-        config.AddTypeConverter(typeof(InputOutputArray), OpenCvConverters.ToInputOutputArray);
-        config.AddTypeConverter(typeof(Size), OpenCvConverters.ToSize);
-        config.AddTypeConverter(typeof(Point), OpenCvConverters.ToPoint);
-        config.AddTypeConverter(typeof(Scalar), OpenCvConverters.ToScalar);
+        config.AddTypeConverter(typeof(InputArray), OpenCVConverters.ToInputArray);
+        config.AddTypeConverter(typeof(OutputArray), OpenCVConverters.ToOutputArray);
+        config.AddTypeConverter(typeof(InputOutputArray), OpenCVConverters.ToInputOutputArray);
+        config.AddTypeConverter(typeof(Size), OpenCVConverters.ToSize);
+        config.AddTypeConverter(typeof(Point), OpenCVConverters.ToPoint);
+        config.AddTypeConverter(typeof(Scalar), OpenCVConverters.ToScalar);
     }
 
     private static void RegisterCv2Operations(FishboneConfiguration config)
@@ -99,7 +99,7 @@ public sealed partial class OpenCvPlugin : IFishbonePlugin
         if (Interlocked.Exchange(ref _nativeResolverRegistered, 1) == 1)
             return;
 
-        var pluginPath = typeof(OpenCvPlugin).Assembly.Location;
+        var pluginPath = typeof(OpenCVPlugin).Assembly.Location;
         if (string.IsNullOrEmpty(pluginPath))
             return;
 

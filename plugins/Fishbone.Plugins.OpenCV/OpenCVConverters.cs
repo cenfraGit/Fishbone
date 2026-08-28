@@ -1,9 +1,9 @@
 using OpenCvSharp;
 using System.Collections;
 
-namespace Fishbone.Plugins.OpenCv;
+namespace Fishbone.Plugins.OpenCV;
 
-internal static class OpenCvConverters
+internal static class OpenCVConverters
 {
     public static InputArray ToInputArray(object value) => (Mat)value;
 
