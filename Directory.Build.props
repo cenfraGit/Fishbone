@@ -1,0 +1,26 @@
+<Project>
+
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!-- project opts in with IsPackable=true -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!-- package metadata, used by whatever opts in -->
+  <PropertyGroup>
+	<VersionPrefix>0.1.0</VersionPrefix>
+	<VersionSuffix>alpha.1</VersionSuffix>
+    <Authors>cenfraGit</Authors>
+    <PackageProjectUrl>https://github.com/cenfraGit/Fishbone</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/cenfraGit/Fishbone</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>scripting;language;interop;embedding;dotnet</PackageTags>
+  </PropertyGroup>
+
+</Project>

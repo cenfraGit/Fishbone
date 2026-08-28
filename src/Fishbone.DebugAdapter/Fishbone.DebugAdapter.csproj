@@ -4,13 +4,24 @@
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+
+    <IsPackable>true</IsPackable>
+    <PackageId>Fishbone.DebugAdapter</PackageId>
+    <Description>Step-debugging for Fishbone scripts over the Debug Adapter Protocol.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="OmniSharp.Extensions.DebugAdapter" Version="0.19.9" />
     <PackageReference Include="OmniSharp.Extensions.DebugAdapter.Server" Version="0.19.9" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Fishbone.Debugging\Fishbone.Debugging.csproj" />
+    <!-- already ships inside Fishbone, so don't bundle again -->
+    <ProjectReference Include="..\Fishbone.Debugging\Fishbone.Debugging.csproj" PrivateAssets="all" />
     <ProjectReference Include="..\Fishbone\Fishbone.csproj" />
   </ItemGroup>
 </Project>
