@@ -1,4 +1,7 @@
 using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using System.Text.Json;
 using Fishbone;
 using Fishbone.DebugClient;
 
@@ -97,5 +100,54 @@ public class RunDebuggableAsyncTests
         Assert.Null(result.Error);
         Assert.NotNull(result.Environment);
         Assert.Equal(42, result.Environment!.GetValue("doubled"));
+    }
+
+    [Fact]
+    public async Task RunDebuggableAsync_ClientVanishesWhilePaused_ScriptStillRunsToCompletion()
+    {
+        // closing the debugger window kills the socket without sending a disconnect request.
+        // the script should carry on as if continued, not be cancelled half way
+        var program = FishboneProgram.FromSourceCode("let seed = 21; let doubled = seed * 2;");
+
+        var result = await program.RunDebuggableAsync(new FishboneConfiguration(), new FishboneDebugOptions
+        {
+            OpenIde       = true,
+            AttachTimeout = TimeSpan.FromSeconds(30),
+            IdeLauncher   = endpoint =>
+            {
+                _ = Task.Run(async () =>
+                {
+                    using var tcp = new TcpClient();
+                    await tcp.ConnectAsync(IPAddress.Loopback, endpoint.Port);
+                    Stream stream = tcp.GetStream();
+
+                    int seq = 1;
+                    await SendRequestAsync(stream, seq++, "initialize", new { adapterID = "fishbone" });
+                    await Task.Delay(300);
+                    await SendRequestAsync(stream, seq++, "attach", new { stopOnEntry = true });
+                    await Task.Delay(300);
+                    await SendRequestAsync(stream, seq++, "configurationDone", new { });
+
+                    // let it settle on the entry stop, then yank the socket
+                    await Task.Delay(1500);
+                    tcp.Client.Close(0);   // abortive, no FIN and no disconnect request
+                });
+                return null;
+            },
+        });
+
+        Assert.True(result.DebuggerAttached);
+        Assert.False(result.WasCancelled);
+        Assert.NotNull(result.Environment);
+        Assert.Equal(42, result.Environment!.GetValue("doubled"));
+    }
+
+    private static async Task SendRequestAsync(Stream stream, int seq, string command, object arguments)
+    {
+        byte[] body = JsonSerializer.SerializeToUtf8Bytes(new { seq, type = "request", command, arguments });
+        byte[] header = Encoding.ASCII.GetBytes($"Content-Length: {body.Length}\r\n\r\n");
+        await stream.WriteAsync(header);
+        await stream.WriteAsync(body);
+        await stream.FlushAsync();
     }
 }

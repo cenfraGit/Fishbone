@@ -157,7 +157,10 @@ public sealed class FishboneDebugServerSession : IAsyncDisposable
             await initialize.ConfigureAwait(false);
             first = await Task.WhenAny(activeSession.Completion, disconnected).ConfigureAwait(false);
             if (first == disconnected && !activeSession.IsDetached)
-                activeSession.Stop();
+                // the client vanished without sending a disconnect request, which is what
+                // closing the debugger window looks like. treat it the same as a graceful
+                // detach and let the script finish, rather than cancelling it half way
+                activeSession.Detach();
 
             int exitCode = await activeSession.Completion.ConfigureAwait(false);
             if (!activeSession.IsDetached && !disconnected.IsCompleted)
