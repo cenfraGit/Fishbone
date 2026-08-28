@@ -57,6 +57,11 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Fishbone.DebugClient\Fishbone.DebugClient.csproj" />
     <ProjectReference Include="..\..\src\Fishbone\Fishbone.csproj" />
+    <!-- Fishbone marks its sibling projects PrivateAssets=all so they pack as one
+         package, which means they no longer transitive. reference what we use -->
+    <ProjectReference Include="..\..\src\Fishbone.Core\Fishbone.Core.csproj" />
+    <ProjectReference Include="..\..\src\Fishbone.Parser\Fishbone.Parser.csproj" />
+    <ProjectReference Include="..\..\src\Fishbone.Interpreter\Fishbone.Interpreter.csproj" />
     <ProjectReference Include="..\Fishbone.Dap\Fishbone.Dap.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 

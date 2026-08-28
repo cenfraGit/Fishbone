@@ -1,4 +1,5 @@
 using Fishbone.Core;
+using Fishbone.Interpreter;
 
 namespace Fishbone.Tests;
 
@@ -63,13 +64,30 @@ try { throw "x"; } catch { log.Add("caught"); } finally { log.Add("f2"); }
         var config = new FishboneConfiguration()
             .AddBuiltIn("record", new Action<string>(log.Add));
 
-        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run("""
+        // a script 'throw' escapes as FishboneScriptException, which carries its own
+        // line/column so the interpreter does not wrap it a second time
+        var exception = Assert.Throws<FishboneScriptException>(() => FishboneProgram.Run("""
 try { throw "escaping"; }
 finally { record("cleanup"); }
 """, config));
 
         Assert.Equal(["cleanup"], log);
         Assert.Contains("escaping", exception.Message);
+        Assert.Equal("escaping", exception.Value);
+        Assert.True(exception.Line > 0);
+        Assert.Null(exception.InnerException);
+    }
+
+    [Fact]
+    public void Run_ThrownValue_IsCatchableAsRuntimeExceptionByAHost()
+    {
+        // a host that does not care why the script failed catches one type for everything
+        var exception = Assert.ThrowsAny<FishboneRuntimeException>(
+            () => FishboneProgram.Run("throw \"boom\";", new FishboneConfiguration()));
+
+        var script = Assert.IsType<FishboneScriptException>(exception);
+        Assert.Equal("boom", script.Value);
+        Assert.Equal(1, script.Line);
     }
 
     [Fact]

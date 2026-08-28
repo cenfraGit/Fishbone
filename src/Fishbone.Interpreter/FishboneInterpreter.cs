@@ -514,7 +514,7 @@ public class FishboneInterpreter
         var value = Evaluate(env, node.Value!);
         if (value is Exception exception)
             throw exception;
-        throw new FishboneScriptException(value);
+        throw new FishboneScriptException(value, node.Line, node.Column);
     }
 
     // --------------------------------------------------------------------------------

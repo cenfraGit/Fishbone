@@ -435,17 +435,33 @@ Two things a script can't catch: host cancellation, and the internal control-flo
 
 (a debugger note. An exception raised inside a `try` isn't reported as an unhandled runtime error. If that `try` has no `catch`, it gets reported once it escapes the statement, which is standard "break on unhandled" behavior.)
 
-### The three exception types
+### The exception types
 
-Every Fishbone error is one of these:
+A host only ever has to catch two things:
 
 - **`FishboneParseException`**, meaning the script couldn't be parsed. Carries the list of syntax errors with their line and column
-- **`FishboneRuntimeException`**, meaning something went wrong while the script ran. Carries the `Line` and `Column` of the failing statement or expression. This is the one an embedding host catches
-- **`FishboneScriptException`**, meaning a script threw a value that wasn't an exception
+- **`FishboneRuntimeException`**, meaning something went wrong while the script ran. Carries the `Line` and `Column` of the failing statement or expression
 
-`FishboneRuntimeException.InnerException` tells you which of two situations you're in. **Null** means the language itself diagnosed the problem: an undefined variable, indexing into null, an impossible conversion. **Non-null** means a .NET call the script made threw, and the inner exception is that original exception.
+There's a third type, **`FishboneScriptException`**, for when a script `throw`s a value that isn't already a .NET exception. It **derives from `FishboneRuntimeException`**, so a host that doesn't care why the script failed catches one type and is done. Narrow to it only when you want the thrown value, which it keeps in `Value`:
 
-Inside a script's `catch (e)`, the binding follows the same split. For a language-diagnosed error, `e` is the `FishboneRuntimeException` itself, with its `Line` and `Column`. For a failed .NET call, `e` is the original exception that call threw.
+```csharp
+try
+{
+    program.Run(config);
+}
+catch (FishboneScriptException ex)
+{
+    Console.WriteLine($"the script threw {ex.Value} at {ex.Line}:{ex.Column}");
+}
+catch (FishboneRuntimeException ex)
+{
+    Console.WriteLine($"failed at {ex.Line}:{ex.Column}: {ex.Message}");
+}
+```
+
+`InnerException` tells you where a `FishboneRuntimeException` came from. **Null** means the language itself diagnosed the problem: an undefined variable, indexing into null, an impossible conversion. **Non-null** means a .NET call the script made threw, and the inner exception is that original exception. (a `FishboneScriptException` always has a null inner, since nothing failed underneath it.)
+
+Inside a script's `catch (e)`, the binding follows the same split. For a language-diagnosed error, `e` is the `FishboneRuntimeException` itself, with its `Line` and `Column`. For a failed .NET call, `e` is the original exception that call threw. For a script `throw`, `e` is the `FishboneScriptException`.
 
 ---
 
@@ -537,9 +553,9 @@ Increment(ref n);                      // 'n' must already exist, and gets updat
 
 Four things are errors: omitting the keyword on an `out`/`ref` parameter, using a keyword on a by-value parameter, passing a non-variable expression with a keyword, and using `out`/`ref` when calling a Fishbone function.
 
-### Host callables with native signatures
+### Host callables built by hand
 
-`out` and `ref` aren't limited to reflected .NET methods. A host can expose a callable that isn't a .NET method at all but still declares a typed `in`/`out`/ `ref` signature, by registering an object implementing `INativeCallable`. Its `Parameters` list gives each parameter a name, a .NET type and a direction.
+`out` and `ref` aren't limited to reflected .NET methods. A host can expose a callable that isn't a .NET method at all but still declares a typed `in`/`out`/`ref` signature, by registering an object implementing `IManualCallable`. Its `Parameters` list gives each parameter a name, a .NET type and a direction.
 
 The interpreter binds arguments positionally, converts inputs through the same registered-converter logic as a real .NET call, invokes the host's implementation, and writes `out`/`ref` results back into the script's variables. This is how you call a runtime-defined operation that has no backing .NET method:
 
