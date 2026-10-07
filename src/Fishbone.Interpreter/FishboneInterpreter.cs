@@ -295,7 +295,58 @@ public class FishboneInterpreter
         if (value is null || targetType.IsInstanceOfType(value))
             return value;
 
-        return TryConvertArgument(value, targetType, out var converted) ? converted : null;
+        if (TryConvertArgument(value, targetType, out var converted))
+            return converted;
+
+        //  ------------------ number casts ------------------ //
+        //
+        // the argument rules are strict, but an explicit cast can
+        // lose information (2.7 as int is 2), so numbers get a second
+        // try. works like a c# checked cast: truncates toward zero, and
+        // returns null where checked c# would throw
+
+        var conversionType = Nullable.GetUnderlyingType(targetType) ?? targetType;
+        var valueCode = Type.GetTypeCode(value.GetType());
+        var targetCode = Type.GetTypeCode(conversionType);
+
+        // typecodes Char..Decimal are char plus the number types
+        if (value is Enum || conversionType.IsEnum
+            || valueCode is < TypeCode.Char or > TypeCode.Decimal
+            || targetCode is < TypeCode.Char or > TypeCode.Decimal)
+            return null;
+
+        // Convert refuses some char conversions (like double to char),
+        // but a char is a 16-bit unsigned number, so ushort works as
+        // the middle step
+        if (value is char c)
+            value = (ushort)c;
+        var castType = targetCode == TypeCode.Char ? typeof(ushort) : conversionType;
+
+        // Char..UInt64 are the integer-like targets. truncate first so
+        // ChangeType doesn't round
+        if (targetCode <= TypeCode.UInt64)
+        {
+            value = value switch
+            {
+                double d => Math.Truncate(d),
+                float f => Math.Truncate((double)f),
+                decimal m => Math.Truncate(m),
+                _ => value
+            };
+        }
+
+        object cast;
+        try
+        {
+            // out of range (and NaN or Infinity to an integer) throws
+            cast = Convert.ChangeType(value, castType, CultureInfo.InvariantCulture);
+        }
+        catch (OverflowException)
+        {
+            return null;
+        }
+
+        return targetCode == TypeCode.Char ? (char)(ushort)cast : cast;
     }
 
     // --------------------------------------------------------------------------------

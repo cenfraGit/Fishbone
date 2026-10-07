@@ -65,6 +65,17 @@ let toObject = 5 as object;
     }
 
     [Fact]
+    public void Run_CastDoubleTooBigForFloat_ReturnsInfinity()
+    {
+        // like a c# checked cast: float overflow isn't an error
+        var env = FishboneProgram.Run("""
+let tooBig = 400000000000000000000000000000000000000.0 as float;
+""", new FishboneConfiguration());
+
+        Assert.Equal(float.PositiveInfinity, env.GetValue("tooBig"));
+    }
+
+    [Fact]
     public void Run_CastToKeywordTypes_OutOfRangeOrNotACast_ReturnsNull()
     {
         var env = FishboneProgram.Run("""
