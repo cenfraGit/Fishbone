@@ -9,7 +9,7 @@ public class IndexerInteropTests
         var configuration = new FishboneConfiguration().AddBuiltIn("sample", sample);
 
         var env = FishboneProgram.Run("""
-sample["2"] = "7";
+sample[2.0] = 7;
 let value = sample[2];
 """, configuration);
 
@@ -24,7 +24,7 @@ let value = sample[2];
         var configuration = new FishboneConfiguration().AddBuiltIn("values", values);
 
         var env = FishboneProgram.Run("""
-values[1] = "9";
+values[1] = 9.0;
 let result = values[1];
 """, configuration);
 
@@ -38,9 +38,26 @@ let result = values[1];
         var values = new Dictionary<string, int>();
         var configuration = new FishboneConfiguration().AddBuiltIn("values", values);
 
-        FishboneProgram.Run("values[123] = \"8\";", configuration);
+        FishboneProgram.Run("values[\"123\"] = 8.0;", configuration);
 
         Assert.Equal(8, values["123"]);
+    }
+
+    [Theory]
+    [InlineData("sample[\"2\"] = 7;")]
+    [InlineData("sample[2] = \"7\";")]
+    [InlineData("values[1] = \"9\";")]
+    [InlineData("values[1] = 2.5;")]
+    [InlineData("dictionary[123] = 8;")]
+    [InlineData("dictionary[\"123\"] = \"8\";")]
+    public void Run_LossyIndexerArgument_RaisesError(string assignment)
+    {
+        var configuration = new FishboneConfiguration()
+            .AddBuiltIn("sample", new CustomIndexer())
+            .AddBuiltIn("values", new int[] { 1, 2, 3 })
+            .AddBuiltIn("dictionary", new Dictionary<string, int>());
+
+        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run(assignment, configuration));
     }
 
     [Fact]

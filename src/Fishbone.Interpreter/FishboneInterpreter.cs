@@ -1070,24 +1070,56 @@ public class FishboneInterpreter
             return ArgumentMatch.None;
         }
 
-        //  ------------------- change type ------------------- //
+        //  --------------------- numbers --------------------- //
         //
-        // if both the value and the parameter are IConvertible
-        // (numbers, string, bool, char, DateTime) use
-        // Convert.ChangeType
+        // a number only converts to another number, and only if it
+        // fits: whole for integer targets, and in range for all.
 
-        try
+        // typecodes SByte..Decimal are the number types, and
+        // SByte..UInt64 the integer ones. an enum reports its
+        // underlying type, so it's excluded explicitly
+        var rawCode = Type.GetTypeCode(rawType);
+        var targetCode = Type.GetTypeCode(conversionType);
+        var rawIsNumber = !rawType.IsEnum && rawCode is >= TypeCode.SByte and <= TypeCode.Decimal;
+        var targetIsNumber = targetCode is >= TypeCode.SByte and <= TypeCode.Decimal;
+
+        if (rawIsNumber && targetIsNumber)
         {
-            if (rawArg is IConvertible && typeof(IConvertible).IsAssignableFrom(conversionType))
+            // NaN % 1 and Infinity % 1 are NaN, so they aren't whole either
+            var isWhole = rawArg switch
             {
-                convertedArg = Convert.ChangeType(rawArg, conversionType, CultureInfo.InvariantCulture);
-                return ArgumentMatch.Convertible;
+                double d => d % 1 == 0,
+                float f => f % 1 == 0,
+                decimal m => m % 1 == 0,
+                _ => true
+            };
+
+            if (targetCode <= TypeCode.UInt64 && !isWhole)
+            {
+                convertedArg = null;
+                return ArgumentMatch.None;
             }
-        }
-        catch
-        {
-            convertedArg = null;
-            return ArgumentMatch.None;
+
+            try
+            {
+                // the value is whole here if the target is an integer,
+                // so ChangeType won't round. out of range throws
+                convertedArg = Convert.ChangeType(rawArg, conversionType, CultureInfo.InvariantCulture);
+            }
+            catch (OverflowException)
+            {
+                convertedArg = null;
+                return ArgumentMatch.None;
+            }
+
+            // a double too big for float becomes Infinity instead of throwing
+            if (convertedArg is float result && float.IsInfinity(result))
+            {
+                convertedArg = null;
+                return ArgumentMatch.None;
+            }
+
+            return ArgumentMatch.Convertible;
         }
 
         //  ----------------- nothing matched ----------------- //
