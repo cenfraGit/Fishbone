@@ -249,32 +249,42 @@ public class FishboneInterpreter
 
     internal object? EvaluateCast(FishboneEnvironment env, CastNode node)
     {
-        var targetType = ResolveCastTargetType(env, node);
+        // plan: we'll first check if the target type is a registered
+        // type or a Type value. if not, we'll check if its a
+        // primitive C# type. otherwise, throw
+
+        //  ------------ resolving the target type ------------ //
+
+        Type targetType;
+
+        // note: types live in the environment as built-ins (so that
+        // they can be used as constructors or casts), so we can look
+        // them up through the environment normally
+
+        if (env.TryGetValue(node.TypeName, out var resolved) && resolved is RegisteredType registeredType)
+            targetType = registeredType.Type;
+        else if (resolved is Type type)
+            targetType = type;
+        else if (PrimitiveTypeNames.TryGetValue(node.TypeName, out var primitive))
+            targetType = primitive;
+        else
+            throw new FishboneRuntimeException($"Couldn't cast to '{node.TypeName}' since it's not a type.",
+                                               node.Line,
+                                               node.Column);
+
+        //  --------------- converting the value --------------- //
+
+        // at this point we have the targetType.
+        // now let's evaluate the value that we'll try to cast
         var value = Evaluate(env, node.Value);
 
-        if (value is null)
-            return null;
-        if (targetType.IsInstanceOfType(value))
+        // if the value is null or the value is already of targetType,
+        // return the value as is. otherwise, we'll try to convert
+
+        if (value is null || targetType.IsInstanceOfType(value))
             return value;
+
         return TryConvertArgument(value, targetType, out var converted) ? converted : null;
-    }
-
-    private Type ResolveCastTargetType(FishboneEnvironment env, CastNode node)
-    {
-        if (env.TryGetValue(node.TypeName, out var resolved))
-        {
-            if (resolved is RegisteredType registeredType)
-                return registeredType.Type;
-            if (resolved is Type type)
-                return type;
-        }
-
-        if (PrimitiveTypeNames.TryGetValue(node.TypeName, out var primitive))
-            return primitive;
-
-        throw new FishboneRuntimeException(
-            $"'{node.TypeName}' is not a type; casting requires a registered type (AddType) or one of: {string.Join(", ", PrimitiveTypeNames.Keys)}.",
-            node.Line, node.Column);
     }
 
     // --------------------------------------------------------------------------------
