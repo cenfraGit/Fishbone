@@ -294,6 +294,10 @@ public record IndexedAssignmentNode(AstNode Target,
                                     AstNode Index,
                                     AstNode Value) : AstNode;
 
+public record MemberAssignmentNode(AstNode Target,
+                                   string MemberName,
+                                   AstNode Value) : AstNode;
+
 public record FunctionDefinitionNode(string Name,
                                      ImmutableArray<string> Parameters,
                                      BlockNode Body) : AstNode
