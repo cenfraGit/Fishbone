@@ -52,6 +52,7 @@ public class FishboneConfiguration
     /// <summary>Binds an ambient built-in (function, value, or registered type) under a name.</summary>
     public FishboneConfiguration AddBuiltIn(string name, object value)
     {
+        ReservedTypes.ThrowIfReserved(name);
         BuiltIns[name] = value;
         return this;
     }
@@ -62,6 +63,7 @@ public class FishboneConfiguration
     /// </summary>
     public FishboneConfiguration AddValue(string name, object value)
     {
+        ReservedTypes.ThrowIfReserved(name);
         Values[name] = value;
         return this;
     }
@@ -99,6 +101,7 @@ public class FishboneConfiguration
     /// </summary>
     public FishboneConfiguration AddType(Type type, string? name = null)
     {
+        ReservedTypes.ThrowIfReserved(name);
         BuiltIns[name ?? type.Name] = new RegisteredType(type);
         return this;
     }
