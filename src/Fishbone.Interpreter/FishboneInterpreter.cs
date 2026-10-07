@@ -241,10 +241,21 @@ public class FishboneInterpreter
     // "int" etc. normally resolve to the conversion builtins, which are functions, not types
     private static readonly Dictionary<string, Type> PrimitiveTypeNames = new(StringComparer.Ordinal)
     {
+        ["sbyte"] = typeof(sbyte),
+        ["byte"] = typeof(byte),
+        ["short"] = typeof(short),
+        ["ushort"] = typeof(ushort),
         ["int"] = typeof(int),
+        ["uint"] = typeof(uint),
+        ["long"] = typeof(long),
+        ["ulong"] = typeof(ulong),
+        ["float"] = typeof(float),
         ["double"] = typeof(double),
+        ["decimal"] = typeof(decimal),
+        ["char"] = typeof(char),
         ["string"] = typeof(string),
         ["bool"] = typeof(bool),
+        ["object"] = typeof(object),
     };
 
     internal object? EvaluateCast(FishboneEnvironment env, CastNode node)
