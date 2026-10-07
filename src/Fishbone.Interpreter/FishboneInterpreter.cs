@@ -954,8 +954,10 @@ public class FishboneInterpreter
 
     private static object? GetDefaultValue(Type type)
     {
-        var targetType = Nullable.GetUnderlyingType(type) ?? type;
-        return targetType.IsValueType ? Activator.CreateInstance(targetType) : null;
+        // if the type is nullable (e.g. int?) return null as default
+        if (Nullable.GetUnderlyingType(type) != null) return null;
+        // CreateInstance will init to default value (if value type)
+        return type.IsValueType ? Activator.CreateInstance(type) : null;
     }
 
     /// <summary>
