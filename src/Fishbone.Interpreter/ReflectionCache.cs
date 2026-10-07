@@ -26,13 +26,14 @@ namespace Fishbone.Interpreter;
 internal static class ReflectionCache
 {
     private const BindingFlags InstanceMembers = BindingFlags.Public | BindingFlags.Instance;
+    private const BindingFlags StaticMembers = BindingFlags.Public | BindingFlags.Static;
 
     private static readonly ConcurrentDictionary<MethodBase, ParameterInfo[]> Parameters = new();
     private static readonly ConcurrentDictionary<MethodInfo, MethodInvoker> Invokers = new();
     private static readonly ConcurrentDictionary<ConstructorInfo, ConstructorInvoker> ConstructorInvokers = new();
     private static readonly ConcurrentDictionary<Type, ConstructorInfo[]> Constructors = new();
     private static readonly ConcurrentDictionary<Type, PropertyInfo[]> SingleParameterIndexers = new();
-    private static readonly ConcurrentDictionary<(Type Type, string Name), MemberLookup> Members = new();
+    private static readonly ConcurrentDictionary<(Type Type, string Name, bool IsStatic), MemberLookup> Members = new();
 
     public static ParameterInfo[] GetParameters(MethodBase method) =>
         Parameters.GetOrAdd(method, static m => m.GetParameters());
@@ -54,27 +55,30 @@ internal static class ReflectionCache
 
     /// <summary>
     /// Resolves a member name against a type, preserving the interpreter's existing resolution
-    /// order: a non-indexed property, then a field, then a method group.
+    /// order: a non-indexed property, then a field, then a method group. isStatic picks static
+    /// or instance members.
     /// </summary>
-    public static MemberLookup ResolveMember(Type type, string name) =>
-        Members.GetOrAdd((type, name), static key => ComputeMember(key.Type, key.Name));
+    public static MemberLookup ResolveMember(Type type, string name, bool isStatic) => 
+        Members.GetOrAdd((type, name, isStatic), static key => ComputeMember(key.Type, key.Name, key.IsStatic));
 
-    private static MemberLookup ComputeMember(Type type, string name)
+    private static MemberLookup ComputeMember(Type type, string name, bool isStatic)
     {
+        BindingFlags bindingScope = (isStatic) ? StaticMembers : InstanceMembers;
+
         var property = type
-            .GetProperties(InstanceMembers)
+            .GetProperties(bindingScope)
             .FirstOrDefault(prop => prop.Name == name && prop.GetIndexParameters().Length == 0);
         if (property is not null)
             return new MemberLookup { Property = property };
 
         var field = type
-            .GetFields(InstanceMembers)
+            .GetFields(bindingScope)
             .FirstOrDefault(fieldInfo => fieldInfo.Name == name);
         if (field is not null)
             return new MemberLookup { Field = field };
 
         var methods = type
-            .GetMethods(InstanceMembers)
+            .GetMethods(bindingScope)
             .Where(method => method.Name == name && !method.IsSpecialName)
             // a 'new'-style redeclaration (e.g. Exception.GetType hiding Object.GetType) surfaces
             // as two identical signatures; keep only the most-derived one so overload resolution

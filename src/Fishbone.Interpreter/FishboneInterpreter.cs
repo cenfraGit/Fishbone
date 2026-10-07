@@ -1333,23 +1333,32 @@ public class FishboneInterpreter
             throw new FishboneRuntimeException(
                 $"Member access ('.{node.MemberName}') is disabled by the host configuration.");
 
+        // we'll first get the target. the target can be an instance
+        // object or a registered type
+
         var target = Evaluate(env, node.Target);
         if (target is null)
             throw new FishboneRuntimeException($"Cannot access member '{node.MemberName}' on null.");
 
-        var type = target.GetType();
-        var member = ReflectionCache.ResolveMember(type, node.MemberName);
+        // if the target is a registered type, we're either trying to
+        // access a static member or enum value (also static)
+
+        var isStatic = target is RegisteredType;
+        var lookupType = target is RegisteredType registeredType ? registeredType.Type : target.GetType();
+        var instance = isStatic ? null : target;
+
+        var member = ReflectionCache.ResolveMember(lookupType, node.MemberName, isStatic);
 
         if (member.Property is not null)
-            return member.Property.GetValue(target)!;
+            return member.Property.GetValue(instance)!;
 
         if (member.Field is not null)
-            return member.Field.GetValue(target)!;
+            return member.Field.GetValue(instance)!;
 
         if (member.Methods is not null)
-            return new BoundMethod(target, member.Methods);
+            return new BoundMethod(instance, member.Methods);
 
-        throw new FishboneRuntimeException($"Type '{type.Name}' does not have a public member named '{node.MemberName}'.");
+        throw new FishboneRuntimeException($"Type '{lookupType.Name}' does not have a public member named '{node.MemberName}'.");
     }
 
     // --------------------------------------------------------------------------------
