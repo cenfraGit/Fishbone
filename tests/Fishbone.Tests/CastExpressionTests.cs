@@ -3,21 +3,112 @@ namespace Fishbone.Tests;
 public class CastExpressionTests
 {
     [Fact]
-    public void Run_CastConvertibleValues_ReturnsConvertedValue()
+    public void Run_NumericCasts_FollowCSharpCasts()
     {
         var env = FishboneProgram.Run("""
-let fromString = "42" as int;
-let fromDouble = 2.0 as int;
-let toDouble = "3.5" as double;
-let toString = 42 as string;
-let toBool = "true" as bool;
+let whole = 2.0 as int;
+let truncated = 2.7 as int;
+let half = 2.5 as int;
+let negative = -2.7 as int;
+let widened = 2 as double;
 """, new FishboneConfiguration());
 
-        Assert.Equal(42, env.GetValue("fromString"));
-        Assert.Equal(2, env.GetValue("fromDouble"));
-        Assert.Equal(3.5, env.GetValue("toDouble"));
-        Assert.Equal("42", env.GetValue("toString"));
-        Assert.Equal(true, env.GetValue("toBool"));
+        Assert.Equal(2, env.GetValue("whole"));
+        Assert.Equal(2, env.GetValue("truncated"));
+        Assert.Equal(2, env.GetValue("half"));
+        Assert.Equal(-2, env.GetValue("negative"));
+        Assert.Equal(2.0, env.GetValue("widened"));
+    }
+
+    [Fact]
+    public void Run_CastIntToEnum_ReturnsEnumValue()
+    {
+        var config = new FishboneConfiguration().AddType<DayOfWeek>();
+
+        var env = FishboneProgram.Run("let day = 1 as DayOfWeek;", config);
+
+        Assert.Equal(DayOfWeek.Monday, env.GetValue("day"));
+    }
+
+    [Fact]
+    public void Run_CastOutOfRange_ReturnsNull()
+    {
+        var env = FishboneProgram.Run("""
+let tooBig = 3000000000 as int;
+let tooBigDouble = 3000000000.0 as int;
+""", new FishboneConfiguration());
+
+        Assert.Null(env.GetValue("tooBig"));
+        Assert.Null(env.GetValue("tooBigDouble"));
+    }
+
+    [Fact]
+    public void Run_CastToKeywordTypes_FollowsCSharpCasts()
+    {
+        var env = FishboneProgram.Run("""
+let toLong = 3000000000 as long;
+let truncatedLong = 2.7 as long;
+let toFloat = 2.5 as float;
+let toByte = 255 as byte;
+let toDecimal = 2.5 as decimal;
+let toChar = 65 as char;
+let toObject = 5 as object;
+""", new FishboneConfiguration());
+
+        Assert.Equal(3000000000L, env.GetValue("toLong"));
+        Assert.Equal(2L, env.GetValue("truncatedLong"));
+        Assert.Equal(2.5f, env.GetValue("toFloat"));
+        Assert.Equal((byte)255, env.GetValue("toByte"));
+        Assert.Equal(2.5m, env.GetValue("toDecimal"));
+        Assert.Equal('A', env.GetValue("toChar"));
+        Assert.Equal(5, env.GetValue("toObject"));
+    }
+
+    [Fact]
+    public void Run_CastDoubleTooBigForFloat_ReturnsInfinity()
+    {
+        // like a c# checked cast: float overflow isn't an error
+        var env = FishboneProgram.Run("""
+let tooBig = 400000000000000000000000000000000000000.0 as float;
+""", new FishboneConfiguration());
+
+        Assert.Equal(float.PositiveInfinity, env.GetValue("tooBig"));
+    }
+
+    [Fact]
+    public void Run_CastToKeywordTypes_OutOfRangeOrNotACast_ReturnsNull()
+    {
+        var env = FishboneProgram.Run("""
+let byteTooBig = 256 as byte;
+let negativeUint = -1 as uint;
+let stringToChar = "A" as char;
+""", new FishboneConfiguration());
+
+        Assert.Null(env.GetValue("byteTooBig"));
+        Assert.Null(env.GetValue("negativeUint"));
+        Assert.Null(env.GetValue("stringToChar"));
+    }
+
+    [Fact]
+    public void Run_CastsThatAreNotCSharpCasts_ReturnNull()
+    {
+        var config = new FishboneConfiguration().AddType<DayOfWeek>();
+
+        var env = FishboneProgram.Run("""
+let fromString = "42" as int;
+let fromDoubleString = "3.5" as double;
+let numberToString = 42 as string;
+let stringToBool = "true" as bool;
+let boolToInt = true as int;
+let enumFromName = "Monday" as DayOfWeek;
+""", config);
+
+        Assert.Null(env.GetValue("fromString"));
+        Assert.Null(env.GetValue("fromDoubleString"));
+        Assert.Null(env.GetValue("numberToString"));
+        Assert.Null(env.GetValue("stringToBool"));
+        Assert.Null(env.GetValue("boolToInt"));
+        Assert.Null(env.GetValue("enumFromName"));
     }
 
     [Fact]
@@ -30,6 +121,29 @@ let fromNull = null as int;
 
         Assert.Null(env.GetValue("notANumber"));
         Assert.Null(env.GetValue("fromNull"));
+    }
+
+    [Fact]
+    public void Run_CastInClassHierarchy_UpcastsAndChecksDowncasts()
+    {
+        var config = new FishboneConfiguration()
+            .AddType<Animal>()
+            .AddType<Dog>()
+            .AddValue("dog", new Dog())
+            .AddValue("cat", new Cat());
+
+        var env = FishboneProgram.Run("""
+let upcast = dog as Animal;
+let downcast = upcast as Dog;
+let wrongDowncast = cat as Dog;
+let stillBarks = (dog as Animal).Bark();
+""", config);
+
+        Assert.Same(config.Values["dog"], env.GetValue("upcast"));
+        Assert.Same(config.Values["dog"], env.GetValue("downcast"));
+        Assert.Null(env.GetValue("wrongDowncast"));
+        // no static types: an upcast doesn't hide members of the real type
+        Assert.Equal("woof", env.GetValue("stillBarks"));
     }
 
     [Fact]
@@ -75,7 +189,7 @@ let size = widget.Size;
     public void Run_CastBindsTighterThanComparison()
     {
         var env = FishboneProgram.Run("""
-let inRange = "5" as int < 10;
+let inRange = 5.5 as int < 10;
 let sum = 1 + 2 as double;
 """, new FishboneConfiguration());
 
@@ -87,4 +201,13 @@ let sum = 1 + 2 as double;
     {
         public int Size { get; set; }
     }
+
+    private class Animal { }
+
+    private sealed class Dog : Animal
+    {
+        public string Bark() => "woof";
+    }
+
+    private sealed class Cat : Animal { }
 }

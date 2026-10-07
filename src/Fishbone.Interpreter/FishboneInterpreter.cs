@@ -241,40 +241,112 @@ public class FishboneInterpreter
     // "int" etc. normally resolve to the conversion builtins, which are functions, not types
     private static readonly Dictionary<string, Type> PrimitiveTypeNames = new(StringComparer.Ordinal)
     {
+        ["sbyte"] = typeof(sbyte),
+        ["byte"] = typeof(byte),
+        ["short"] = typeof(short),
+        ["ushort"] = typeof(ushort),
         ["int"] = typeof(int),
+        ["uint"] = typeof(uint),
+        ["long"] = typeof(long),
+        ["ulong"] = typeof(ulong),
+        ["float"] = typeof(float),
         ["double"] = typeof(double),
+        ["decimal"] = typeof(decimal),
+        ["char"] = typeof(char),
         ["string"] = typeof(string),
         ["bool"] = typeof(bool),
+        ["object"] = typeof(object),
     };
 
     internal object? EvaluateCast(FishboneEnvironment env, CastNode node)
     {
-        var targetType = ResolveCastTargetType(env, node);
+        // plan: we'll first check if the target type is a registered
+        // type or a Type value. if not, we'll check if its a
+        // primitive C# type. otherwise, throw
+
+        //  ------------ resolving the target type ------------ //
+
+        Type targetType;
+
+        // note: types live in the environment as built-ins (so that
+        // they can be used as constructors or casts), so we can look
+        // them up through the environment normally
+
+        if (env.TryGetValue(node.TypeName, out var resolved) && resolved is RegisteredType registeredType)
+            targetType = registeredType.Type;
+        else if (resolved is Type type)
+            targetType = type;
+        else if (PrimitiveTypeNames.TryGetValue(node.TypeName, out var primitive))
+            targetType = primitive;
+        else
+            throw new FishboneRuntimeException($"Couldn't cast to '{node.TypeName}' since it's not a type.",
+                                               node.Line,
+                                               node.Column);
+
+        //  --------------- converting the value --------------- //
+
+        // at this point we have the targetType.
+        // now let's evaluate the value that we'll try to cast
         var value = Evaluate(env, node.Value);
 
-        if (value is null)
-            return null;
-        if (targetType.IsInstanceOfType(value))
-            return value;
-        return TryConvertArgument(value, targetType, out var converted) ? converted : null;
-    }
+        // if the value is null or the value is already of targetType,
+        // return the value as is. otherwise, we'll try to convert
 
-    private Type ResolveCastTargetType(FishboneEnvironment env, CastNode node)
-    {
-        if (env.TryGetValue(node.TypeName, out var resolved))
+        if (value is null || targetType.IsInstanceOfType(value))
+            return value;
+
+        if (TryConvertArgument(value, targetType, out var converted))
+            return converted;
+
+        //  ------------------ number casts ------------------ //
+        //
+        // the argument rules are strict, but an explicit cast can
+        // lose information (2.7 as int is 2), so numbers get a second
+        // try. works like a c# checked cast: truncates toward zero, and
+        // returns null where checked c# would throw
+
+        var conversionType = Nullable.GetUnderlyingType(targetType) ?? targetType;
+        var valueCode = Type.GetTypeCode(value.GetType());
+        var targetCode = Type.GetTypeCode(conversionType);
+
+        // typecodes Char..Decimal are char plus the number types
+        if (value is Enum || conversionType.IsEnum
+            || valueCode is < TypeCode.Char or > TypeCode.Decimal
+            || targetCode is < TypeCode.Char or > TypeCode.Decimal)
+            return null;
+
+        // Convert refuses some char conversions (like double to char),
+        // but a char is a 16-bit unsigned number, so ushort works as
+        // the middle step
+        if (value is char c)
+            value = (ushort)c;
+        var castType = targetCode == TypeCode.Char ? typeof(ushort) : conversionType;
+
+        // Char..UInt64 are the integer-like targets. truncate first so
+        // ChangeType doesn't round
+        if (targetCode <= TypeCode.UInt64)
         {
-            if (resolved is RegisteredType registeredType)
-                return registeredType.Type;
-            if (resolved is Type type)
-                return type;
+            value = value switch
+            {
+                double d => Math.Truncate(d),
+                float f => Math.Truncate((double)f),
+                decimal m => Math.Truncate(m),
+                _ => value
+            };
         }
 
-        if (PrimitiveTypeNames.TryGetValue(node.TypeName, out var primitive))
-            return primitive;
+        object cast;
+        try
+        {
+            // out of range (and NaN or Infinity to an integer) throws
+            cast = Convert.ChangeType(value, castType, CultureInfo.InvariantCulture);
+        }
+        catch (OverflowException)
+        {
+            return null;
+        }
 
-        throw new FishboneRuntimeException(
-            $"'{node.TypeName}' is not a type; casting requires a registered type (AddType) or one of: {string.Join(", ", PrimitiveTypeNames.Keys)}.",
-            node.Line, node.Column);
+        return targetCode == TypeCode.Char ? (char)(ushort)cast : cast;
     }
 
     // --------------------------------------------------------------------------------
@@ -933,14 +1005,14 @@ public class FishboneInterpreter
 
     private static object? GetDefaultValue(Type type)
     {
-        var targetType = Nullable.GetUnderlyingType(type) ?? type;
-        return targetType.IsValueType ? Activator.CreateInstance(targetType) : null;
+        // if the type is nullable (e.g. int?) return null as default
+        if (Nullable.GetUnderlyingType(type) != null) return null;
+        // CreateInstance will init to default value (if value type)
+        return type.IsValueType ? Activator.CreateInstance(type) : null;
     }
 
-    /// <summary>
-    /// Quality of a single argument-to-parameter match, used to rank overloads. Ordered so a
-    /// larger value is a better match; <see cref="None"/> means the argument is not accepted.
-    /// </summary>
+    // this represents the score for how good an arg-to-param
+    // conversion match is
     private enum ArgumentMatch
     {
         None = 0,
@@ -952,17 +1024,39 @@ public class FishboneInterpreter
     private bool TryConvertArgument(object? rawArg, Type targetType, out object? convertedArg) =>
         ConvertArgument(rawArg, targetType, out convertedArg) != ArgumentMatch.None;
 
+    // this method checks if the script value can go into a .NET
+    // parameter. returns the score for how good the match is, and the
+    // converted value
     private ArgumentMatch ConvertArgument(object? rawArg, Type targetType, out object? convertedArg)
     {
+        // setup: get the underlying type if parameter is nullable
+        // (int? -> int). GetUnderlyingType returns null for anything
+        // that isn't nullable.
         var nullableType = Nullable.GetUnderlyingType(targetType);
+        // the type to actually convert to. if param type isn't
+        // nullable (nullableType is null), use targetType itself.
         var conversionType = nullableType ?? targetType;
+
+        //  --------------- if the value is null --------------- //
+        //
+        // if the value is null, the method will pass it only if the
+        // target parameter is a reference type or a nullable type.
 
         if (rawArg is null)
         {
-            convertedArg = GetDefaultValue(conversionType);
-            var nullAccepted = !conversionType.IsValueType || nullableType is not null || convertedArg is not null;
+            // note: passing targetType (instead of conversionType)
+            // because conversionType is already nullable unwrapped
+            convertedArg = GetDefaultValue(targetType);
+            // so null will be assignable if its a reference type, or
+            // if the parameter is nullable.
+            var nullAccepted = !conversionType.IsValueType || nullableType is not null;
             return nullAccepted ? ArgumentMatch.Assignable : ArgumentMatch.None;
         }
+
+        //  ------------------ if exact match ------------------ //
+        //
+        // if the value's runtime type is already the parameter type,
+        // pass it through.
 
         var rawType = rawArg.GetType();
         if (rawType == targetType || rawType == conversionType)
@@ -971,14 +1065,22 @@ public class FishboneInterpreter
             return ArgumentMatch.Exact;
         }
 
+        //  ---------- assignable without conversion ---------- //
+        //
+        // if value can go into a variable of that type as is (like
+        // subclasses, interfaces, object, etc).
+
         if (targetType.IsInstanceOfType(rawArg))
         {
             convertedArg = rawArg;
             return ArgumentMatch.Assignable;
         }
 
-        // a host-registered converter handles types the generic path below cannot (anything not
-        // IConvertible or an enum); it takes precedence so registered types convert deterministically
+        //  ------------ host-registered converter ------------ //
+        //
+        // if the host registered a converter for this type (through
+        // fishbone config), try to use it
+
         if (_typeConverters.TryGetValue(conversionType, out var converter))
         {
             try
@@ -993,27 +1095,85 @@ public class FishboneInterpreter
             }
         }
 
-        try
+        //  ---------------------- enums ---------------------- //
+        //
+        // builds an enum type, using whole numbers to identify enum
+        // element
+
+        if (conversionType.IsEnum)
         {
-            if (conversionType.IsEnum)
+            if (rawArg
+                is int
+                or long
+                or short
+                or byte
+                or sbyte
+                or uint
+                or ulong
+                or ushort)
             {
-                convertedArg = rawArg is string enumName
-                    ? Enum.Parse(conversionType, enumName)
-                    : Enum.ToObject(conversionType, rawArg);
+                convertedArg = Enum.ToObject(conversionType, rawArg);
                 return ArgumentMatch.Convertible;
             }
 
-            if (rawArg is IConvertible && typeof(IConvertible).IsAssignableFrom(conversionType))
-            {
-                convertedArg = Convert.ChangeType(rawArg, conversionType, CultureInfo.InvariantCulture);
-                return ArgumentMatch.Convertible;
-            }
-        }
-        catch
-        {
+            // don't let it fall through
             convertedArg = null;
             return ArgumentMatch.None;
         }
+
+        //  --------------------- numbers --------------------- //
+        //
+        // a number only converts to another number, and only if it
+        // fits: whole for integer targets, and in range for all.
+
+        // typecodes SByte..Decimal are the number types, and
+        // SByte..UInt64 the integer ones. an enum reports its
+        // underlying type, so it's excluded explicitly
+        var rawCode = Type.GetTypeCode(rawType);
+        var targetCode = Type.GetTypeCode(conversionType);
+        var rawIsNumber = !rawType.IsEnum && rawCode is >= TypeCode.SByte and <= TypeCode.Decimal;
+        var targetIsNumber = targetCode is >= TypeCode.SByte and <= TypeCode.Decimal;
+
+        if (rawIsNumber && targetIsNumber)
+        {
+            // NaN % 1 and Infinity % 1 are NaN, so they aren't whole either
+            var isWhole = rawArg switch
+            {
+                double d => d % 1 == 0,
+                float f => f % 1 == 0,
+                decimal m => m % 1 == 0,
+                _ => true
+            };
+
+            if (targetCode <= TypeCode.UInt64 && !isWhole)
+            {
+                convertedArg = null;
+                return ArgumentMatch.None;
+            }
+
+            try
+            {
+                // the value is whole here if the target is an integer,
+                // so ChangeType won't round. out of range throws
+                convertedArg = Convert.ChangeType(rawArg, conversionType, CultureInfo.InvariantCulture);
+            }
+            catch (OverflowException)
+            {
+                convertedArg = null;
+                return ArgumentMatch.None;
+            }
+
+            // a double too big for float becomes Infinity instead of throwing
+            if (convertedArg is float result && float.IsInfinity(result))
+            {
+                convertedArg = null;
+                return ArgumentMatch.None;
+            }
+
+            return ArgumentMatch.Convertible;
+        }
+
+        //  ----------------- nothing matched ----------------- //
 
         convertedArg = null;
         return ArgumentMatch.None;
