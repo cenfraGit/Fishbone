@@ -327,6 +327,27 @@ dict["key"] = value;
 
 Writes to a list index, a dictionary key, or a .NET indexer.
 
+### Member assignment
+
+```csharp
+box.Count = 5;
+box.Inner.Label = "hi";
+Settings.Value = 3;   // a static member, through a registered type
+```
+
+Sets a public property or field on a .NET object, or a static one through a type name (see [Static members and enums](#static-members-and-enums)). The value converts the same way as a method argument (see [Type conversions](#type-conversions)), so `box.Count = 2.0` works but `box.Count = 2.5` is an error.
+
+It's an error to assign to a read-only property (no public setter), a `readonly` or `const` field, a method, a missing member, or a member of `null`.
+
+Structs need care. Reading a struct from a member, a call or an index gives you a **copy**, so setting a member on it would change the copy and lose the change. Like C#, that's an error:
+
+```csharp
+box.Spot.X = 5;       // error: box.Spot is a copy
+let spot = box.Spot;  // copy it into a variable,
+spot.X = 5;           // change it there,
+box.Spot = spot;      // and assign it back
+```
+
 ### Compound assignment
 
 ```csharp
@@ -337,13 +358,14 @@ average /= count;
 remainder %= modulus;
 list[i] += 1;
 dict["key"] *= 2;
+box.Count += 1;
 ```
 
 `+=`, `-=`, `*=`, `/=` and `%=` are sugar. `target op= value` is exactly `target = target op value`, and the result follows the same arithmetic rules as the operator underneath, so `x /= 2` always produces a `double`.
 
-The target has to be a variable or an indexed target. Anything else is a parse error.
+The target has to be a variable, an indexed target or a member. Anything else is a parse error.
 
-(one caveat with an indexed target like `list[i] += 1`. The index expression is evaluated twice, once to read and once to write, so keep side effects out of it.)
+(one caveat with an indexed or member target like `list[i] += 1` or `get().Count += 1`. The target and index expressions are evaluated twice, once to read and once to write, so keep side effects out of them.)
 
 ### Expression statements
 

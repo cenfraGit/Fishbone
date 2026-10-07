@@ -74,6 +74,7 @@ public class FishboneInterpreter
                 DeclarationNode declaration => EvaluateDeclaration(env, declaration),
                 AssignmentNode assignment => EvaluateAssignment(env, assignment),
                 IndexedAssignmentNode indexedAssignment => EvaluateIndexedAssignment(env, indexedAssignment),
+                MemberAssignmentNode memberAssignment => EvaluateMemberAssignment(env, memberAssignment),
                 UnaryOpNode unary => EvaluateUnary(env, unary),
                 BinaryOpNode binary => EvaluateBinary(env, binary),
                 CastNode castNode => EvaluateCast(env, castNode)!,
@@ -176,6 +177,62 @@ public class FishboneInterpreter
         object? value = Evaluate(env, node.Value);
 
         SetIndexedValue(target, index, value);
+        return value!;
+    }
+
+    internal object EvaluateMemberAssignment(FishboneEnvironment env, MemberAssignmentNode node)
+    {
+        if (!_enableMemberAccess)
+            throw new FishboneRuntimeException(
+                $"Member access ('.{node.MemberName}') is disabled by the host configuration.");
+
+        var target = Evaluate(env, node.Target);
+        if (target is null)
+            throw new FishboneRuntimeException($"Cannot assign member '{node.MemberName}' on null.");
+
+        var value = Evaluate(env, node.Value);
+
+        // same lookup as reading a member: a registered type means static members
+        var isStatic = target is RegisteredType;
+        var lookupType = target is RegisteredType registeredType ? registeredType.Type : target.GetType();
+        var instance = isStatic ? null : target;
+
+        // a struct read from a member, call or index is a copy, so setting a member on it
+        // would be lost. only a variable holds the struct itself (like C# error CS1612)
+        if (!isStatic && lookupType.IsValueType && node.Target is not IdentifierNode)
+            throw new FishboneRuntimeException(
+                $"Cannot assign '{node.MemberName}' on a copy of struct '{lookupType.Name}'. " +
+                "Store it in a variable, change it there, and assign it back.");
+
+        var member = ReflectionCache.ResolveMember(lookupType, node.MemberName, isStatic);
+
+        Type memberType;
+        if (member.Property is not null)
+        {
+            if (member.Property.SetMethod is not { IsPublic: true })
+                throw new FishboneRuntimeException($"Property '{node.MemberName}' on type '{lookupType.Name}' is read-only.");
+            memberType = member.Property.PropertyType;
+        }
+        else if (member.Field is not null)
+        {
+            if (member.Field.IsInitOnly || member.Field.IsLiteral)
+                throw new FishboneRuntimeException($"Field '{node.MemberName}' on type '{lookupType.Name}' is read-only.");
+            memberType = member.Field.FieldType;
+        }
+        else if (member.Methods is not null)
+            throw new FishboneRuntimeException($"'{node.MemberName}' on type '{lookupType.Name}' is a method and can't be assigned.");
+        else
+            throw new FishboneRuntimeException($"Type '{lookupType.Name}' does not have a public member named '{node.MemberName}'.");
+
+        if (!TryConvertArgument(value, memberType, out var converted))
+            throw new FishboneRuntimeException(
+                $"Cannot assign a value of type '{value?.GetType().Name ?? "null"}' to '{node.MemberName}' of type '{memberType.Name}'.");
+
+        if (member.Property is not null)
+            member.Property.SetValue(instance, converted);
+        else
+            member.Field!.SetValue(instance, converted);
+
         return value!;
     }
 
