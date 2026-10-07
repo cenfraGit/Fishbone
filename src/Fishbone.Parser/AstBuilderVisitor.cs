@@ -182,12 +182,17 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
     public override AstNode VisitIndexedAssignmentStat(FishboneParser.IndexedAssignmentStatContext context)
     {
         AstNode assignmentTarget = Visit(context.expr(0));
-        if (assignmentTarget is not IndexingNode indexingNode)
-            throw new FishboneParseException([new ParseError(context.Start.Line, context.Start.Column + 1,
-                $"Indexed assignment requires an indexed target, but found {assignmentTarget.GetType().Name}.", context.expr(0).GetText())]);
-
         AstNode value = Visit(context.expr(1));
-        return new IndexedAssignmentNode(indexingNode.Target, indexingNode.Index, value) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+        var line = context.Start.Line;
+        var column = context.Start.Column + 1;
+
+        return assignmentTarget switch
+        {
+            IndexingNode indexing => new IndexedAssignmentNode(indexing.Target, indexing.Index, value) { Line = line, Column = column },
+            MemberAccessNode member => new MemberAssignmentNode(member.Target, member.MemberName, value) { Line = line, Column = column },
+            _ => throw new FishboneParseException([new ParseError(line, column,
+                $"Assignment requires a variable, an indexed target or a member, but found {assignmentTarget.GetType().Name}.", context.expr(0).GetText())])
+        };
     }
 
     public override AstNode VisitCompoundAssignmentStat(FishboneParser.CompoundAssignmentStatContext context)
@@ -214,9 +219,13 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
                 var combinedIndexedValue = new BinaryOpNode(binaryOp, indexing, rightValue) { Line = line, Column = column };
                 return new IndexedAssignmentNode(indexing.Target, indexing.Index, combinedIndexedValue) { Line = line, Column = column };
 
+            case MemberAccessNode member:
+                var combinedMemberValue = new BinaryOpNode(binaryOp, member, rightValue) { Line = line, Column = column };
+                return new MemberAssignmentNode(member.Target, member.MemberName, combinedMemberValue) { Line = line, Column = column };
+
             default:
                 throw new FishboneParseException([new ParseError(line, column,
-                    $"Compound assignment requires a variable or indexed target, but found {target.GetType().Name}.", context.expr(0).GetText())]);
+                    $"Compound assignment requires a variable, an indexed target or a member, but found {target.GetType().Name}.", context.expr(0).GetText())]);
         }
     }
 
