@@ -12,25 +12,23 @@ public class ReflectiveOpenCVTests
         return config;
     }
 
-    // TODO: bring back once enums work in scripts. strict conversions (#29) dropped
-    // string to enum, and there is no other way to name ColorConversionCodes yet
-    // [Fact]
-    // public void CvtColor_WritesResultBackIntoScriptAllocatedMat()
-    // {
-    //     using var src = new Mat(rows: 4, cols: 6, type: MatType.CV_8UC3, s: new Scalar(128, 64, 32));
-    //     var config = ConfigWithOpenCV(src);
-    //
-    //     var env = FishboneProgram.Run("""
-    // let dst = Mat();
-    // cv_cvt_color(src, dst, "BGR2GRAY");
-    // """, config);
-    //
-    //     var dst = Assert.IsType<Mat>(env.GetValue("dst"));
-    //     Assert.False(dst.Empty());        // the op actually ran and filled dst
-    //     Assert.Equal(1, dst.Channels());  // BGR -> single gray channel
-    //     Assert.Equal(4, dst.Rows);
-    //     Assert.Equal(6, dst.Cols);
-    // }
+    [Fact]
+    public void CvtColor_WritesResultBackIntoScriptAllocatedMat()
+    {
+        using var src = new Mat(rows: 4, cols: 6, type: MatType.CV_8UC3, s: new Scalar(128, 64, 32));
+        var config = ConfigWithOpenCV(src);
+
+        var env = FishboneProgram.Run("""
+let dst = Mat();
+cv_cvt_color(src, dst, ColorConversionCodes.BGR2GRAY);
+""", config);
+
+        var dst = Assert.IsType<Mat>(env.GetValue("dst"));
+        Assert.False(dst.Empty());        // the op actually ran and filled dst
+        Assert.Equal(1, dst.Channels());  // BGR -> single gray channel
+        Assert.Equal(4, dst.Rows);
+        Assert.Equal(6, dst.Cols);
+    }
 
     [Fact]
     public void Resize_UsesListToSizeConverterAndOptionalDefaults()

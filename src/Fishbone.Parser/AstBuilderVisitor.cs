@@ -38,13 +38,17 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
 
     public override AstNode VisitFunctionDefinitionStat(FishboneParser.FunctionDefinitionStatContext context)
     {
+        CheckReserved(context.ID(0).GetText(), context.Start.Line, context.Start.Column + 1);
         var funcName = context.ID(0).GetText();
         var block = Visit(context.blockStat());
 
         // get parameters
         var funcParams = new List<string>();
         for (int i = 1; i < context.ID().Length; i++)
+        {
+            CheckReserved(context.ID(i).GetText(), context.ID(i).Symbol.Line, context.ID(i).Symbol.Column + 1);
             funcParams.Add(context.ID(i).GetText());
+        }
 
         return new FunctionDefinitionNode(funcName, funcParams.ToImmutableArray(), (BlockNode)block) { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }
@@ -59,6 +63,9 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
             var modifier = argument.OUT() is not null ? ArgumentModifier.Out
                 : argument.REF() is not null ? ArgumentModifier.Ref
                 : ArgumentModifier.None;
+
+            if (modifier == ArgumentModifier.Out)
+                CheckReserved(argument.expr().GetText(), argument.expr().Start.Line, argument.expr().Start.Column + 1);
 
             funcArgs.Add(new ArgumentNode(modifier, Visit(argument.expr())));
         }
@@ -85,6 +92,8 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
 
         var tryBlock = (BlockNode)Visit(context.blockStat());
         string? exceptionName = catchClause?.ID()?.GetText();
+        if (catchClause?.ID() is { } catchId)
+            CheckReserved(catchId.GetText(), catchId.Symbol.Line, catchId.Symbol.Column + 1);
         var catchBlock = catchClause is null ? null : (BlockNode)Visit(catchClause.blockStat());
         var finallyBlock = finallyClause is null ? null : (BlockNode)Visit(finallyClause.blockStat());
 
@@ -156,6 +165,7 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
 
     public override AstNode VisitDeclarationStat(FishboneParser.DeclarationStatContext context)
     {
+        CheckReserved(context.ID().GetText(), context.Start.Line, context.Start.Column + 1);
         var name = context.ID().GetText();
         AstNode value = Visit(context.expr());
         return new DeclarationNode(name, value) { Line = context.Start.Line, Column = context.Start.Column + 1 };
@@ -163,6 +173,7 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
 
     public override AstNode VisitAssignmentStat(FishboneParser.AssignmentStatContext context)
     {
+        CheckReserved(context.ID().GetText(), context.Start.Line, context.Start.Column + 1);
         var name = context.ID().GetText();
         AstNode value = Visit(context.expr());
         return new AssignmentNode(name, value) { Line = context.Start.Line, Column = context.Start.Column + 1 };
@@ -258,6 +269,7 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
 
     public override AstNode VisitForeachStat(FishboneParser.ForeachStatContext context)
     {
+        CheckReserved(context.ID().GetText(), context.Start.Line, context.Start.Column + 1);
         var iteratorName = context.ID().GetText();
         var iterable = Visit(context.expr());
         var body = VisitBody(context.statement());
@@ -266,6 +278,7 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
 
     public override AstNode VisitForStat(FishboneParser.ForStatContext context)
     {
+        CheckReserved(context.ID().GetText(), context.Start.Line, context.Start.Column + 1);
         var iteratorName = context.ID().GetText();
         var start = Visit(context.expr(0));
         var end = Visit(context.expr(1));
@@ -511,5 +524,18 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
     public override AstNode VisitNullExpr(FishboneParser.NullExprContext context)
     {
         return new LiteralNode(null!) { Line = context.Start.Line, Column = context.Start.Column + 1 };
+    }
+
+    // redirects the original argument exception into a FishboneParseException
+    private static void CheckReserved(string? name, int line, int column)
+    {
+        try
+        {
+            ReservedTypes.ThrowIfReserved(name);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new FishboneParseException([new ParseError(line, column, ex.Message, null)]);
+        }
     }
 }

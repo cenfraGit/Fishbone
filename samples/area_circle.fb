@@ -8,7 +8,7 @@ func get_circle_area(radius)
 }
 
 print("Enter the circle's radius: ");
-let radius = input() as double;
+let radius = double.Parse(input());
 let area = get_circle_area(radius);
 
 print("The area of the circle is: ");

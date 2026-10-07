@@ -16,12 +16,13 @@ namespace Fishbone.Plugins.OpenCV;
 ///
 /// <code>
 /// let dst = Mat();
-/// cv_cvt_color(src, dst, "BGR2GRAY");   // dst is filled in place
+/// cv_cvt_color(src, dst, ColorConversionCodes.BGR2GRAY);   // dst is filled in place
 /// </code>
 ///
 /// The wrapper-type conversions that make this work (<c>Mat</c> to InputArray/OutputArray, lists to
 /// Size/Scalar/Point) are registered as Fishbone type converters; optional OpenCV parameters may be
-/// omitted and take their defaults.
+/// omitted and take their defaults. Every enum those operations take is registered too, so scripts
+/// can name its values (<c>ColorConversionCodes.BGR2GRAY</c>).
 /// </summary>
 public sealed partial class OpenCVPlugin : IFishbonePlugin
 {
@@ -58,7 +59,16 @@ public sealed partial class OpenCVPlugin : IFishbonePlugin
         // group overloads under one name so a call resolves across all of them; prefix with "cv_"
         // to namespace the operations and avoid colliding with other plugins' built-ins
         foreach (var overloads in methods.GroupBy(method => "cv_" + ToSnakeCase(method.Name)))
-            config.AddBuiltIn(overloads.Key, new BoundMethod(target: null!, overloads.ToArray()));
+            config.AddBuiltIn(overloads.Key, new BoundMethod(target: null, overloads.ToArray()));
+
+        // register the enums the operations take, so scripts can write ColorConversionCodes.BGR2GRAY
+        var enumTypes = methods
+            .SelectMany(method => method.GetParameters())
+            .Select(parameter => parameter.ParameterType)
+            .Where(type => type.IsEnum)
+            .Distinct();
+        foreach (var enumType in enumTypes)
+            config.AddType(enumType);
     }
 
     /// <summary>
