@@ -63,13 +63,23 @@ Two kinds, both like C#:
 
 An identifier names a variable or a function. The first character is a letter or an underscore, and the rest can be letters, digits or underscores (`[a-zA-Z_][a-zA-Z0-9_]*`).
 
-Identifiers are case sensitive, and they can't collide with a reserved keyword.
+Identifiers are case sensitive, and they can't collide with a reserved keyword or a reserved type name.
 
 ### Reserved keywords
 
 There are 25 of them:
 
 `let` `null` `true` `false` `if` `else` `while` `foreach` `for` `break` `continue` `try` `catch` `finally` `throw` `in` `as` `func` `return` `and` `or` `xor` `not` `out` `ref`
+
+### Reserved type names
+
+The C# keyword type names are reserved too. There are 15 of them:
+
+`sbyte` `byte` `short` `ushort` `int` `uint` `long` `ulong` `float` `double` `decimal` `char` `string` `bool` `object`
+
+Each one always means its .NET type, so `int` is `System.Int32`. You can use them as cast targets (`x as int`) and to reach static members (`int.Parse("42")`, see [Static members and enums](#static-members-and-enums)).
+
+You can't declare them as names. `let int = 5;`, `func string() {}`, a parameter, a `for` or `foreach` variable, a `catch` binding, or `out double` are all parse errors. A host can't register them either, so `AddValue("int", ...)`, `AddBuiltIn` and `AddType` with a reserved name throw an `ArgumentException`. Names that only contain one, like `integer` or `Int`, are fine.
 
 ### Integer literals
 
@@ -249,8 +259,8 @@ let x = null as int;       // null
 
 The type name resolves at runtime, in this order:
 
-1. A registered type, meaning anything the host exposed through `AddType<T>()`, or any environment value that happens to be a .NET `System.Type`
-2. The C# keyword type names `sbyte`, `byte`, `short`, `ushort`, `int`, `uint`, `long`, `ulong`, `float`, `double`, `decimal`, `char`, `string`, `bool` and `object`, which are special-cased so they work as cast targets even though nothing registered them
+1. A [reserved type name](#reserved-type-names) like `int` or `double`, which always means its .NET type
+2. A registered type, meaning anything the host exposed through `AddType<T>()`, or any environment value that happens to be a .NET `System.Type`
 
 If neither matches, the cast raises a runtime error.
 
@@ -269,7 +279,7 @@ Otherwise the cast first tries the same conversions as a method argument (see [T
 
 Checked is deliberate. C#'s default unchecked casts wrap around silently, so `(byte)256` is `0`, and that loses information without telling you.
 
-Anything C# doesn't allow as a cast gives `null`, so `"42" as int`, `42 as string`, `true as int` and `"A" as char` are all `null`. Parsing text is a method call, not a cast.
+Anything C# doesn't allow as a cast gives `null`, so `"42" as int`, `42 as string`, `true as int` and `"A" as char` are all `null`. Parsing text is a method call, not a cast: `int.Parse("42")`.
 
 Enum casts only go from an integer to an enum for now (`1 as DayOfWeek`). C# also allows `2.0` to an enum and an enum to `int`, but Fishbone doesn't support those yet.
 
@@ -504,6 +514,26 @@ let list = [1, 2, 3];
 let count = list.Count;
 ```
 
+### Static members and enums
+
+On a type name, `.` reaches the type's **static** members instead: static properties, fields (including `const`) and methods. This works for registered types and for [reserved type names](#reserved-type-names):
+
+```csharp
+// host: config.AddType<DayOfWeek>();
+//       config.AddType(typeof(Path));   // a static class can't be a generic argument
+let day = DayOfWeek.Monday;
+let isMonday = day == DayOfWeek.Monday;   // true
+let n = int.Parse("42");
+let ok = int.TryParse(text, out value);
+let file = Path.GetFileName("a/b.txt");
+```
+
+Enum values are static fields, so this is how a script names one. An enum value compares by value with `==`, passes to a .NET parameter of that enum type as an exact match, and prints as its name. It's never equal to a number, so `DayOfWeek.Monday == 1` is `false`.
+
+Static and instance members stay separate, like in C#. A type name only sees static members, and an instance only sees instance members, so `"abc".Empty` (a static field reached through an instance) and `DayOfWeek.Monday.Monday` are both errors.
+
+A static method can be stored and called later, like any method: `let parse = int.Parse; parse("7")`.
+
 ### Method calls
 
 Methods resolve at runtime. When one has overloads, Fishbone first filters to the ones whose parameters could accept your arguments, then picks the *best* match.
@@ -568,7 +598,7 @@ let p = Point(3, 4);   // invokes the Point(int, int) constructor
 let sum = p.X + p.Y;   // instances are ordinary .NET objects
 ```
 
-Constructor overloads resolve with the same best-match rules as method calls. Calling a registered type with no matching constructor is an error, and so is registering a type that exposes no public constructor.
+Constructor overloads resolve with the same best-match rules as method calls. Calling a registered type with no matching constructor is an error. That includes types with no public constructor at all, like an enum or a static class. You can still register those to reach their static members.
 
 ### Out and ref arguments
 
