@@ -7,7 +7,6 @@
 // it to the correct Evaluate* method. it can be used to evaluate a whole program
 // --------------------------------------------------------------------------------
 
-using Fishbone;
 using Fishbone.Ast;
 using Fishbone.Debugging;
 using System.Collections;
@@ -69,32 +68,32 @@ public class FishboneInterpreter
         {
             return node switch
             {
-            ProgramNode programNode => EvaluateProgram(env, programNode),
-            LiteralNode literal => literal.Value,
-            IdentifierNode identifier => env.GetValue(identifier.Name),
-            DeclarationNode declaration => EvaluateDeclaration(env, declaration),
-            AssignmentNode assignment => EvaluateAssignment(env, assignment),
-            IndexedAssignmentNode indexedAssignment => EvaluateIndexedAssignment(env, indexedAssignment),
-            UnaryOpNode unary => EvaluateUnary(env, unary),
-            BinaryOpNode binary => EvaluateBinary(env, binary),
-            CastNode castNode => EvaluateCast(env, castNode)!,
-            InterpolatedStringNode interpolated => EvaluateInterpolatedString(env, interpolated),
-            IfNode ifNode => EvaluateIf(env, ifNode),
-            WhileNode whileNode => EvaluateWhile(env, whileNode),
-            ForeachNode foreachNode => EvaluateForeach(env, foreachNode),
-            ForNode forNode => EvaluateFor(env, forNode),
-            BlockNode block => EvaluateBlock(env, block),
-            FunctionDefinitionNode functionDefinition => EvaluateFunctionDefinition(env, functionDefinition),
-            CallNode callNode => EvaluateCallNode(env, callNode),
-            ListNode listNode => EvaluateListNode(env, listNode),
-            DictionaryNode dictionaryNode => EvaluateDictionaryNode(env, dictionaryNode),
-            IndexingNode indexingNode => EvaluateIndexingNode(env, indexingNode),
-            MemberAccessNode memberAccessNode => EvaluateMemberAccessNode(env, memberAccessNode),
-            ReturnNode returnNode => EvaluateReturn(env, returnNode),
-            BreakNode breakNode => EvaluateBreak(env, breakNode),
-            ContinueNode continueNode => EvaluateContinue(env, continueNode),
-            TryNode tryNode => EvaluateTry(env, tryNode),
-            ThrowNode throwNode => EvaluateThrow(env, throwNode),
+                ProgramNode programNode => EvaluateProgram(env, programNode),
+                LiteralNode literal => literal.Value,
+                IdentifierNode identifier => EvaluateIdentifier(env, identifier),
+                DeclarationNode declaration => EvaluateDeclaration(env, declaration),
+                AssignmentNode assignment => EvaluateAssignment(env, assignment),
+                IndexedAssignmentNode indexedAssignment => EvaluateIndexedAssignment(env, indexedAssignment),
+                UnaryOpNode unary => EvaluateUnary(env, unary),
+                BinaryOpNode binary => EvaluateBinary(env, binary),
+                CastNode castNode => EvaluateCast(env, castNode)!,
+                InterpolatedStringNode interpolated => EvaluateInterpolatedString(env, interpolated),
+                IfNode ifNode => EvaluateIf(env, ifNode),
+                WhileNode whileNode => EvaluateWhile(env, whileNode),
+                ForeachNode foreachNode => EvaluateForeach(env, foreachNode),
+                ForNode forNode => EvaluateFor(env, forNode),
+                BlockNode block => EvaluateBlock(env, block),
+                FunctionDefinitionNode functionDefinition => EvaluateFunctionDefinition(env, functionDefinition),
+                CallNode callNode => EvaluateCallNode(env, callNode),
+                ListNode listNode => EvaluateListNode(env, listNode),
+                DictionaryNode dictionaryNode => EvaluateDictionaryNode(env, dictionaryNode),
+                IndexingNode indexingNode => EvaluateIndexingNode(env, indexingNode),
+                MemberAccessNode memberAccessNode => EvaluateMemberAccessNode(env, memberAccessNode),
+                ReturnNode returnNode => EvaluateReturn(env, returnNode),
+                BreakNode breakNode => EvaluateBreak(env, breakNode),
+                ContinueNode continueNode => EvaluateContinue(env, continueNode),
+                TryNode tryNode => EvaluateTry(env, tryNode),
+                ThrowNode throwNode => EvaluateThrow(env, throwNode),
                 _ => throw new NotImplementedException($"Execution for {node.GetType().Name} not yet implemented.")
             };
         }
@@ -131,6 +130,18 @@ public class FishboneInterpreter
     private static bool ShouldReport(Exception exception) =>
         exception is not OperationCanceledException and not ReturnException and not BreakException and not ContinueException
         && !exception.Data.Contains(DebuggerReportedKey);
+
+    // --------------------------------------------------------------------------------
+    // identifiers
+    // --------------------------------------------------------------------------------
+
+    internal object EvaluateIdentifier(FishboneEnvironment env, IdentifierNode identifier)
+    {
+        if (ReservedTypes.PrimitiveTypeNames.TryGetValue(identifier.Name, out Type? primitiveType))
+            return new RegisteredType(primitiveType);
+
+        return env.GetValue(identifier.Name);
+    }
 
     // --------------------------------------------------------------------------------
     // declarations and assignment
@@ -237,32 +248,11 @@ public class FishboneInterpreter
     // casts
     // --------------------------------------------------------------------------------
 
-    // names accepted as cast targets when the environment doesn't resolve them to a type;
-    // "int" etc. normally resolve to the conversion builtins, which are functions, not types
-    private static readonly Dictionary<string, Type> PrimitiveTypeNames = new(StringComparer.Ordinal)
-    {
-        ["sbyte"] = typeof(sbyte),
-        ["byte"] = typeof(byte),
-        ["short"] = typeof(short),
-        ["ushort"] = typeof(ushort),
-        ["int"] = typeof(int),
-        ["uint"] = typeof(uint),
-        ["long"] = typeof(long),
-        ["ulong"] = typeof(ulong),
-        ["float"] = typeof(float),
-        ["double"] = typeof(double),
-        ["decimal"] = typeof(decimal),
-        ["char"] = typeof(char),
-        ["string"] = typeof(string),
-        ["bool"] = typeof(bool),
-        ["object"] = typeof(object),
-    };
-
     internal object? EvaluateCast(FishboneEnvironment env, CastNode node)
     {
-        // plan: we'll first check if the target type is a registered
-        // type or a Type value. if not, we'll check if its a
-        // primitive C# type. otherwise, throw
+        // plan: we'll first check if the target type is a primitive
+        // type. if not, we'll check if it's a registered type or a
+        // Type value. otherwise, throw
 
         //  ------------ resolving the target type ------------ //
 
@@ -270,14 +260,15 @@ public class FishboneInterpreter
 
         // note: types live in the environment as built-ins (so that
         // they can be used as constructors or casts), so we can look
-        // them up through the environment normally
+        // them up through the environment normally. regardless,
+        // we'll check primitive types first.
 
-        if (env.TryGetValue(node.TypeName, out var resolved) && resolved is RegisteredType registeredType)
+        if (ReservedTypes.PrimitiveTypeNames.TryGetValue(node.TypeName, out var primitive))
+            targetType = primitive;
+        else if (env.TryGetValue(node.TypeName, out var resolved) && resolved is RegisteredType registeredType)
             targetType = registeredType.Type;
         else if (resolved is Type type)
             targetType = type;
-        else if (PrimitiveTypeNames.TryGetValue(node.TypeName, out var primitive))
-            targetType = primitive;
         else
             throw new FishboneRuntimeException($"Couldn't cast to '{node.TypeName}' since it's not a type.",
                                                node.Line,
