@@ -224,7 +224,7 @@ Two of those are worth pointing at, because they differ from C#.
 ### Arithmetic
 
 - `+`, `-` and `*` keep `int` when both sides are `int`, and give you a `double` as soon as either side is one
-- `/` is always true division. It gives a `double` no matter what the operands are, so `5 / 2` is `2.5` and `4 / 2` is `2.0`. Integer division by zero therefore produces `double` infinity rather than an error. There's no floor-division operator, so use `int(a / b)` when you need an integer quotient (assuming the host registered an `int` function, see [What the host gives you](#what-the-host-gives-you))
+- `/` is always true division. It gives a `double` no matter what the operands are, so `5 / 2` is `2.5` and `4 / 2` is `2.0`. Integer division by zero therefore produces `double` infinity rather than an error. There's no floor-division operator, so use `a / b as int` when you need an integer quotient. The cast truncates toward zero, like C# integer division
 - `%` is the remainder. It keeps `int` when both sides are `int` (only `/` promotes), and follows C#'s truncated convention, where the sign follows the dividend. So `-5 % 3` is `-2` and `5 % -3` is `2`. Integer remainder by zero raises an error, and `double` remainder by zero gives you `NaN`
 
 ### Equality and comparison
@@ -240,8 +240,9 @@ Equality on a .NET object honors that type's own `Equals`, so records and other 
 `expr as TypeName` is a **safe cast**. It gives you the value converted to the named type, or `null` when the conversion isn't possible. A failed conversion is never an error, though an unknown type name is:
 
 ```csharp
-let n = "42" as int;       // 42
-let bad = "oops" as int;   // null
+let n = 2.7 as int;        // 2
+let big = 256 as byte;     // null, out of range
+let s = "42" as int;       // null, text is never parsed
 let p = value as Point;    // the same instance if value is a Point, otherwise null
 let x = null as int;       // null
 ```
@@ -249,13 +250,28 @@ let x = null as int;       // null
 The type name resolves at runtime, in this order:
 
 1. A registered type, meaning anything the host exposed through `AddType<T>()`, or any environment value that happens to be a .NET `System.Type`
-2. The primitive names `int`, `double`, `string` and `bool`, which are special-cased so they work as cast targets even though nothing registered them
+2. The C# keyword type names `sbyte`, `byte`, `short`, `ushort`, `int`, `uint`, `long`, `ulong`, `float`, `double`, `decimal`, `char`, `string`, `bool` and `object`, which are special-cased so they work as cast targets even though nothing registered them
 
 If neither matches, the cast raises a runtime error.
 
-The conversion itself uses the same rules as .NET method-argument interop. A value already of the target type comes back unchanged. Otherwise a host-registered `TypeConverter` for that type is tried, then enum conversion, then `Convert.ChangeType` with the invariant culture for `IConvertible` values.
+A cast follows C# casts. A value that already is the target type, or derives from it or implements it, comes back unchanged. So `dog as Animal` is the same `dog`, and `cat as Dog` is `null`.
 
-Note that numeric conversion follows .NET rounding, so `3.7 as int` is `4`. A C# cast would have truncated it to `3`.
+Otherwise the cast first tries the same conversions as a method argument (see [Type conversions](#type-conversions)), including host-registered converters. If those don't apply, numbers get an explicit cast that works like a C# **checked** cast. Where checked C# would throw, `as` gives you `null`:
+
+| Cast                                  | Result     | Why                                                |
+|---------------------------------------|------------|----------------------------------------------------|
+| `2.7 as int`                          | `2`        | Truncates toward zero, like C#                     |
+| `-2.7 as int`                         | `-2`       | Truncates toward zero, like C#                     |
+| `65 as char`                          | `'A'`      | C# allows number to `char`                         |
+| `3000000000 as int`                   | `null`     | Out of range                                       |
+| `256 as byte`, `-1 as uint`           | `null`     | Out of range                                       |
+| a `double` too big for `float`        | `Infinity` | Float overflow isn't an error, even in checked C#  |
+
+Checked is deliberate. C#'s default unchecked casts wrap around silently, so `(byte)256` is `0`, and that loses information without telling you.
+
+Anything C# doesn't allow as a cast gives `null`, so `"42" as int`, `42 as string`, `true as int` and `"A" as char` are all `null`. Parsing text is a method call, not a cast.
+
+Enum casts only go from an integer to an enum for now (`1 as DayOfWeek`). C# also allows `2.0` to an enum and an enum to `int`, but Fishbone doesn't support those yet.
 
 ---
 
@@ -492,7 +508,7 @@ let count = list.Count;
 
 Methods resolve at runtime. When one has overloads, Fishbone first filters to the ones whose parameters could accept your arguments, then picks the *best* match.
 
-Each argument is scored by how closely it matches the parameter type. An exact runtime-type match ranks above a reference or interface assignment (`int` to `object`), which ranks above a value conversion (`int` to `double`, or an enum from a string). Highest total score wins.
+Each argument is scored by how closely it matches the parameter type. An exact runtime-type match ranks above a reference or interface assignment (`int` to `object`), which ranks above a value conversion (`int` to `double`, or an integer to an enum). Highest total score wins.
 
 If two overloads tie, the one that filled fewer optional parameters from their defaults wins. If they still tie, the call is rejected as ambiguous rather than silently picking one.
 
@@ -514,11 +530,19 @@ canny(src, dst, 100, 200, 5);       // aperture = 5, l2 takes its default
 
 ### Type conversions
 
-When you call a .NET method, Fishbone converts arguments automatically via `Convert.ChangeType`. Enum parameters take either a string name (`"Monday"`) or an integer value, parsed with `Enum.Parse`.
+When you call a .NET method, Fishbone converts an argument only when no information is lost. Otherwise the call fails with an error naming the parameter.
+
+- A number converts to another number type when it fits, meaning it's whole for an integer parameter and in range. So `2.0` goes to an `int`, but `2.5` and `3000000000` don't
+- A `double` goes to a `float` parameter when it's in range, even though it loses some precision. C# would need a cast here, but .NET APIs often take `float` and scripts only have `double`
+- An integer goes to an enum parameter, so `1` is `DayOfWeek.Monday`. Names like `"Monday"` and non-whole numbers don't
+- `null` goes to reference types and to nullable value types like `int?`. A plain `int` parameter rejects it
+- Nothing converts to or from `string`, `bool` or `char`. `"42"` is not an `int`, and `5` is not a `string`
+
+The same rules apply to constructors, indexers and host callables built by hand. Use `as` when you want a conversion that may lose information, like truncating `2.7` to `2`.
 
 ### Custom type converters
 
-That automatic conversion only covers types that are `IConvertible` or enums. For a .NET type that's neither (a tuple or matrix wrapper, say), a host can register its own with `FishboneConfiguration.AddTypeConverter(type, toNet, fromNet?)`.
+That automatic conversion only covers numbers and enums. For a .NET type that's neither (a tuple or matrix wrapper, say), a host can register its own with `FishboneConfiguration.AddTypeConverter(type, toNet, fromNet?)`.
 
 The `toNet` direction is consulted anywhere a value of that type is expected, so by-value, `ref` and `out` arguments alike, and it ranks as an explicit conversion during overload resolution.
 
