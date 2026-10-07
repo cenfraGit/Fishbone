@@ -960,10 +960,8 @@ public class FishboneInterpreter
         return type.IsValueType ? Activator.CreateInstance(type) : null;
     }
 
-    /// <summary>
-    /// Quality of a single argument-to-parameter match, used to rank overloads. Ordered so a
-    /// larger value is a better match; <see cref="None"/> means the argument is not accepted.
-    /// </summary>
+    // this represents the score for how good an arg-to-param
+    // conversion match is
     private enum ArgumentMatch
     {
         None = 0,
@@ -975,17 +973,39 @@ public class FishboneInterpreter
     private bool TryConvertArgument(object? rawArg, Type targetType, out object? convertedArg) =>
         ConvertArgument(rawArg, targetType, out convertedArg) != ArgumentMatch.None;
 
+    // this method checks if the script value can go into a .NET
+    // parameter. returns the score for how good the match is, and the
+    // converted value
     private ArgumentMatch ConvertArgument(object? rawArg, Type targetType, out object? convertedArg)
     {
+        // setup: get the underlying type if parameter is nullable
+        // (int? -> int). GetUnderlyingType returns null for anything
+        // that isn't nullable.
         var nullableType = Nullable.GetUnderlyingType(targetType);
+        // the type to actually convert to. if param type isn't
+        // nullable (nullableType is null), use targetType itself.
         var conversionType = nullableType ?? targetType;
+
+        //  --------------- if the value is null --------------- //
+        //
+        // if the value is null, the method will pass it only if the
+        // target parameter is a reference type or a nullable type.
 
         if (rawArg is null)
         {
-            convertedArg = GetDefaultValue(conversionType);
-            var nullAccepted = !conversionType.IsValueType || nullableType is not null || convertedArg is not null;
+            // note: passing targetType (instead of conversionType)
+            // because conversionType is already nullable unwrapped
+            convertedArg = GetDefaultValue(targetType);
+            // so null will be assignable if its a reference type, or
+            // if the parameter is nullable.
+            var nullAccepted = !conversionType.IsValueType || nullableType is not null;
             return nullAccepted ? ArgumentMatch.Assignable : ArgumentMatch.None;
         }
+
+        //  ------------------ if exact match ------------------ //
+        //
+        // if the value's runtime type is already the parameter type,
+        // pass it through.
 
         var rawType = rawArg.GetType();
         if (rawType == targetType || rawType == conversionType)
@@ -994,14 +1014,22 @@ public class FishboneInterpreter
             return ArgumentMatch.Exact;
         }
 
+        //  ---------- assignable without conversion ---------- //
+        //
+        // if value can go into a variable of that type as is (like
+        // subclasses, interfaces, object, etc).
+
         if (targetType.IsInstanceOfType(rawArg))
         {
             convertedArg = rawArg;
             return ArgumentMatch.Assignable;
         }
 
-        // a host-registered converter handles types the generic path below cannot (anything not
-        // IConvertible or an enum); it takes precedence so registered types convert deterministically
+        //  ------------ host-registered converter ------------ //
+        //
+        // if the host registered a converter for this type (through
+        // fishbone config), try to use it
+
         if (_typeConverters.TryGetValue(conversionType, out var converter))
         {
             try
@@ -1016,16 +1044,40 @@ public class FishboneInterpreter
             }
         }
 
-        try
+        //  ---------------------- enums ---------------------- //
+        //
+        // builds an enum type, using whole numbers to identify enum
+        // element
+
+        if (conversionType.IsEnum)
         {
-            if (conversionType.IsEnum)
+            if (rawArg
+                is int
+                or long
+                or short
+                or byte
+                or sbyte
+                or uint
+                or ulong
+                or ushort)
             {
-                convertedArg = rawArg is string enumName
-                    ? Enum.Parse(conversionType, enumName)
-                    : Enum.ToObject(conversionType, rawArg);
+                convertedArg = Enum.ToObject(conversionType, rawArg);
                 return ArgumentMatch.Convertible;
             }
 
+            // don't let it fall through
+            convertedArg = null;
+            return ArgumentMatch.None;
+        }
+
+        //  ------------------- change type ------------------- //
+        //
+        // if both the value and the parameter are IConvertible
+        // (numbers, string, bool, char, DateTime) use
+        // Convert.ChangeType
+
+        try
+        {
             if (rawArg is IConvertible && typeof(IConvertible).IsAssignableFrom(conversionType))
             {
                 convertedArg = Convert.ChangeType(rawArg, conversionType, CultureInfo.InvariantCulture);
@@ -1037,6 +1089,8 @@ public class FishboneInterpreter
             convertedArg = null;
             return ArgumentMatch.None;
         }
+
+        //  ----------------- nothing matched ----------------- //
 
         convertedArg = null;
         return ArgumentMatch.None;
