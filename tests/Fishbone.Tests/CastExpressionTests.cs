@@ -43,6 +43,42 @@ let tooBigDouble = 3000000000.0 as int;
     }
 
     [Fact]
+    public void Run_CastToKeywordTypes_FollowsCSharpCasts()
+    {
+        var env = FishboneProgram.Run("""
+let toLong = 3000000000 as long;
+let truncatedLong = 2.7 as long;
+let toFloat = 2.5 as float;
+let toByte = 255 as byte;
+let toDecimal = 2.5 as decimal;
+let toChar = 65 as char;
+let toObject = 5 as object;
+""", new FishboneConfiguration());
+
+        Assert.Equal(3000000000L, env.GetValue("toLong"));
+        Assert.Equal(2L, env.GetValue("truncatedLong"));
+        Assert.Equal(2.5f, env.GetValue("toFloat"));
+        Assert.Equal((byte)255, env.GetValue("toByte"));
+        Assert.Equal(2.5m, env.GetValue("toDecimal"));
+        Assert.Equal('A', env.GetValue("toChar"));
+        Assert.Equal(5, env.GetValue("toObject"));
+    }
+
+    [Fact]
+    public void Run_CastToKeywordTypes_OutOfRangeOrNotACast_ReturnsNull()
+    {
+        var env = FishboneProgram.Run("""
+let byteTooBig = 256 as byte;
+let negativeUint = -1 as uint;
+let stringToChar = "A" as char;
+""", new FishboneConfiguration());
+
+        Assert.Null(env.GetValue("byteTooBig"));
+        Assert.Null(env.GetValue("negativeUint"));
+        Assert.Null(env.GetValue("stringToChar"));
+    }
+
+    [Fact]
     public void Run_CastsThatAreNotCSharpCasts_ReturnNull()
     {
         var config = new FishboneConfiguration().AddType<DayOfWeek>();
