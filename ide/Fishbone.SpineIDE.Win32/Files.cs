@@ -15,6 +15,9 @@ internal static partial class Program
     // null until the script is saved or opened from disk
     private static string? _filePath;
 
+    // set while attached, to the name of the host's script
+    private static string? _remoteName;
+
     private static bool IsModified => Sci(SCI_GETMODIFY) != 0;
 
     private static void LoadDocument(string text, string? path)
@@ -28,6 +31,11 @@ internal static partial class Program
 
     private static void UpdateTitle()
     {
+        if (_remoteName is not null)
+        {
+            SetWindowTextW(_window, $"[Remote] {_remoteName} - SpineIDE");
+            return;
+        }
         string name = _filePath is null ? "untitled" : Path.GetFileName(_filePath);
         SetWindowTextW(_window, $"{name}{(IsModified ? "*" : "")} - SpineIDE");
     }

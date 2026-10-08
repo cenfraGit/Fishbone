@@ -24,7 +24,7 @@ internal static partial class Program
         WS_VSCROLL = 0x00200000, WS_HSCROLL = 0x00100000, WS_BORDER = 0x00800000;
     private const uint ES_MULTILINE = 0x4, ES_AUTOVSCROLL = 0x40, ES_AUTOHSCROLL = 0x80, ES_READONLY = 0x800;
     private const uint WM_DESTROY = 0x2, WM_SIZE = 0x5, WM_CLOSE = 0x10, WM_SETFONT = 0x30, WM_NOTIFY = 0x4E,
-        WM_KEYDOWN = 0x100, WM_SYSKEYDOWN = 0x104, WM_COMMAND = 0x111, WM_APP_INVOKE = 0x8001;
+        WM_KEYDOWN = 0x100, WM_SYSKEYDOWN = 0x104, WM_COMMAND = 0x111, WM_DPICHANGED = 0x2E0, WM_APP_INVOKE = 0x8001;
     private const uint EM_SETSEL = 0xB1, EM_REPLACESEL = 0xC2, EM_SETLIMITTEXT = 0xC5, EM_SETCUEBANNER = 0x1501;
     private const int VK_RETURN = 0x0D, VK_SPACE = 0x20, VK_F5 = 0x74, VK_F9 = 0x78, VK_F10 = 0x79, VK_F11 = 0x7A,
         VK_SHIFT = 0x10, VK_CONTROL = 0x11, VK_N = 0x4E, VK_O = 0x4F, VK_S = 0x53;
@@ -59,6 +59,14 @@ internal static partial class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        // no console here, so a bad command line shows in a message box
+        var errors = new StringWriter();
+        if (!SpineIdeStartupOptions.TryParse(args, errors, out SpineIdeStartupOptions options))
+        {
+            MessageBoxW(IntPtr.Zero, errors.ToString(), "SpineIDE", 0x10); // MB_ICONERROR
+            return 1;
+        }
+
         SetupSession();
 
         IntPtr instance = GetModuleHandleW(null);
@@ -106,18 +114,13 @@ internal static partial class Program
         _debugButton = CreateChild("BUTTON", "Debug (F5)", WS_CHILD | WS_VISIBLE, DebugButtonId);
         _status = CreateChild("STATIC", "", WS_CHILD | WS_VISIBLE, 0);
 
-        IntPtr mono = CreateFontW(-16, 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 0, 0, "Consolas");
-        IntPtr gui = CreateFontW(-12, 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 0, 0, "Segoe UI");
-        SendMessageW(_output, WM_SETFONT, mono, 1);
-        SendMessageW(_input, WM_SETFONT, mono, 1);
         // multiline edits cap at 32k chars by default, 0 lifts that
         SendMessageW(_output, EM_SETLIMITTEXT, 0, 0);
-        SendMessageW(_variables, WM_SETFONT, mono, 1);
-        foreach (IntPtr control in new[] { _runButton, _debugButton, _status })
-            SendMessageW(control, WM_SETFONT, gui, 1);
+        _dpi = (int)GetDpiForWindow(_window);
+        ApplyDpi();
 
-        if (args.Length > 0)
-            LoadDocument(File.ReadAllText(args[0]), Path.GetFullPath(args[0]));
+        if (options.FilePath is not null)
+            LoadDocument(File.ReadAllText(options.FilePath), Path.GetFullPath(options.FilePath));
         else
             LoadDocument(DefaultScript, null);
 
@@ -131,6 +134,10 @@ internal static partial class Program
 
         // loading plugins for completion touches disk, so do it before the first keystroke needs it
         _ = Task.Run(() => _ = FishboneCompletionCatalog.Shared);
+
+        // a host started us to debug its script, like RunDebuggableAsync does
+        if (options.AttachPort is int port)
+            Attach(port);
 
         while (GetMessageW(out MSG msg, IntPtr.Zero, 0, 0) > 0)
         {
@@ -154,6 +161,14 @@ internal static partial class Program
         {
             case WM_SIZE:
                 Layout((int)(lParam & 0xFFFF), (int)((lParam >> 16) & 0xFFFF));
+                return 0;
+            case WM_DPICHANGED:
+                // moved to a monitor with another scale. windows suggests the new window rect
+                _dpi = (int)(wParam & 0xFFFF);
+                RECT suggested = Marshal.PtrToStructure<RECT>(lParam);
+                SetWindowPos(hwnd, IntPtr.Zero, suggested.left, suggested.top,
+                    suggested.right - suggested.left, suggested.bottom - suggested.top, 0x14); // SWP_NOZORDER | SWP_NOACTIVATE
+                ApplyDpi();
                 return 0;
             case WM_COMMAND:
                 RunCommand((int)(wParam & 0xFFFF));
@@ -224,18 +239,42 @@ internal static partial class Program
     private static IntPtr CreateChild(string className, string text, uint style, int id) =>
         CreateWindowExW(0, className, text, style, 0, 0, 0, 0, _window, id, IntPtr.Zero, IntPtr.Zero);
 
+    // the monitor's dpi, 96 at 100% scale. sizes in this file are written for 96
+    private static int _dpi = 96;
+    private static IntPtr _monoFont, _guiFont;
+
+    private static int Scale(int pixels) => pixels * _dpi / 96;
+
+    // fonts and fixed sizes, for the current monitor
+    private static void ApplyDpi()
+    {
+        DeleteObject(_monoFont);
+        DeleteObject(_guiFont);
+        _monoFont = CreateFontW(-Scale(16), 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 0, 0, "Consolas");
+        _guiFont = CreateFontW(-Scale(12), 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 0, 0, "Segoe UI");
+        foreach (IntPtr control in new[] { _output, _input, _variables })
+            SendMessageW(control, WM_SETFONT, _monoFont, 1);
+        foreach (IntPtr control in new[] { _runButton, _debugButton, _status })
+            SendMessageW(control, WM_SETFONT, _guiFont, 1);
+        SetMarginWidths();
+
+        GetClientRect(_window, out RECT client);
+        Layout(client.right, client.bottom);
+    }
+
     private static void Layout(int width, int height)
     {
-        int editorHeight = (height - TopBarHeight) * 6 / 10;
-        int bottomHeight = height - TopBarHeight - editorHeight;
+        int top = Scale(TopBarHeight), input = Scale(InputHeight);
+        int editorHeight = (height - top) * 6 / 10;
+        int bottomHeight = height - top - editorHeight;
         int outputWidth = width * 6 / 10;
-        MoveWindow(_runButton, 8, 4, 110, 24, true);
-        MoveWindow(_debugButton, 124, 4, 110, 24, true);
-        MoveWindow(_status, 246, 9, width - 254, 20, true);
-        MoveWindow(_editor, 0, TopBarHeight, width, editorHeight, true);
-        MoveWindow(_output, 0, TopBarHeight + editorHeight, outputWidth, bottomHeight - InputHeight, true);
-        MoveWindow(_input, 0, TopBarHeight + editorHeight + bottomHeight - InputHeight, outputWidth, InputHeight, true);
-        MoveWindow(_variables, outputWidth, TopBarHeight + editorHeight, width - outputWidth, bottomHeight, true);
+        MoveWindow(_runButton, Scale(8), Scale(4), Scale(110), Scale(24), true);
+        MoveWindow(_debugButton, Scale(124), Scale(4), Scale(110), Scale(24), true);
+        MoveWindow(_status, Scale(246), Scale(9), width - Scale(254), Scale(20), true);
+        MoveWindow(_editor, 0, top, width, editorHeight, true);
+        MoveWindow(_output, 0, top + editorHeight, outputWidth, bottomHeight - input, true);
+        MoveWindow(_input, 0, top + editorHeight + bottomHeight - input, outputWidth, input, true);
+        MoveWindow(_variables, outputWidth, top + editorHeight, width - outputWidth, bottomHeight, true);
     }
 
 }

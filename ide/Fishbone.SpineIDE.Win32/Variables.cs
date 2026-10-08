@@ -65,7 +65,8 @@ internal static partial class Program
     }
 
     private static void InsertDebugVariable(IntPtr parent, FishboneDebugVariable variable) =>
-        InsertItem(parent, ItemText(variable.Name, variable.Value, variable.Type),
+        InsertItem(parent, ItemText(variable.Name, variable.Value, variable.Type)
+                + (variable.ImageHandle is null ? "" : "    double-click to view"),
             hasChildren: variable.ChildrenHandle is not null, new VariableNode { Debug = variable });
 
     private static void InsertLocalValue(IntPtr parent, string name, object? value) =>
@@ -110,6 +111,11 @@ internal static partial class Program
     // children load the first time an item opens
     private static void OnVariablesNotification(IntPtr lParam)
     {
+        if (Marshal.PtrToStructure<NMHDR>(lParam).code == NM_DBLCLK)
+        {
+            OnVariableDoubleClick();
+            return;
+        }
         var notification = Marshal.PtrToStructure<NMTREEVIEWW>(lParam);
         if (notification.hdr.code != TVN_ITEMEXPANDINGW || notification.action != TVE_EXPAND)
             return;

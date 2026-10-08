@@ -16,7 +16,26 @@ public static class W {
   public static string Text(IntPtr h) { var s = new StringBuilder(200000); SendMessageW(h, 0x0D, (IntPtr)200000, s); return s.ToString(); }
 }
 '@
-$p = Start-Process $Exe -PassThru
+# debugging saves the script first, so the test works on a file of its own
+$script = Join-Path $Out "smoke.fb"
+Set-Content -Path $script -Encoding utf8 -Value @'
+// F5 debug / continue    Ctrl+F5 run    Shift+F5 stop
+// F9 breakpoint    F10 step over    F11 step into    Shift+F11 step out
+// Ctrl+Space completion
+func square(x)
+{
+    return x * x;
+}
+
+let i = 0;
+while (i < 10000)
+{
+    let squared = square(i);
+    println("line " + i.ToString() + " squared is " + squared.ToString());
+    i = i + 1;
+}
+'@
+$p = Start-Process $Exe -ArgumentList "`"$script`"" -PassThru
 Start-Sleep -Seconds 2; $p.Refresh(); $w = $p.MainWindowHandle
 $ed = [W]::FindWindowExW($w, [IntPtr]::Zero, "Scintilla", $null)
 $outBox = [W]::FindWindowExW($w, [IntPtr]::Zero, "Edit", $null)

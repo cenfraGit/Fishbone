@@ -65,6 +65,38 @@ internal static partial class Program
         });
     }
 
+    private const uint SCI_SETREADONLY = 2171;
+
+    private static async void Attach(int port)
+    {
+        BeginExecution($"attaching to port {port}...");
+        ScriptRunOutcome? outcome = await _session.AttachAsync("127.0.0.1", port, OpenRemoteSource, _ => { });
+        Post(() =>
+        {
+            _paused = false;
+            _remoteName = null;
+            Sci(SCI_SETREADONLY, 0);
+            ShowCurrentLine(-1);
+            UpdateTitle();
+            EndExecution(outcome);
+        });
+    }
+
+    // shows the host's script. it's the host's copy, so it can't be edited here
+    private static Task<IReadOnlyList<int>> OpenRemoteSource(FishboneDebugSource source)
+    {
+        var opened = new TaskCompletionSource<IReadOnlyList<int>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Post(() =>
+        {
+            _remoteName = source.Name;
+            Sci(SCI_SETREADONLY, 0);
+            LoadDocument(source.Content, null);
+            Sci(SCI_SETREADONLY, 1);
+            opened.SetResult(BreakpointLines());
+        });
+        return opened.Task;
+    }
+
     private static void BeginExecution(string status)
     {
         _running = true;

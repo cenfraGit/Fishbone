@@ -60,11 +60,9 @@ internal static partial class Program
         Sci(SCI_SETCARETLINEBACK, 0xF5F5F5);
 
         Sci(SCI_SETMARGINTYPEN, MarginNumbers, 1); // SC_MARGIN_NUMBER
-        Sci(SCI_SETMARGINWIDTHN, MarginNumbers, 44);
 
         // breakpoint margin, clickable, shows the breakpoint dot and the current line arrow
         Sci(SCI_SETMARGINTYPEN, MarginBreakpoints, 0); // SC_MARGIN_SYMBOL
-        Sci(SCI_SETMARGINWIDTHN, MarginBreakpoints, 16);
         Sci(SCI_SETMARGINMASKN, MarginBreakpoints, (1 << MarkerBreakpoint) | (1 << MarkerCurrentArrow));
         Sci(SCI_SETMARGINSENSITIVEN, MarginBreakpoints, 1);
         Sci(SCI_MARKERDEFINE, MarkerBreakpoint, 0); // SC_MARK_CIRCLE
@@ -78,7 +76,6 @@ internal static partial class Program
 
         // fold margin. scintilla draws the tree and handles clicks itself once fold levels are set
         Sci(SCI_SETMARGINTYPEN, MarginFolding, 0);
-        Sci(SCI_SETMARGINWIDTHN, MarginFolding, 16);
         Sci(SCI_SETMARGINMASKN, MarginFolding, unchecked((int)0xFE000000)); // SC_MASK_FOLDERS
         Sci(SCI_SETMARGINSENSITIVEN, MarginFolding, 1);
         // fold marker numbers 25..31 paired with their box-tree symbols
@@ -93,6 +90,13 @@ internal static partial class Program
 
         Sci(SCI_AUTOCSETIGNORECASE, 1);
         Sci(SCI_AUTOCSETORDER, 1); // scintilla sorts the list for us
+    }
+
+    private static void SetMarginWidths()
+    {
+        Sci(SCI_SETMARGINWIDTHN, MarginNumbers, Scale(44));
+        Sci(SCI_SETMARGINWIDTHN, MarginBreakpoints, Scale(16));
+        Sci(SCI_SETMARGINWIDTHN, MarginFolding, Scale(16));
     }
 
     private static void OnEditorNotification(SCNotification notification)
