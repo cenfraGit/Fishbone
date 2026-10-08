@@ -505,16 +505,15 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
                     bool isProgramExit = string.Equals(
                         paused.Snapshot.Reason, FishbonePauseSnapshot.ProgramExitReason, StringComparison.OrdinalIgnoreCase);
 
-                    // always surface the final variables. The end-of-program pause is not interactive:
-                    // don't steal focus or highlight a current line, and let the session finish on its
-                    // own so the debug controls disable. The variable panel keeps this last snapshot.
+                    // always surface the final variables. At the end-of-program pause, don't steal
+                    // focus or highlight a current line. The session stays paused there until the user
+                    // continues or stops, so collections in the variable panel can still be expanded:
+                    // their children are fetched from the debug host, which goes away once it finishes.
                     if (_debugEditor is not null && !isProgramExit)
                         ActivateEditor(_debugEditor.SourceId);
                     WeakReferenceMessenger.Default.Send(new MessageDebugPaused(paused.Snapshot, session));
                     WeakReferenceMessenger.Default.Send(new MessageDebugLocationChanged(
                         _debugEditor?.SourceId ?? string.Empty, isProgramExit ? null : frame?.Line));
-                    if (isProgramExit)
-                        _ = session.ContinueAsync();
                     break;
                 case FishboneDebugContinued:
                     WeakReferenceMessenger.Default.Send(new MessageDebugContinued());

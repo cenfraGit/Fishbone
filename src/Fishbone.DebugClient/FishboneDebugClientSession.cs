@@ -166,16 +166,19 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
     public async Task<IReadOnlyList<FishboneBreakpointResult>> SetBreakpointsAsync(IReadOnlyList<int> lines, CancellationToken cancellationToken = default)
     {
         DebugAdapterClient client = RequireClient();
+        int[] requested = lines.Distinct().Order().ToArray();
         await _requestGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             var response = await client.SetBreakpoints(new SetBreakpointsArguments
             {
                 Source = _dapSource ?? throw new InvalidOperationException("The debug source is not available."),
-                Breakpoints = new Container<SourceBreakpoint>(lines.Distinct().Order().Select(line => new SourceBreakpoint { Line = line }))
+                Breakpoints = new Container<SourceBreakpoint>(requested.Select(line => new SourceBreakpoint { Line = line }))
             }, cancellationToken).ConfigureAwait(false);
+            // results come back in request order. each keeps the line that was asked for, so a
+            // breakpoint the adapter bound to a later line stays where the user put it
             var results = (response.Breakpoints ?? []).Select((breakpoint, index) => new FishboneBreakpointResult(
-                breakpoint.Line ?? (index < lines.Count ? lines[index] : 0), breakpoint.Verified, breakpoint.Message)).ToArray();
+                index < requested.Length ? requested[index] : breakpoint.Line ?? 0, breakpoint.Verified, breakpoint.Message)).ToArray();
             return results;
         }
         finally
