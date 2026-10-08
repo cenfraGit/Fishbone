@@ -264,11 +264,32 @@ let nested = [[1, 2], [3, 4]];
         Assert.Equal(expectedAst, ast);
     }
 
+    [Theory]
+    [InlineData("let empty = {};")]
+    [InlineData("""let nested = {"inner": {}};""")]
+    [InlineData("let r = f({});")]
+    public void Parse_EmptyBracesExpression_IsParseErrorPointingToEmptyDictionary(string code)
+    {
+        // {} is reserved for a future meaning. the empty dictionary is {:}
+        var exception = Assert.Throws<FishboneParseException>(() => ParserTestHelpers.ParseProgram(code));
+
+        Assert.Contains("{:}", exception.Message);
+    }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("if (true) {}")]
+    [InlineData("func f() {}")]
+    public void Parse_EmptyBlock_IsStillAllowed(string code)
+    {
+        ParserTestHelpers.ParseProgram(code);
+    }
+
     [Fact]
     public void Parse_DictionaryExpressions_ReturnsDictionaryNodes()
     {
         var ast = ParserTestHelpers.ParseProgram("""
-let empty = {};
+let empty = {:};
 let mixed = {"one": 1, 2: "two", true: false};
 let expressions = {key: x + 1, format(42): value};
 let nested = {"list": [1, 2], "dict": {"inner": 3}};

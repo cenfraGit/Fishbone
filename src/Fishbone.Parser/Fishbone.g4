@@ -56,7 +56,7 @@ dictPair     : expr COLON expr ;
 expr
     : '(' expr ')'                            #ParenthesesExpr
     | '[' (expr (COMMA expr)*)? ']'           #ListExpr
-    | '{' (dictPair (COMMA dictPair)*)? '}'   #DictionaryExpr
+    | '{' (COLON | dictPair (COMMA dictPair)*)? '}'  #DictionaryExpr
     | expr '(' (argument (COMMA argument)*)? ')'  #CallExpr
     | expr '.' ID                             #MemberAccessExpr
     | expr '[' expr ']'                       #IndexingExpr
