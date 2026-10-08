@@ -68,6 +68,24 @@ let same = 9007199254740993 == 9007199254740993;
     }
 
     [Fact]
+    public void Run_Equality_CharComparesAsNumber()
+    {
+        // like c#, and like + and < already do
+        var env = FishboneProgram.Run("""
+let c = 65 as char;
+let withInt = c == 65;
+let withDouble = 65.0 == c;
+let withChar = c == (65 as char);
+let notEqual = c != 66;
+""", new FishboneConfiguration());
+
+        Assert.Equal(true, env.GetValue("withInt"));
+        Assert.Equal(true, env.GetValue("withDouble"));
+        Assert.Equal(true, env.GetValue("withChar"));
+        Assert.Equal(true, env.GetValue("notEqual"));
+    }
+
+    [Fact]
     public void Run_Equality_NonNumbersAreNeverNumbers()
     {
         var env = FishboneProgram.Run("""

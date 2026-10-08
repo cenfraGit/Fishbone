@@ -290,11 +290,15 @@ public class FishboneInterpreter
                 if (wat is null) return false;
                 Type watType = wat.GetType();
                 var rawCode = Type.GetTypeCode(watType);
-                return !watType.IsEnum && rawCode is >= TypeCode.SByte and <= TypeCode.Decimal;
+                return !watType.IsEnum && rawCode is >= TypeCode.Char and <= TypeCode.Decimal;
             }
 
             if (IsNumber(left) && IsNumber(right))
             {
+                // .ToDecimal and .ToDouble will throw if passed char
+                if (left is char cLeft) left = (int)cLeft;
+                if (right is char cRight) right = (int)cRight;
+
                 if (left is float or double || right is float or double)
                     return Convert.ToDouble(left) == Convert.ToDouble(right);
                 return Convert.ToDecimal(left) == Convert.ToDecimal(right);
