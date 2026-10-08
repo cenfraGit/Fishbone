@@ -720,10 +720,7 @@ public class FishboneInterpreter
         }
 
         if (callee is Delegate csharpDelegate)
-        {
-            var invoke = csharpDelegate.GetType().GetMethod("Invoke")!;
-            return InvokeReflectedCallable(env, csharpDelegate, invoke, argumentNodes);
-        }
+            return InvokeDelegate(env, csharpDelegate, argumentNodes);
 
         if (callee is BoundMethod boundMethod)
             return InvokeBoundMethod(env, boundMethod, argumentNodes);
@@ -745,6 +742,22 @@ public class FishboneInterpreter
 
     internal object InvokeReflectedCallable(FishboneEnvironment env, object? target, MethodInfo method, IReadOnlyList<ArgumentNode> argumentNodes) =>
         InvokeBestOverload(env, target, [method], argumentNodes, method.Name);
+
+    // calls through the delegate's own Invoke, so it runs like a c# call: every handler of a
+    // multicast delegate, and the bound target or closure it carries
+    private object InvokeDelegate(FishboneEnvironment env, Delegate csharpDelegate, IReadOnlyList<ArgumentNode> argumentNodes)
+    {
+        var invoke = csharpDelegate.GetType().GetMethod("Invoke")!;
+
+        // Invoke names its parameters arg, arg1, ... so errors use the names of the method
+        // behind it. any extra parameters that method has (a bound first argument, a closure)
+        // come first
+        var count = ReflectionCache.GetParameters(invoke).Length;
+        var inner = ReflectionCache.GetParameters(csharpDelegate.Method);
+        var names = inner.Length >= count ? inner[^count..].Select(p => p.Name).ToArray() : null;
+
+        return InvokeBestOverload(env, csharpDelegate, [invoke], argumentNodes, invoke.Name, names);
+    }
 
     internal object InvokeConstructorOverload(FishboneEnvironment env, RegisteredType registeredType, IReadOnlyList<ArgumentNode> argumentNodes)
     {
@@ -890,7 +903,8 @@ public class FishboneInterpreter
         object? target,
         IReadOnlyList<MethodBase> methods,
         IReadOnlyList<ArgumentNode> argumentNodes,
-        string methodName)
+        string methodName,
+        string?[]? parameterNames = null)
     {
         // evaluate every argument once. 'out' arguments are skipped: the receiving variable need
         // not exist yet (the call introduces it), so evaluating it would wrongly fail. 'ref' and
@@ -912,7 +926,7 @@ public class FishboneInterpreter
         foreach (var method in methods)
         {
             var parameters = ReflectionCache.GetParameters(method);
-            if (!TryBindOverload(parameters, argumentNodes, rawArgs, out var args, out var writeBacks, out var score, out var defaultsUsed, out var diagnostic))
+            if (!TryBindOverload(parameters, parameterNames, argumentNodes, rawArgs, out var args, out var writeBacks, out var score, out var defaultsUsed, out var diagnostic))
             {
                 deferredDiagnostic ??= diagnostic;
                 continue;
@@ -966,6 +980,7 @@ public class FishboneInterpreter
     /// </summary>
     private bool TryBindOverload(
         ParameterInfo[] parameters,
+        string?[]? parameterNames,
         IReadOnlyList<ArgumentNode> argumentNodes,
         object?[] rawArgs,
         out object?[] args,
@@ -988,6 +1003,7 @@ public class FishboneInterpreter
         for (int i = 0; i < parameters.Length; i++)
         {
             var parameter = parameters[i];
+            var name = parameterNames?[i] ?? parameter.Name;
 
             // no argument was supplied for this parameter: accept the overload only if the parameter
             // is optional, supplying its default value. out/ref parameters are never optional
@@ -995,7 +1011,7 @@ public class FishboneInterpreter
             {
                 if (!parameter.HasDefaultValue)
                 {
-                    diagnostic ??= $"No argument supplied for parameter '{parameter.Name}', which has no default value.";
+                    diagnostic ??= $"No argument supplied for parameter '{name}', which has no default value.";
                     return false;
                 }
 
@@ -1015,13 +1031,13 @@ public class FishboneInterpreter
             {
                 if (argument.Modifier != ArgumentModifier.Out)
                 {
-                    diagnostic = $"Parameter '{parameter.Name}' is an out parameter; pass the argument with 'out'.";
+                    diagnostic = $"Parameter '{name}' is an out parameter; pass the argument with 'out'.";
                     return false;
                 }
 
                 if (argument.Value is not IdentifierNode outTarget)
                 {
-                    diagnostic = $"Out argument '{parameter.Name}' must be a variable.";
+                    diagnostic = $"Out argument '{name}' must be a variable.";
                     return false;
                 }
 
@@ -1036,20 +1052,20 @@ public class FishboneInterpreter
             {
                 if (argument.Modifier != ArgumentModifier.Ref)
                 {
-                    diagnostic = $"Parameter '{parameter.Name}' is a ref parameter; pass the argument with 'ref'.";
+                    diagnostic = $"Parameter '{name}' is a ref parameter; pass the argument with 'ref'.";
                     return false;
                 }
 
                 if (argument.Value is not IdentifierNode refTarget)
                 {
-                    diagnostic = $"Ref argument '{parameter.Name}' must be a variable.";
+                    diagnostic = $"Ref argument '{name}' must be a variable.";
                     return false;
                 }
 
                 var refMatch = ConvertArgument(rawArgs[i], targetType, out var refConverted);
                 if (refMatch == ArgumentMatch.None)
                 {
-                    diagnostic ??= DescribeConversionFailure(i, rawArgs[i], parameter.Name!, targetType);
+                    diagnostic ??= DescribeConversionFailure(i, rawArgs[i], name!, targetType);
                     return false;
                 }
 
@@ -1061,14 +1077,14 @@ public class FishboneInterpreter
 
             if (argument.Modifier != ArgumentModifier.None)
             {
-                diagnostic = $"Parameter '{parameter.Name}' is passed by value; remove '{argument.Modifier.ToString().ToLowerInvariant()}'.";
+                diagnostic = $"Parameter '{name}' is passed by value; remove '{argument.Modifier.ToString().ToLowerInvariant()}'.";
                 return false;
             }
 
             var match = ConvertArgument(rawArgs[i], targetType, out var convertedArg);
             if (match == ArgumentMatch.None)
             {
-                diagnostic ??= DescribeConversionFailure(i, rawArgs[i], parameter.Name!, targetType);
+                diagnostic ??= DescribeConversionFailure(i, rawArgs[i], name!, targetType);
                 return false;
             }
 
