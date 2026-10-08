@@ -90,6 +90,36 @@ let sum = v.Sum();
         Assert.Contains("constructor", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void Run_StructCalledWithNoArguments_ReturnsDefaultValue()
+    {
+        // like new Size() in c#. structs always have an empty constructor, but reflection
+        // doesn't list it
+        var config = new FishboneConfiguration()
+            .AddType<Size>()
+            .AddType<TimeSpan>();
+
+        var env = FishboneProgram.Run("""
+let empty = Size();
+let sized = Size(2, 3);
+let zero = TimeSpan();
+""", config);
+
+        Assert.Equal(default(Size), env.GetValue("empty"));
+        Assert.Equal(new Size(2, 3), env.GetValue("sized"));
+        Assert.Equal(TimeSpan.Zero, env.GetValue("zero"));
+    }
+
+    [Fact]
+    public void Run_StructWithNoMatchingConstructor_Throws()
+    {
+        var config = new FishboneConfiguration().AddType<Size>();
+
+        Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run("let s = Size(1);", config));
+    }
+
+    private readonly record struct Size(int Width, int Height);
+
     private sealed class Point
     {
         public Point(int x, int y)
