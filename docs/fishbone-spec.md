@@ -240,7 +240,17 @@ Two of those are worth pointing at, because they differ from C#.
 
 ### Equality and comparison
 
-`==` and `!=` are **total**. They never raise an error, whatever you throw at them. Numbers compare by value across `int`, `long` and `double` (`1 == 1.0` is `true`), and everything else uses value equality, so mismatched types are simply not equal. `1 == "1"` is `false`, not an error.
+`==` and `!=` are **total**. They never raise an error, whatever you throw at them. Numbers compare by value across all .NET numeric types (`1 == 1.0` is `true`, and so is `1` against a `float`, `byte` or `decimal` from the host). Integers compare exactly, so two large `long` values that differ are never equal. Only a comparison with a `float` or `double` goes through `double`, like in C#. Everything else uses value equality, so mismatched types are simply not equal. `1 == "1"` is `false`, not an error, and so is `true == 1`, since `bool` and enums aren't numbers. A `char` compares as its character code, like in C#, so `(65 as char) == 65` is `true`.
+
+Dictionary keys don't follow this rule. A dictionary compares keys like a .NET `Dictionary<object, ...>`, so an `int` key and a `double` key are different keys even when `==` says they're equal:
+
+```csharp
+let d = {1: "a"};
+let x = d[1.0];             // error: the key isn't found
+let y = d[(2 / 2) as int];  // "a"
+```
+
+This matters most with `/`, which always gives a `double`. Cast the key with `as int` when you look up an integer key with a computed value.
 
 Equality on a .NET object honors that type's own `Equals`, so records and other value-equal types compare by value. A type that doesn't define equality falls back to reference identity.
 
