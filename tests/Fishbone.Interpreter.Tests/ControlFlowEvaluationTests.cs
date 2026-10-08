@@ -256,7 +256,7 @@ for (i in 0, 10)
 }
 """);
 
-        Assert.Equal(45.0, env.GetValue("total"));
+        Assert.Equal(45, env.GetValue("total"));
     }
 
     [Fact]
@@ -270,7 +270,7 @@ for (i in 0, 10, 2)
 }
 """);
 
-        Assert.Equal(20.0, env.GetValue("total"));
+        Assert.Equal(20, env.GetValue("total"));
     }
 
     [Fact]
@@ -284,7 +284,7 @@ for (i in 10, 0, -1)
 }
 """);
 
-        Assert.Equal(55.0, env.GetValue("total"));
+        Assert.Equal(55, env.GetValue("total"));
     }
 
     [Fact]
@@ -298,7 +298,7 @@ for (i in 5, 0)
 }
 """);
 
-        Assert.Equal(15.0, env.GetValue("total"));
+        Assert.Equal(15, env.GetValue("total"));
     }
 
     [Fact]
@@ -337,7 +337,7 @@ for (i in 0, 10)
 }
 """);
 
-        Assert.Equal(6.0, env.GetValue("total"));
+        Assert.Equal(6, env.GetValue("total"));
     }
 
     [Fact]
@@ -352,7 +352,7 @@ for (i in 0, 5)
 }
 """);
 
-        Assert.Equal(8.0, env.GetValue("total"));
+        Assert.Equal(8, env.GetValue("total"));
     }
 
     [Fact]

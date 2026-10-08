@@ -444,6 +444,22 @@ for (i in 10, 0, -2) { }   // i = 10, 8, 6, 4, 2
 
 A numeric range. The syntax is `for (identifier in start, end)` or `for (identifier in start, end, step)`. The step defaults to `1` or `-1` depending on which way you're going, `end` is exclusive, and the loop variable is scoped to the body.
 
+The loop variable's type follows the range, like the [arithmetic rules](#arithmetic):
+
+```csharp
+for (i in 0, 5) { }            // i is an int: 0, 1, 2, 3, 4
+for (i in 0, 3000000000, 1000000000) { }   // i is a long, since the end is a long
+for (i in 0, 2, 0.5) { }       // i is a double: 0.0, 0.5, 1.0, 1.5
+for (i in 0, 1, 0.1) { }       // ten doubles, from 0.0 to 0.9
+```
+
+- It's an `int` when start, end and step are all `int`s, a `long` when they're all integers and one is a `long`, and a `double` when any of them is floating-point.
+- Each value is `start + k * step`, not a running sum, so a fractional step doesn't drift. `0, 1, 0.1` runs exactly ten times.
+- A range that ends near the limit of its type is fine. `for (i in 2147483640, int.MaxValue, 5)` gives `2147483640` and `2147483645`. The next value wouldn't fit in an `int`, but it only ends the loop.
+- Start, end and step must be numbers. A string, `null` or a `bool` is an error, so `for (i in "0", "3")` doesn't parse the text.
+- A step of `0` is an error, and so is a step that moves away from `end`, like `for (i in 0, 10, -1)`, since that loop would never stop.
+- Assigning to the loop variable in the body doesn't change the iterations. The next value is still `start + k * step`.
+
 ### Break and continue
 
 ```csharp
