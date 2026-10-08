@@ -720,7 +720,10 @@ public class FishboneInterpreter
         }
 
         if (callee is Delegate csharpDelegate)
-            return InvokeReflectedCallable(env, csharpDelegate.Target, csharpDelegate.Method, argumentNodes);
+        {
+            var invoke = csharpDelegate.GetType().GetMethod("Invoke")!;
+            return InvokeReflectedCallable(env, csharpDelegate, invoke, argumentNodes);
+        }
 
         if (callee is BoundMethod boundMethod)
             return InvokeBoundMethod(env, boundMethod, argumentNodes);
