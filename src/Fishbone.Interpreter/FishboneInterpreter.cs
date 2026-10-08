@@ -746,6 +746,11 @@ public class FishboneInterpreter
     internal object InvokeConstructorOverload(FishboneEnvironment env, RegisteredType registeredType, IReadOnlyList<ArgumentNode> argumentNodes)
     {
         var constructors = ReflectionCache.GetConstructors(registeredType.Type);
+        var type = registeredType.Type;
+        // structs always have an empty constructor, but reflection doesn't list it
+        if (type.IsValueType && !type.IsEnum && argumentNodes.Count == 0
+            && !constructors.Any(c => c.GetParameters().Length == 0))
+            return Activator.CreateInstance(type)!;
         if (constructors.Length == 0)
             throw new FishboneRuntimeException($"Type '{registeredType.Type.Name}' has no public constructor to call.");
 
