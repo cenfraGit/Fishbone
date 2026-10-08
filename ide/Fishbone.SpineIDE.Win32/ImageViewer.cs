@@ -5,14 +5,28 @@ namespace SpineIDE.Win32;
 
 internal static partial class Program
 {
-    private const uint WM_PAINT = 0xF, WS_EX_TOOLWINDOW = 0x80;
+    private const uint WM_PAINT = 0xF, WM_ERASEBKGND = 0x14, WS_EX_TOOLWINDOW = 0x80, WM_MOUSEMOVE = 0x200,
+        WM_LBUTTONDOWN = 0x201, WM_LBUTTONUP = 0x202, WM_LBUTTONDBLCLK = 0x203, WM_MOUSEWHEEL = 0x20A;
     private const int CW_USEDEFAULT = unchecked((int)0x80000000);
     private const int NM_DBLCLK = -3;
     private const uint TVM_GETNEXTITEM = 0x110A, TVM_GETITEMW = 0x113E, TVGN_CARET = 0x9;
 
     // the delegate has to stay referenced, like the main window's
     private static readonly WndProcDelegate _imageWndProc = ImageWndProc;
-    private static readonly Dictionary<IntPtr, (IntPtr Bitmap, int Width, int Height)> _images = [];
+    private static readonly Dictionary<IntPtr, ImageView> _images = [];
+
+    // one shown image and how it's zoomed. Scale is screen pixels per image pixel, and X, Y is
+    // where the image's top left corner sits in the window
+    private sealed class ImageView
+    {
+        public required IntPtr Bitmap;
+        public required int Width, Height;
+        public required string Name, Title;
+        public bool Fit = true;
+        public double Scale = 1, X, Y;
+        public int DragX, DragY;
+        public bool Dragging;
+    }
     private static IntPtr _gdiplusToken;
 
     // the docked preview. it follows a variable by name, so stepping keeps showing the same one
@@ -27,11 +41,11 @@ internal static partial class Program
         var windowClass = new WNDCLASSEX
         {
             cbSize = (uint)Marshal.SizeOf<WNDCLASSEX>(),
-            style = 0x3, // CS_HREDRAW | CS_VREDRAW
+            style = 0xB, // CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS
             lpfnWndProc = Marshal.GetFunctionPointerForDelegate(_imageWndProc),
             hInstance = GetModuleHandleW(null),
             hCursor = LoadCursorW(IntPtr.Zero, 32512),
-            hbrBackground = 13, // COLOR_GRAYTEXT + 1, so the image's edges stand out
+            hbrBackground = 13, // COLOR_APPWORKSPACE + 1, so the image's edges stand out
             lpszClassName = "SpineIDE.Image",
         };
         RegisterClassExW(ref windowClass);
@@ -76,6 +90,7 @@ internal static partial class Program
 
     private static void SetPreview(string name, byte[]? png)
     {
+        ImageView? previous = _images.GetValueOrDefault(_preview);
         ClearPreview();
         var (bitmap, width, height) = png is null ? (0, 0, 0) : DecodePng(png);
         if (bitmap == 0)
@@ -83,8 +98,12 @@ internal static partial class Program
             SetWindowTextW(_previewHeader, $"Image: {name} has nothing to show");
             return;
         }
-        _images[_preview] = (bitmap, width, height);
-        SetWindowTextW(_previewHeader, $"Image: {name} ({width}x{height})");
+        var view = new ImageView { Bitmap = bitmap, Width = width, Height = height, Name = name, Title = $"Image: {name} ({width}x{height})" };
+        // stepping refreshes the same image, so it keeps its zoom
+        if (previous is not null && previous.Name == name && previous.Width == width && previous.Height == height)
+            (view.Fit, view.Scale, view.X, view.Y) = (previous.Fit, previous.Scale, previous.X, previous.Y);
+        _images[_preview] = view;
+        SetWindowTextW(_previewHeader, view.Title);
         InvalidateRect(_preview, IntPtr.Zero, true);
     }
 
@@ -92,8 +111,8 @@ internal static partial class Program
     private static void ClearPreview()
     {
         _previewVersion++;
-        if (_images.Remove(_preview, out var image))
-            DeleteObject(image.Bitmap);
+        if (_images.Remove(_preview, out var view))
+            DeleteObject(view.Bitmap);
         SetWindowTextW(_previewHeader, "Image");
         InvalidateRect(_preview, IntPtr.Zero, true);
     }
@@ -133,9 +152,10 @@ internal static partial class Program
         // show it at its own size, up to most of a typical screen
         var frame = new RECT { right = Math.Min(width, 1400), bottom = Math.Min(height, 900) };
         AdjustWindowRectEx(ref frame, WS_OVERLAPPEDWINDOW, false, WS_EX_TOOLWINDOW);
-        IntPtr window = CreateWindowExW(WS_EX_TOOLWINDOW, "SpineIDE.Image", $"{name} ({width}x{height})", WS_OVERLAPPEDWINDOW,
+        string title = $"{name} ({width}x{height})";
+        IntPtr window = CreateWindowExW(WS_EX_TOOLWINDOW, "SpineIDE.Image", title, WS_OVERLAPPEDWINDOW,
             CW_USEDEFAULT, CW_USEDEFAULT, frame.right - frame.left, frame.bottom - frame.top, _window, IntPtr.Zero, GetModuleHandleW(null), IntPtr.Zero);
-        _images[window] = (bitmap, width, height);
+        _images[window] = new ImageView { Bitmap = bitmap, Width = width, Height = height, Name = name, Title = title };
         ShowWindow(window, 1);
     }
 
@@ -173,24 +193,79 @@ internal static partial class Program
         }
     }
 
+    // the wheel zooms around the cursor, dragging moves the image, and a double-click fits it again
     private static IntPtr ImageWndProc(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam)
     {
+        int mouseX = (short)(lParam & 0xFFFF), mouseY = (short)((lParam >> 16) & 0xFFFF);
         switch (msg)
         {
-            case WM_PAINT when _images.TryGetValue(hwnd, out var image):
-                PaintImage(hwnd, image.Bitmap, image.Width, image.Height);
+            case WM_PAINT when _images.TryGetValue(hwnd, out var view):
+                PaintImage(hwnd, view);
                 return 0;
             case WM_PAINT when hwnd == _preview:
                 PaintPlaceholder(hwnd);
                 return 0;
+            // the image paints its own background, so dragging doesn't flicker
+            case WM_ERASEBKGND when _images.ContainsKey(hwnd):
+                return 1;
             case WM_SIZE:
                 InvalidateRect(hwnd, IntPtr.Zero, true);
                 return 0;
-            case WM_DESTROY when _images.Remove(hwnd, out var image):
-                DeleteObject(image.Bitmap);
+            case WM_MOUSEWHEEL when _images.TryGetValue(hwnd, out var view):
+            {
+                // the wheel reports screen coordinates
+                var point = new POINT { x = mouseX, y = mouseY };
+                ScreenToClient(hwnd, ref point);
+                double factor = (short)((wParam >> 16) & 0xFFFF) > 0 ? 1.25 : 0.8;
+                double scale = Math.Clamp(view.Scale * factor, 0.01, 64);
+                // keep the pixel under the cursor where it is
+                view.X = point.x - (point.x - view.X) * scale / view.Scale;
+                view.Y = point.y - (point.y - view.Y) * scale / view.Scale;
+                view.Scale = scale;
+                view.Fit = false;
+                ShowPointer(hwnd, view, point.x, point.y);
+                InvalidateRect(hwnd, IntPtr.Zero, false);
+                return 0;
+            }
+            case WM_LBUTTONDOWN when _images.TryGetValue(hwnd, out var view):
+                // the wheel goes to the focused window
+                SetFocus(hwnd);
+                SetCapture(hwnd);
+                (view.Dragging, view.DragX, view.DragY) = (true, mouseX, mouseY);
+                return 0;
+            case WM_MOUSEMOVE when _images.TryGetValue(hwnd, out var view):
+                if (view.Dragging)
+                {
+                    view.X += mouseX - view.DragX;
+                    view.Y += mouseY - view.DragY;
+                    (view.DragX, view.DragY, view.Fit) = (mouseX, mouseY, false);
+                    InvalidateRect(hwnd, IntPtr.Zero, false);
+                }
+                ShowPointer(hwnd, view, mouseX, mouseY);
+                return 0;
+            case WM_LBUTTONUP when _images.TryGetValue(hwnd, out var view):
+                view.Dragging = false;
+                ReleaseCapture();
+                return 0;
+            case WM_LBUTTONDBLCLK when _images.TryGetValue(hwnd, out var view):
+                view.Fit = true;
+                SetWindowTextW(hwnd == _preview ? _previewHeader : hwnd, view.Title);
+                InvalidateRect(hwnd, IntPtr.Zero, false);
+                return 0;
+            case WM_DESTROY when _images.Remove(hwnd, out var view):
+                DeleteObject(view.Bitmap);
                 return 0;
         }
         return DefWindowProcW(hwnd, msg, wParam, lParam);
+    }
+
+    // the pixel under the cursor and the zoom, in the preview's header or the pop-out's title.
+    // row and column, like HALCON counts them
+    private static void ShowPointer(IntPtr hwnd, ImageView view, int x, int y)
+    {
+        int column = (int)Math.Floor((x - view.X) / view.Scale), row = (int)Math.Floor((y - view.Y) / view.Scale);
+        string pointer = column >= 0 && row >= 0 && column < view.Width && row < view.Height ? $"   row {row}, col {column}" : "";
+        SetWindowTextW(hwnd == _preview ? _previewHeader : hwnd, $"{view.Title}   {view.Scale * 100:F0}%{pointer}");
     }
 
     private static void PaintPlaceholder(IntPtr hwnd)
@@ -205,25 +280,65 @@ internal static partial class Program
         EndPaint(hwnd, ref paint);
     }
 
-    // fits the image in the window, keeping its proportions
-    private static void PaintImage(IntPtr hwnd, IntPtr bitmap, int width, int height)
+    // draws into a buffer first, so moving the image doesn't flicker
+    private static void PaintImage(IntPtr hwnd, ImageView view)
     {
         IntPtr dc = BeginPaint(hwnd, out PAINTSTRUCT paint);
         GetClientRect(hwnd, out RECT client);
-        double scale = Math.Min((double)client.right / width, (double)client.bottom / height);
-        int drawWidth = (int)(width * scale), drawHeight = (int)(height * scale);
-        int x = (client.right - drawWidth) / 2, y = (client.bottom - drawHeight) / 2;
+        if (view.Fit)
+        {
+            // the whole image, centered, keeping its proportions
+            view.Scale = Math.Min((double)client.right / view.Width, (double)client.bottom / view.Height);
+            view.X = (client.right - view.Width * view.Scale) / 2;
+            view.Y = (client.bottom - view.Height * view.Scale) / 2;
+        }
+
+        IntPtr buffer = CreateCompatibleDC(dc);
+        IntPtr bufferBitmap = CreateCompatibleBitmap(dc, client.right, client.bottom);
+        IntPtr previousBuffer = SelectObject(buffer, bufferBitmap);
+        FillRect(buffer, ref client, GetSysColorBrush(12)); // COLOR_APPWORKSPACE, like the class background
 
         IntPtr source = CreateCompatibleDC(dc);
-        IntPtr previous = SelectObject(source, bitmap);
+        IntPtr previous = SelectObject(source, view.Bitmap);
         // smooth when shrinking, sharp pixels when enlarging
-        SetStretchBltMode(dc, scale < 1 ? 4 : 3); // HALFTONE : COLORONCOLOR
-        SetBrushOrgEx(dc, 0, 0, IntPtr.Zero);
-        StretchBlt(dc, x, y, drawWidth, drawHeight, source, 0, 0, width, height, 0x00CC0020); // SRCCOPY
+        SetStretchBltMode(buffer, view.Scale < 1 ? 4 : 3); // HALFTONE : COLORONCOLOR
+        SetBrushOrgEx(buffer, 0, 0, IntPtr.Zero);
+        StretchBlt(buffer, (int)Math.Round(view.X), (int)Math.Round(view.Y), (int)Math.Round(view.Width * view.Scale),
+            (int)Math.Round(view.Height * view.Scale), source, 0, 0, view.Width, view.Height, 0x00CC0020); // SRCCOPY
         SelectObject(source, previous);
         DeleteDC(source);
+
+        BitBlt(dc, 0, 0, client.right, client.bottom, buffer, 0, 0, 0x00CC0020);
+        SelectObject(buffer, previousBuffer);
+        DeleteObject(bufferBitmap);
+        DeleteDC(buffer);
         EndPaint(hwnd, ref paint);
     }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT
+    {
+        public int x, y;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool ScreenToClient(IntPtr hwnd, ref POINT point);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SetCapture(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool ReleaseCapture();
+
+    [DllImport("user32.dll")]
+    private static extern int FillRect(IntPtr dc, ref RECT rect, IntPtr brush);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr CreateCompatibleBitmap(IntPtr dc, int width, int height);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool BitBlt(IntPtr destination, int x, int y, int width, int height,
+        IntPtr source, int sourceX, int sourceY, uint rop);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct GdiplusStartupInput
