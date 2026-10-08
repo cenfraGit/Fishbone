@@ -39,9 +39,8 @@ internal static partial class Program
             return;
         BeginExecution("running...");
 
-        // input() comes in a later step
-        ScriptRunOutcome? outcome = await _session.RunAsync(Encoding.UTF8.GetString(GetEditorBytes()), null, _ =>
-            Task.FromException<string>(new NotSupportedException("input() isn't supported in SpineIDE for Windows yet.")));
+        string? directory = _filePath is null ? null : Path.GetDirectoryName(_filePath);
+        ScriptRunOutcome? outcome = await _session.RunAsync(Encoding.UTF8.GetString(GetEditorBytes()), directory, ReadInput);
         Post(() => EndExecution(outcome));
     }
 
@@ -52,16 +51,12 @@ internal static partial class Program
             _ = _session.ContinueAsync();
             return;
         }
-        if (_running)
+        // the debug host runs the script from its file, so it's saved first
+        if (_running || !Save())
             return;
         BeginExecution("starting the debugger...");
 
-        // the debug host runs a script from a file, so it gets a scratch copy of the editor text
-        string path = Path.Combine(Path.GetTempPath(), "spineide", "script.fb");
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllBytes(path, GetEditorBytes());
-
-        ScriptRunOutcome? outcome = await _session.DebugAsync(path, BreakpointLines(), _ => { });
+        ScriptRunOutcome? outcome = await _session.DebugAsync(_filePath!, BreakpointLines(), _ => { });
         Post(() =>
         {
             _paused = false;
@@ -114,6 +109,50 @@ internal static partial class Program
         if (frame is not null)
             ShowCurrentLine(frame.Line - 1);
         SetWindowTextW(_status, $"paused ({snapshot.Reason}) at line {frame?.Line}");
+    }
+
+    // --------------------------------------------------------------------------------
+    // input()
+    // --------------------------------------------------------------------------------
+
+    private static TaskCompletionSource<string>? _inputAnswer;
+
+    // the session calls this on the script's thread, and waits on the answer
+    private static Task<string> ReadInput(CancellationToken cancellationToken)
+    {
+        var answer = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Post(() =>
+        {
+            _inputAnswer = answer;
+            EnableWindow(_input, true);
+            SetFocus(_input);
+            SetWindowTextW(_status, "waiting for input...");
+        });
+        cancellationToken.Register(() => Post(() => EndInput(null)));
+        return answer.Task;
+    }
+
+    private static void SubmitInput()
+    {
+        var text = new StringBuilder(GetWindowTextLengthW(_input) + 1);
+        GetWindowTextW(_input, text, text.Capacity);
+        EndInput(text.ToString());
+    }
+
+    // null means the script stopped waiting
+    private static void EndInput(string? line)
+    {
+        if (_inputAnswer is null)
+            return;
+        if (line is null)
+            _inputAnswer.TrySetCanceled();
+        else
+            _inputAnswer.TrySetResult(line);
+        _inputAnswer = null;
+        SetWindowTextW(_input, "");
+        EnableWindow(_input, false);
+        SetFocus(_editor);
+        SetWindowTextW(_status, "running...");
     }
 
     private static void AppendOutput(string text)

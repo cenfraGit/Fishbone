@@ -101,6 +101,9 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
             await _client.Initialize(linked.Token).ConfigureAwait(false);
             var attach = new AttachRequestArguments();
             attach.ExtensionData["stopOnEntry"] = stopOnEntry;
+            // a host this session started has no one else waiting on it, so it can stay paused at
+            // the end to show the final values. someone else's host shouldn't be held up like that
+            attach.ExtensionData["pauseAtEnd"] = Ownership == FishboneDebugSessionOwnership.Launched;
             await _client.Attach(attach, linked.Token).ConfigureAwait(false);
             var loaded = await _client.RequestLoadedSources(new LoadedSourcesArguments(), linked.Token).ConfigureAwait(false);
             _dapSource = loaded.Sources?.FirstOrDefault()

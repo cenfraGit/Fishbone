@@ -100,6 +100,62 @@ internal static partial class Program
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr SendMessageW(IntPtr hwnd, uint msg, IntPtr wParam, ref TVINSERTSTRUCTW lParam);
 
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct OPENFILENAMEW
+    {
+        public int lStructSize;
+        public IntPtr hwndOwner, hInstance;
+        // pairs of description and pattern, separated by nul characters
+        public string lpstrFilter;
+        public string? lpstrCustomFilter;
+        public int nMaxCustFilter, nFilterIndex;
+        public IntPtr lpstrFile;
+        public int nMaxFile;
+        public string? lpstrFileTitle;
+        public int nMaxFileTitle;
+        public string? lpstrInitialDir, lpstrTitle;
+        public int Flags;
+        public short nFileOffset, nFileExtension;
+        public string? lpstrDefExt;
+        public IntPtr lCustData, lpfnHook;
+        public string? lpTemplateName;
+        public IntPtr pvReserved;
+        public int dwReserved, FlagsEx;
+    }
+
+    [DllImport("comdlg32.dll", CharSet = CharSet.Unicode)]
+    private static extern bool GetOpenFileNameW(ref OPENFILENAMEW dialog);
+
+    [DllImport("comdlg32.dll", CharSet = CharSet.Unicode)]
+    private static extern bool GetSaveFileNameW(ref OPENFILENAMEW dialog);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int MessageBoxW(IntPtr hwnd, string text, string caption, uint type);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr CreateMenu();
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr CreatePopupMenu();
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern bool AppendMenuW(IntPtr menu, uint flags, IntPtr idOrSubmenu, string? text);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetMenu(IntPtr hwnd, IntPtr menu);
+
+    [DllImport("user32.dll")]
+    private static extern bool DestroyWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool EnableWindow(IntPtr hwnd, bool enable);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SetFocus(IntPtr hwnd);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetWindowTextW(IntPtr hwnd, System.Text.StringBuilder text, int maxCount);
+
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr GetModuleHandleW(string? name);
 

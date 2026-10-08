@@ -48,6 +48,12 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
         get { lock (_sync) return _lastResumeWasSuccessful; }
     }
 
+    /// <summary>
+    /// When true, the script pauses once more after its last statement, so a client can show the
+    /// final values even when it wasn't stepping. A client that launched its own host asks for this.
+    /// </summary>
+    public bool PauseAtEnd { get; set; }
+
     public bool PauseOnRuntimeExceptions
     {
         get { lock (_sync) return _pauseOnRuntimeExceptions; }
@@ -223,7 +229,7 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
 
         lock (_sync)
         {
-            if (!_stopRequested && _stepMode != StepMode.None && _state == DebugSessionState.Running)
+            if (!_stopRequested && (_stepMode != StepMode.None || PauseAtEnd) && _state == DebugSessionState.Running)
             {
                 _stepMode = StepMode.None;
                 _pauseRequested = false;

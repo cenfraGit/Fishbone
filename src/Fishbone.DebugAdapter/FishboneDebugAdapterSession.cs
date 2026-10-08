@@ -91,10 +91,14 @@ public sealed class FishboneDebugAdapterSession :
 
     public Task<AttachResponse> Handle(AttachRequestArguments request, CancellationToken cancellationToken)
     {
-        if (request.ExtensionData.TryGetValue("stopOnEntry", out object? value))
-            _stopOnEntry = value is bool boolean ? boolean : bool.TryParse(value?.ToString(), out bool parsed) && parsed;
+        _stopOnEntry = ReadFlag(request, "stopOnEntry");
+        _coordinator.PauseAtEnd = ReadFlag(request, "pauseAtEnd");
         return Task.FromResult(new AttachResponse());
     }
+
+    private static bool ReadFlag(AttachRequestArguments request, string name) =>
+        request.ExtensionData.TryGetValue(name, out object? value)
+        && (value is bool boolean ? boolean : bool.TryParse(value?.ToString(), out bool parsed) && parsed);
 
     public Task<ConfigurationDoneResponse> Handle(ConfigurationDoneArguments request, CancellationToken cancellationToken)
     {

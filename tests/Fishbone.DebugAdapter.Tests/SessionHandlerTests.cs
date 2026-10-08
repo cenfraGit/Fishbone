@@ -80,6 +80,21 @@ let done = true;
         Assert.False(breakpoints[4].Verified);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AttachPauseAtEndControlsCoordinator(bool pauseAtEnd)
+    {
+        using var coordinator = new BreakpointCoordinator("test.fb");
+        using var session = new FishboneDebugAdapterSession(coordinator, "test.fb", 1, _ => Task.CompletedTask);
+        var request = new AttachRequestArguments();
+        request.ExtensionData["pauseAtEnd"] = pauseAtEnd;
+
+        await session.Handle(request, CancellationToken.None);
+
+        Assert.Equal(pauseAtEnd, coordinator.PauseAtEnd);
+    }
+
     [Fact]
     public async Task ExceptionFilterControlsCoordinator()
     {

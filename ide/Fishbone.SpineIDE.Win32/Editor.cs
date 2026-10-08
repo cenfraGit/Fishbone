@@ -102,6 +102,9 @@ internal static partial class Program
             case SCN_STYLENEEDED:
                 Highlight();
                 break;
+            case SCN_SAVEPOINTREACHED or SCN_SAVEPOINTLEFT:
+                UpdateTitle();
+                break;
             case SCN_MARGINCLICK when notification.margin == MarginBreakpoints:
                 ToggleBreakpoint((int)Sci(SCI_LINEFROMPOSITION, notification.position));
                 break;
