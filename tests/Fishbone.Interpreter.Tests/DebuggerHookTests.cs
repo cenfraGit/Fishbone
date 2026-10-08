@@ -8,16 +8,19 @@ namespace Fishbone.Interpreter.Tests;
 public class DebuggerHookTests
 {
     [Fact]
-    public void EvaluateNotifiesDebuggerBeforeEveryVisitedNode()
+    public void EvaluateNotifiesDebuggerBeforeEachStatement()
     {
-        var ast = ASTParser.Parse("let result = 1 + 2;");
+        // statements only, not the expressions inside them
+        var ast = ASTParser.Parse("let result = 1 + 2; print(result);");
         var debugger = new RecordingDebugger();
         var interpreter = new FishboneInterpreter(debugger: debugger);
+        var env = new FishboneEnvironment();
+        env.Declare("print", new Action<object>(_ => { }));
 
-        interpreter.Evaluate(new FishboneEnvironment(), ast);
+        interpreter.Evaluate(env, ast);
 
         Assert.Equal(
-            [nameof(ProgramNode), nameof(DeclarationNode), nameof(BinaryOpNode), nameof(LiteralNode), nameof(LiteralNode)],
+            [nameof(DeclarationNode), nameof(CallNode)],
             debugger.BeforeNodes.Select(node => node.GetType().Name));
     }
 

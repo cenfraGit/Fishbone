@@ -63,7 +63,6 @@ public class FishboneInterpreter
         ArgumentNullException.ThrowIfNull(node);
 
         _cancellationToken.ThrowIfCancellationRequested();
-        _debugger.OnBeforeExecute(node, env);
 
         try
         {
@@ -465,11 +464,19 @@ public class FishboneInterpreter
     // control flow
     // --------------------------------------------------------------------------------
 
+    // the debugger stops at statements, not at every expression inside them, so a call or
+    // list spread over several lines is a single stop. a body without braces is a statement too
+    private object ExecuteStatement(FishboneEnvironment env, AstNode statement)
+    {
+        _debugger.OnBeforeExecute(statement, env);
+        return Evaluate(env, statement);
+    }
+
     internal object EvaluateProgram(FishboneEnvironment env, ProgramNode node)
     {
         object lastValue = null!;
         foreach (var statement in node.Statements)
-            lastValue = Evaluate(env, statement);
+            lastValue = ExecuteStatement(env, statement);
         return lastValue;
     }
 
@@ -480,7 +487,7 @@ public class FishboneInterpreter
         object lastValue = null!;
 
         foreach (var statement in node.Statements)
-            lastValue = Evaluate(blockEnv, statement);
+            lastValue = ExecuteStatement(blockEnv, statement);
 
         return lastValue;
     }
@@ -488,9 +495,9 @@ public class FishboneInterpreter
     internal object EvaluateIf(FishboneEnvironment env, IfNode node)
     {
         if (IsTruthy(Evaluate(env, node.Condition)))
-            return Evaluate(env, node.ThenBranch);
+            return ExecuteStatement(env, node.ThenBranch);
         else if (node.ElseBranch != null)
-            return Evaluate(env, node.ElseBranch);
+            return ExecuteStatement(env, node.ElseBranch);
 
         return null!;
     }
@@ -499,11 +506,16 @@ public class FishboneInterpreter
     {
         object lastValue = null!;
 
-        while (IsTruthy(Evaluate(env, node.Condition)))
+        while (true)
         {
+            // each check of the condition is a new arrival at the header
+            _debugger.OnBeforeExecute(node, env);
+            if (!IsTruthy(Evaluate(env, node.Condition)))
+                break;
+
             try
             {
-                lastValue = Evaluate(env, node.Body);
+                lastValue = ExecuteStatement(env, node.Body);
             }
             catch (ContinueException)
             {
@@ -536,9 +548,12 @@ public class FishboneInterpreter
         {
             loopEnv.Assign(node.IteratorName, value!);
 
+            // each iteration is a new arrival at the header, so the body's lines count as new
+            // too, even when the body is a single line
+            _debugger.OnBeforeExecute(node, loopEnv);
             try
             {
-                lastValue = Evaluate(loopEnv, node.Body);
+                lastValue = ExecuteStatement(loopEnv, node.Body);
             }
             catch (ContinueException)
             {
@@ -580,9 +595,12 @@ public class FishboneInterpreter
         foreach (var value in values)
         {
             loopEnv.Assign(node.IteratorName, value);
+
+            // see EvaluateForeach
+            _debugger.OnBeforeExecute(node, loopEnv);
             try
             {
-                lastValue = Evaluate(loopEnv, node.Body);
+                lastValue = ExecuteStatement(loopEnv, node.Body);
             }
             catch (ContinueException)
             {
