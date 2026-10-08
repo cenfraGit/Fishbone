@@ -29,6 +29,7 @@ internal static partial class Program
         _session.Continued += () => Post(() =>
         {
             _paused = false;
+            UpdateToolbar();
             ShowCurrentLine(-1);
             SetWindowTextW(_status, "running...");
         });
@@ -101,6 +102,7 @@ internal static partial class Program
     private static void BeginExecution(string status)
     {
         _running = true;
+        UpdateToolbar();
         _runClock.Restart();
         SetWindowTextW(_status, status);
     }
@@ -108,6 +110,8 @@ internal static partial class Program
     private static void EndExecution(ScriptRunOutcome? outcome)
     {
         _running = false;
+        _paused = false;
+        UpdateToolbar();
         // null means a newer run replaced this one, and that one reports itself
         if (outcome is null)
             return;
@@ -129,6 +133,7 @@ internal static partial class Program
         FishboneDebugFrame? frame = snapshot.Frames.FirstOrDefault();
         ShowDebugVariables(frame, session);
         _paused = true;
+        UpdateToolbar();
 
         // the pause after the last statement only shows the final values. it stays until the
         // user continues, so they can still be looked at

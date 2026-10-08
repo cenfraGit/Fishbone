@@ -41,7 +41,7 @@ Start-Sleep -Seconds 2; $p.Refresh(); $w = $p.MainWindowHandle
 $ed = [W]::FindWindowExW($w, [IntPtr]::Zero, "Scintilla", $null)
 $outBox = [W]::FindWindowExW($w, [IntPtr]::Zero, "Edit", $null)
 $vars = [W]::FindWindowExW($w, $outBox, "Edit", $null)
-$st = [W]::FindWindowExW($w, [IntPtr]::Zero, "Static", $null)
+$st = [W]::FindWindowExW($w, [IntPtr]::Zero, "msctls_statusbar32", $null)
 function Key($vk) { [W]::PostMessageW($ed, 0x100, [IntPtr]$vk, [IntPtr]::Zero) | Out-Null; [W]::PostMessageW($ed, 0x101, [IntPtr]$vk, [IntPtr]::Zero) | Out-Null }
 function Send-Text($s) { foreach ($c in $s.ToCharArray()) { if ($c -eq "`n") { Key 0x0D } else { [W]::PostMessageW($ed, 0x102, [IntPtr][int]$c, [IntPtr]::Zero) | Out-Null }; Start-Sleep -Milliseconds 30 } }
 # PrintWindow draws the window itself, so the shot works even when another window is in front

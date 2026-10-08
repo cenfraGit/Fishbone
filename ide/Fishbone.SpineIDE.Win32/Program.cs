@@ -21,7 +21,7 @@ namespace SpineIDE.Win32;
 internal static partial class Program
 {
     private const uint WS_OVERLAPPEDWINDOW = 0x00CF0000, WS_CHILD = 0x40000000, WS_VISIBLE = 0x10000000,
-        WS_VSCROLL = 0x00200000, WS_HSCROLL = 0x00100000, WS_BORDER = 0x00800000, SS_CENTERIMAGE = 0x200;
+        WS_VSCROLL = 0x00200000, WS_HSCROLL = 0x00100000, WS_BORDER = 0x00800000, SS_CENTERIMAGE = 0x200, SBARS_SIZEGRIP = 0x100;
     private const uint ES_MULTILINE = 0x4, ES_AUTOVSCROLL = 0x40, ES_AUTOHSCROLL = 0x80, ES_READONLY = 0x800;
     private const uint WM_DESTROY = 0x2, WM_SIZE = 0x5, WM_CLOSE = 0x10, WM_SETFONT = 0x30, WM_NOTIFY = 0x4E,
         WM_KEYDOWN = 0x100, WM_SYSKEYDOWN = 0x104, WM_COMMAND = 0x111, WM_CTLCOLORSTATIC = 0x138, WM_DPICHANGED = 0x2E0, WM_APP_INVOKE = 0x8001;
@@ -51,8 +51,29 @@ internal static partial class Program
     // the delegate has to stay referenced or the gc collects it while windows still calls it
     private static readonly WndProcDelegate _wndProc = WndProc;
 
-    private static IntPtr _window, _editor, _output, _input, _variables, _runButton, _debugButton, _status;
+    private static IntPtr _window, _editor, _output, _input, _variables, _status;
     private static IntPtr _outputHeader, _variablesHeader;
+    private static readonly List<IntPtr> _toolbar = [];
+
+    private static readonly (int Id, string Label)[] ToolbarCommands =
+    [
+        (RunButtonId, "Run"), (DebugButtonId, "Debug"),
+        (CommandContinue, "Continue"), (CommandPause, "Pause"), (CommandStop, "Stop"),
+        (CommandStepOver, "Step Over"), (CommandStepInto, "Step Into"), (CommandStepOut, "Step Out"),
+    ];
+
+    // only the buttons that do something right now are enabled
+    private static void UpdateToolbar()
+    {
+        for (int i = 0; i < _toolbar.Count; i++)
+            EnableWindow(_toolbar[i], ToolbarCommands[i].Id switch
+            {
+                RunButtonId or DebugButtonId => !_running,
+                CommandPause => _running && !_paused,
+                CommandStop => _running,
+                _ => _paused,
+            });
+    }
 
     // lets background threads (the debug client) run code on the ui thread
     private static readonly ConcurrentQueue<Action> _uiQueue = new();
@@ -107,7 +128,8 @@ internal static partial class Program
         SendMessageW(_input, EM_SETCUEBANNER, 1, "input() waits here. Enter sends the line");
         EnableWindow(_input, false);
         // ICC_TREEVIEW_CLASSES registers the tree view class
-        var controls = new INITCOMMONCONTROLSEX { dwSize = (uint)Marshal.SizeOf<INITCOMMONCONTROLSEX>(), dwICC = 0x2 };
+        // ICC_BAR_CLASSES registers the status bar
+        var controls = new INITCOMMONCONTROLSEX { dwSize = (uint)Marshal.SizeOf<INITCOMMONCONTROLSEX>(), dwICC = 0x2 | 0x4 };
         InitCommonControlsEx(ref controls);
         _variables = CreateChild("SysTreeView32", "",
             WS_CHILD | WS_VISIBLE | WS_BORDER | TVS_HASBUTTONS | TVS_LINESATROOT | TVS_SHOWSELALWAYS | TVS_FULLROWSELECT, 0);
@@ -118,9 +140,11 @@ internal static partial class Program
         RegisterImageClass();
         _preview = CreateWindowExW(0, "SpineIDE.Image", "", WS_CHILD | WS_VISIBLE | WS_BORDER,
             0, 0, 0, 0, _window, IntPtr.Zero, instance, IntPtr.Zero);
-        _runButton = CreateChild("BUTTON", "Run (Ctrl+F5)", WS_CHILD | WS_VISIBLE, RunButtonId);
-        _debugButton = CreateChild("BUTTON", "Debug (F5)", WS_CHILD | WS_VISIBLE, DebugButtonId);
-        _status = CreateChild("STATIC", "", WS_CHILD | WS_VISIBLE, 0);
+        foreach (var (id, label) in ToolbarCommands)
+            _toolbar.Add(CreateChild("BUTTON", label, WS_CHILD | WS_VISIBLE, id));
+        UpdateToolbar();
+        // a status bar keeps its own place at the bottom, and WM_SETTEXT sets its text
+        _status = CreateChild("msctls_statusbar32", "", WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP, 0);
         _outputHeader = CreateChild("STATIC", "Output", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE, 0);
         _previewHeader = CreateChild("STATIC", "Image", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE, 0);
         _variablesHeader = CreateChild("STATIC", "Variables", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE, 0);
@@ -271,7 +295,7 @@ internal static partial class Program
         _treeFont = CreateFontW(-Scale(14), 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 0, 0, "Segoe UI");
         foreach (IntPtr control in new[] { _output, _input })
             SendMessageW(control, WM_SETFONT, _monoFont, 1);
-        foreach (IntPtr control in new[] { _runButton, _debugButton, _status })
+        foreach (IntPtr control in _toolbar.Append(_status))
             SendMessageW(control, WM_SETFONT, _guiFont, 1);
         foreach (IntPtr control in new[] { _outputHeader, _previewHeader, _variablesHeader })
             SendMessageW(control, WM_SETFONT, _headerFont, 1);
@@ -288,9 +312,18 @@ internal static partial class Program
     {
         int top = Scale(TopBarHeight), input = Scale(InputHeight), header = Scale(HeaderHeight), gap = Scale(Gap);
         int indent = Scale(6);
-        MoveWindow(_runButton, Scale(8), Scale(4), Scale(110), Scale(24), true);
-        MoveWindow(_debugButton, Scale(124), Scale(4), Scale(110), Scale(24), true);
-        MoveWindow(_status, Scale(246), Scale(9), width - Scale(254), Scale(20), true);
+        int x = Scale(8);
+        for (int i = 0; i < _toolbar.Count; i++)
+        {
+            MoveWindow(_toolbar[i], x, Scale(4), Scale(80), Scale(24), true);
+            // a wider gap between the run, the session and the stepping groups
+            x += Scale(i is 1 or 4 ? 96 : 84);
+        }
+
+        // the status bar sizes itself on WM_SIZE, the panes take the rest
+        SendMessageW(_status, WM_SIZE, 0, 0);
+        GetWindowRect(_status, out RECT statusRect);
+        height -= statusRect.bottom - statusRect.top;
 
         int rightWidth = width * 35 / 100;
         int leftWidth = width - rightWidth - gap;

@@ -234,6 +234,9 @@ internal static partial class Program
         uint italic, uint underline, uint strikeOut, uint charSet, uint outPrecision, uint clipPrecision,
         uint quality, uint pitchAndFamily, string faceName);
 
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
+
     [DllImport("gdi32.dll")]
     private static extern uint SetBkColor(IntPtr dc, uint color);
 
