@@ -70,10 +70,11 @@ for (i in {{range}}) { values.Add(i); guard(values.Count); }
 
     [Theory]
     [InlineData("2147483640, 2147483647, 5", new[] { 2147483640, 2147483645 })]
-    [InlineData("-2147483641, -2147483648, -5", new[] { -2147483641, -2147483646 })]
+    [InlineData("-2147483641, int.MinValue, -5", new[] { -2147483641, -2147483646 })]
     public void Run_IntRangeNearLimit_DoesNotOverflow(string range, int[] expected)
     {
-        // the value after the last one doesn't fit in an int, but it only ends the loop
+        // the value after the last one doesn't fit in an int, but it only ends the loop.
+        // int.MinValue because -2147483648 is -(2147483648), and 2147483648 is a long
         var values = Values(range);
 
         Assert.Equal(expected.Cast<object>(), values);

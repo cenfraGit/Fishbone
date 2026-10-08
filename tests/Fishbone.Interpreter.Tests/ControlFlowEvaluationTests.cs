@@ -337,7 +337,7 @@ for (i in 0, 10)
 }
 """);
 
-        Assert.Equal(6.0, env.GetValue("total"));
+        Assert.Equal(6, env.GetValue("total"));
     }
 
     [Fact]
@@ -352,7 +352,7 @@ for (i in 0, 5)
 }
 """);
 
-        Assert.Equal(8.0, env.GetValue("total"));
+        Assert.Equal(8, env.GetValue("total"));
     }
 
     [Fact]
