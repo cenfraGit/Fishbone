@@ -26,7 +26,7 @@ internal static partial class Program
     private const uint WM_DESTROY = 0x2, WM_SIZE = 0x5, WM_CLOSE = 0x10, WM_SETFONT = 0x30, WM_NOTIFY = 0x4E,
         WM_KEYDOWN = 0x100, WM_SYSKEYDOWN = 0x104, WM_COMMAND = 0x111, WM_TIMER = 0x113, WM_CTLCOLORSTATIC = 0x138, WM_DPICHANGED = 0x2E0, WM_APP_INVOKE = 0x8001;
     private const uint EM_SETSEL = 0xB1, EM_REPLACESEL = 0xC2, EM_SETLIMITTEXT = 0xC5, EM_SETCUEBANNER = 0x1501;
-    private const int VK_RETURN = 0x0D, VK_SPACE = 0x20, VK_F5 = 0x74, VK_F9 = 0x78, VK_F10 = 0x79, VK_F11 = 0x7A,
+    private const int VK_RETURN = 0x0D, VK_ESCAPE = 0x1B, VK_SPACE = 0x20, VK_F5 = 0x74, VK_F9 = 0x78, VK_F10 = 0x79, VK_F11 = 0x7A,
         VK_SHIFT = 0x10, VK_CONTROL = 0x11, VK_N = 0x4E, VK_O = 0x4F, VK_S = 0x53;
     private const int RunButtonId = 1, DebugButtonId = 2, TopBarHeight = 32, InputHeight = 24, HeaderHeight = 22, Gap = 4;
 
@@ -269,6 +269,9 @@ internal static partial class Program
             ShowCompletion(forced: true);
             return true;
         }
+        // scintilla still gets the key and closes its popup. Escape on the completion list leaves the tip
+        if (key == VK_ESCAPE && Sci(SCI_AUTOCACTIVE) == 0)
+            _tipDismissed = true;
         return false;
     }
 

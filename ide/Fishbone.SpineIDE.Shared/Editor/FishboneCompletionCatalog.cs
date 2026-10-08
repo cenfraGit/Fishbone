@@ -102,7 +102,8 @@ public sealed class FishboneCompletionCatalog
         return new FishboneCompletionCatalog(globals, globalsByInitial, keywords, signatures, description);
     }
 
-    private static FishboneSignature ToDisplay(string name, Fishbone.FishboneSignature signature) => new(
+    /// <summary>A signature from <see cref="FishboneConfiguration.Describe"/> in the form the editor shows.</summary>
+    public static FishboneSignature ToDisplay(string name, Fishbone.FishboneSignature signature) => new(
         name,
         signature.Parameters
             .Select(parameter => new FishboneParameter(parameter.Name, FriendlyType(parameter.Type), parameter.Direction switch

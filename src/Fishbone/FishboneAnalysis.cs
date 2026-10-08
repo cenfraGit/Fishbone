@@ -16,7 +16,8 @@ namespace Fishbone;
 public sealed record FishboneDiagnostic(int Line, int Column, int EndLine, int EndColumn, string Message);
 
 /// <summary>A script variable, with its type when the analyzer is sure of it.</summary>
-public sealed record FishboneScriptVariable(string Name, Type? Type);
+/// <param name="Parameters">The parameter names when it's a script function, otherwise null.</param>
+public sealed record FishboneScriptVariable(string Name, Type? Type, IReadOnlyList<string>? Parameters = null);
 
 /// <summary>
 /// The type of an expression. <see cref="IsStatic"/> means the expression names the type itself,
@@ -48,8 +49,9 @@ public sealed class FishboneAnalysis
     }
 
     // the type is worked out the first time it's needed
-    private sealed class Declaration(string name, long visibleFrom, Func<Fact?> type)
+    private sealed class Declaration(string name, long visibleFrom, Func<Fact?> type, IReadOnlyList<string>? parameters = null)
     {
+        public IReadOnlyList<string>? Parameters { get; } = parameters;
         private readonly Lazy<Fact?> _type = new(type, LazyThreadSafetyMode.None);
         public string Name { get; } = name;
         public long VisibleFrom { get; } = visibleFrom;
@@ -107,7 +109,8 @@ public sealed class FishboneAnalysis
             // the latest declaration of a name hides the earlier ones
             foreach (var declaration in Enumerable.Reverse(scope.Declarations))
                 if (declaration.VisibleFrom <= position && seen.Add(declaration.Name))
-                    variables.Add(new(declaration.Name, _assigned.Contains(declaration.Name) ? null : declaration.Type?.Type));
+                    variables.Add(new(declaration.Name, _assigned.Contains(declaration.Name) ? null : declaration.Type?.Type,
+                        _assigned.Contains(declaration.Name) ? null : declaration.Parameters));
         }
         return variables;
     }
@@ -166,7 +169,7 @@ public sealed class FishboneAnalysis
                 break;
 
             case FunctionDefinitionNode function:
-                scope.Declarations.Add(new(function.Name, End(function), () => null));
+                scope.Declarations.Add(new(function.Name, End(function), () => null, function.Parameters));
                 var body = Open(scope, function.Body, isFunction: true);
                 foreach (var parameter in function.Parameters)
                     body.Declarations.Add(new(parameter, body.Start, () => null));

@@ -180,6 +180,19 @@ public class StaticAnalysisTests
         Assert.Contains(Analyze(code).VisibleAt(3, 1), variable => variable.Name == "a");
     }
 
+    [Fact]
+    public void VisibleAt_GivesAScriptFunctionsParameters()
+    {
+        const string code = """
+            func area(width, height) { return width * height; }
+
+            """;
+        var function = Assert.Single(Analyze(code).VisibleAt(2, 1));
+
+        Assert.Equal(["width", "height"], function.Parameters);
+        Assert.Null(Assert.Single(Analyze("let x = 1;\n").VisibleAt(2, 1)).Parameters);
+    }
+
     [Theory]
     [InlineData("0, 10", typeof(int))]
     [InlineData("0, 3000000000", typeof(long))]

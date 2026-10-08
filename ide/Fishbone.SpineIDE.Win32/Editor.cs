@@ -135,12 +135,21 @@ internal static partial class Program
             case SCN_MODIFIED when (notification.modificationType & 0x3) != 0: // SC_MOD_INSERTTEXT | SC_MOD_DELETETEXT
                 SetTimer(_window, AnalysisTimer, 400, IntPtr.Zero);
                 break;
-            case SCN_DWELLSTART when _diagnosticRanges.FirstOrDefault(range =>
+            // a parameter tip takes the call tip first
+            case SCN_DWELLSTART when _tipCall < 0 && _diagnosticRanges.FirstOrDefault(range =>
                     range.Start <= (int)notification.position && (int)notification.position < range.End) is { Message: not null } hovered:
+                _tipIsDiagnostic = true;
                 Sci(SCI_CALLTIPSHOW, notification.position, Utf8(hovered.Message));
                 break;
-            case SCN_DWELLEND:
+            case SCN_DWELLEND when _tipIsDiagnostic:
+                _tipIsDiagnostic = false;
                 Sci(SCI_CALLTIPCANCEL);
+                break;
+            case SCN_UPDATEUI when (notification.updated & 0x3) != 0: // SC_UPDATE_CONTENT | SC_UPDATE_SELECTION
+                UpdateSignatureHelp();
+                break;
+            case SCN_CALLTIPCLICK:
+                CycleOverload((int)notification.position);
                 break;
         }
     }

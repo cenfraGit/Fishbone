@@ -50,7 +50,9 @@ internal static partial class Program
         public IntPtr text, length, linesAdded;
         public int message;
         public IntPtr wParam, lParam, line;
-        public int foldLevelNow, foldLevelPrev, margin;
+        public int foldLevelNow, foldLevelPrev, margin, listType, x, y, token;
+        public IntPtr annotationLinesAdded;
+        public int updated, listCompletionMethod, characterSource;
     }
 
     [StructLayout(LayoutKind.Sequential)]
