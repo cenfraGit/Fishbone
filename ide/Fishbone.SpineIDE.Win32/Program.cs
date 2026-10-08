@@ -94,19 +94,21 @@ internal static partial class Program
         uint editStyle = WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | WS_BORDER
             | ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY;
         _output = CreateChild("EDIT", "", editStyle, 0);
-        _variables = CreateChild("EDIT", "", editStyle, 0);
+        // ICC_TREEVIEW_CLASSES registers the tree view class
+        var controls = new INITCOMMONCONTROLSEX { dwSize = (uint)Marshal.SizeOf<INITCOMMONCONTROLSEX>(), dwICC = 0x2 };
+        InitCommonControlsEx(ref controls);
+        _variables = CreateChild("SysTreeView32", "",
+            WS_CHILD | WS_VISIBLE | WS_BORDER | TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT | TVS_SHOWSELALWAYS, 0);
         _runButton = CreateChild("BUTTON", "Run (Ctrl+F5)", WS_CHILD | WS_VISIBLE, RunButtonId);
         _debugButton = CreateChild("BUTTON", "Debug (F5)", WS_CHILD | WS_VISIBLE, DebugButtonId);
         _status = CreateChild("STATIC", "", WS_CHILD | WS_VISIBLE, 0);
 
         IntPtr mono = CreateFontW(-16, 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 0, 0, "Consolas");
         IntPtr gui = CreateFontW(-12, 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 0, 0, "Segoe UI");
-        foreach (IntPtr box in new[] { _output, _variables })
-        {
-            SendMessageW(box, WM_SETFONT, mono, 1);
-            // multiline edits cap at 32k chars by default, 0 lifts that
-            SendMessageW(box, EM_SETLIMITTEXT, 0, 0);
-        }
+        SendMessageW(_output, WM_SETFONT, mono, 1);
+        // multiline edits cap at 32k chars by default, 0 lifts that
+        SendMessageW(_output, EM_SETLIMITTEXT, 0, 0);
+        SendMessageW(_variables, WM_SETFONT, mono, 1);
         foreach (IntPtr control in new[] { _runButton, _debugButton, _status })
             SendMessageW(control, WM_SETFONT, gui, 1);
 
@@ -149,9 +151,11 @@ internal static partial class Program
                 DebugOrContinue();
                 return 0;
             case WM_NOTIFY:
-                var notification = Marshal.PtrToStructure<SCNotification>(lParam);
-                if (notification.hwndFrom == _editor)
-                    OnEditorNotification(notification);
+                IntPtr from = Marshal.PtrToStructure<NMHDR>(lParam).hwndFrom;
+                if (from == _editor)
+                    OnEditorNotification(Marshal.PtrToStructure<SCNotification>(lParam));
+                else if (from == _variables)
+                    OnVariablesNotification(lParam);
                 return 0;
             case WM_APP_INVOKE:
                 while (_uiQueue.TryDequeue(out Action? action))

@@ -53,6 +53,53 @@ internal static partial class Program
         public int foldLevelNow, foldLevelPrev, margin;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct TVITEMW
+    {
+        public uint mask;
+        public IntPtr hItem;
+        public uint state, stateMask;
+        // a raw pointer: in notifications it's only set when the mask says so
+        public IntPtr pszText;
+        public int cchTextMax, iImage, iSelectedImage, cChildren;
+        public IntPtr lParam;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct TVINSERTSTRUCTW
+    {
+        public IntPtr hParent, hInsertAfter;
+        public TVITEMW item;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NMHDR
+    {
+        public IntPtr hwndFrom, idFrom;
+        public int code;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NMTREEVIEWW
+    {
+        public NMHDR hdr;
+        public uint action;
+        public TVITEMW itemOld, itemNew;
+        public int ptDragX, ptDragY;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct INITCOMMONCONTROLSEX
+    {
+        public uint dwSize, dwICC;
+    }
+
+    [DllImport("comctl32.dll")]
+    private static extern bool InitCommonControlsEx(ref INITCOMMONCONTROLSEX controls);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr SendMessageW(IntPtr hwnd, uint msg, IntPtr wParam, ref TVINSERTSTRUCTW lParam);
+
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr GetModuleHandleW(string? name);
 

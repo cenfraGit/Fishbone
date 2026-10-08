@@ -21,10 +21,10 @@ internal static partial class Program
         _session.Started += () => Post(() =>
         {
             SetWindowTextW(_output, "");
-            SetWindowTextW(_variables, "");
+            ClearVariables();
         });
         _session.Output += text => Post(() => AppendOutput(text));
-        _session.Paused += (snapshot, _, isProgramExit) => Post(() => OnPaused(snapshot, isProgramExit));
+        _session.Paused += (snapshot, session, isProgramExit) => Post(() => OnPaused(snapshot, session, isProgramExit));
         _session.Continued += () => Post(() =>
         {
             _paused = false;
@@ -89,14 +89,17 @@ internal static partial class Program
                 ? $"error at {error.LocationDisplay.ToLowerInvariant()}: {error.ExMessage}{Environment.NewLine}"
                 : $"error: {error.ExMessage}{Environment.NewLine}");
 
+        if (outcome.Environment is not null)
+            ShowFinalVariables(outcome.Environment);
+
         string result = outcome.Errors.Count > 0 ? "finished with errors" : "finished";
         SetWindowTextW(_status, $"{result} in {_runClock.Elapsed.TotalMilliseconds:F0} ms");
     }
 
-    private static void OnPaused(FishbonePauseSnapshot snapshot, bool isProgramExit)
+    private static void OnPaused(FishbonePauseSnapshot snapshot, IFishboneDebugClientSession session, bool isProgramExit)
     {
         FishboneDebugFrame? frame = snapshot.Frames.FirstOrDefault();
-        ShowVariables(frame);
+        ShowDebugVariables(frame, session);
         _paused = true;
 
         // the pause after the last statement only shows the final values. it stays until the
@@ -111,21 +114,6 @@ internal static partial class Program
         if (frame is not null)
             ShowCurrentLine(frame.Line - 1);
         SetWindowTextW(_status, $"paused ({snapshot.Reason}) at line {frame?.Line}");
-    }
-
-    private static void ShowVariables(FishboneDebugFrame? frame)
-    {
-        if (frame is null)
-            return;
-
-        var text = new StringBuilder();
-        foreach (FishboneDebugScope scope in frame.Scopes)
-        {
-            text.AppendLine(scope.Name);
-            foreach (FishboneDebugVariable variable in scope.Variables)
-                text.AppendLine($"    {variable.Name} = {variable.Value}");
-        }
-        SetWindowTextW(_variables, text.ToString());
     }
 
     private static void AppendOutput(string text)
