@@ -19,7 +19,7 @@ using System.Threading.Tasks;
 
 namespace SpineIDE;
 
-internal static class SingleInstance
+public static class SingleInstance
 {
     // Local\ scope: one primary per interactive session; username keeps parallel
     // sessions of different users on the same machine from colliding.

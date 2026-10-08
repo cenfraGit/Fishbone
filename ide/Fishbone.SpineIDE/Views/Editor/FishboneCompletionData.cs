@@ -6,51 +6,21 @@ using System;
 
 namespace SpineIDE.Views.Editor;
 
-/// <summary>What a completion item represents; also drives sort priority in the popup.</summary>
-public enum FishboneCompletionKind
+/// <summary>Shows a shared <see cref="FishboneCompletionItem"/> in AvaloniaEdit's completion popup.</summary>
+public sealed class FishboneCompletionData(FishboneCompletionItem item) : ICompletionData
 {
-    Keyword,
-    Function,
-    Type,
-    Constant,
-    Variable,
-    Parameter
-}
-
-/// <summary>
-/// A single entry in the editor's completion popup. Implements AvaloniaEdit's <see cref="ICompletionData"/>;
-/// items are plain data (no per-window state) so the catalog can share one instance across every editor.
-/// </summary>
-public sealed class FishboneCompletionData : ICompletionData
-{
-    public FishboneCompletionData(string text, FishboneCompletionKind kind, string? description = null)
-    {
-        Text = text;
-        Kind = kind;
-        Description = description ?? kind.ToString().ToLowerInvariant();
-        // in-scope locals rank above the global API, which ranks above bare keywords
-        Priority = kind switch
-        {
-            FishboneCompletionKind.Variable or FishboneCompletionKind.Parameter => 3,
-            FishboneCompletionKind.Function or FishboneCompletionKind.Type or FishboneCompletionKind.Constant => 2,
-            _ => 1
-        };
-    }
-
-    public FishboneCompletionKind Kind { get; }
-
     // no icons for now; the interface requires the member
     public IImage Image => null!;
 
-    public string Text { get; }
+    public string Text => item.Text;
 
     /// <summary>Shown in the list row.</summary>
-    public object Content => Text;
+    public object Content => item.Text;
 
     /// <summary>Shown as the hover tooltip (signature / kind).</summary>
-    public object Description { get; }
+    public object Description => item.Description;
 
-    public double Priority { get; }
+    public double Priority => item.Priority;
 
     public void Complete(TextArea textArea, ISegment completionSegment, EventArgs insertionRequestEventArgs)
         => textArea.Document.Replace(completionSegment, Text);

@@ -18,9 +18,6 @@
     <EmbeddedResource Include="Assets\Themes\dark_plus.json" />
     <EmbeddedResource Include="Assets\Themes\onedark-color-theme.json" />
     <EmbeddedResource Include="Assets\Themes\onelight-color-theme.json" />
-    <EmbeddedResource Include="..\..\samples\*.fb">
-      <LogicalName>SpineIDE.Samples.%(Filename)%(Extension)</LogicalName>
-    </EmbeddedResource>
   </ItemGroup>
 
   <ItemGroup>
@@ -55,11 +52,11 @@
     <PackageReference Include="Dock.Model.Mvvm" Version="12.0.0.2" />
     <PackageReference Include="MessageBox.Avalonia" Version="12.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.8" />
-    <PackageReference Include="System.CommandLine" Version="2.0.9" />
     <PackageReference Include="TextMateSharp.Grammars" Version="2.0.3" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Fishbone.SpineIDE.Shared\Fishbone.SpineIDE.Shared.csproj" />
     <ProjectReference Include="..\..\src\Fishbone.DebugClient\Fishbone.DebugClient.csproj" />
     <ProjectReference Include="..\..\src\Fishbone\Fishbone.csproj" />
     <!-- Fishbone marks its sibling projects PrivateAssets=all so they pack as one

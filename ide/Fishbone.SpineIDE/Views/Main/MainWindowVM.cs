@@ -307,15 +307,11 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         CancellationToken cancellationToken)
     {
         string scriptCode = m.Script.Code;
-        var configuration = new FishboneConfiguration();
         var outputBuffer = new ScriptOutputBuffer();
-
-        FishbonePluginLoader.LoadPlugins(FishbonePluginLoader.DefaultPluginsDirectory, configuration);
-
-        configuration.AddBuiltIn("print", new Action<object?>(outputBuffer.Append));
-        configuration.AddBuiltIn("println", new Action<object?>(outputBuffer.AppendLine));
-        configuration.AddBuiltIn("input", new Func<string>(() =>
-            ReadScriptInput(outputBuffer, executionVersion, cancellationToken)));
+        var configuration = SpineConfiguration.Create(
+            outputBuffer.Append,
+            outputBuffer.AppendLine,
+            () => ReadScriptInput(outputBuffer, executionVersion, cancellationToken));
 
         Task<ScriptExecutionResult> executionTask = Task.Run(
             () =>

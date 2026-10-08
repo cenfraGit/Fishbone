@@ -3,22 +3,22 @@ using System.Text;
 
 namespace SpineIDE.Panels;
 
-internal sealed class ScriptOutputBuffer
+public sealed class ScriptOutputBuffer
 {
     private readonly object _sync = new();
     private readonly StringBuilder _pending = new();
 
-    internal void Append(object? value)
+    public void Append(object? value)
     {
         AppendText(value?.ToString() ?? string.Empty);
     }
 
-    internal void AppendLine(object? value)
+    public void AppendLine(object? value)
     {
         AppendText((value?.ToString() ?? string.Empty) + Environment.NewLine);
     }
 
-    internal string DrainPending()
+    public string DrainPending()
     {
         lock (_sync)
         {

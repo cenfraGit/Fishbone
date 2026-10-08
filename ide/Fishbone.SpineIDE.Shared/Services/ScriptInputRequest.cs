@@ -4,34 +4,34 @@ using System.Threading.Tasks;
 
 namespace SpineIDE.Services;
 
-internal sealed class ScriptInputRequest : IDisposable
+public sealed class ScriptInputRequest : IDisposable
 {
     private readonly TaskCompletionSource<string> _completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly CancellationTokenRegistration _cancellationRegistration;
 
-    internal ScriptInputRequest(CancellationToken cancellationToken)
+    public ScriptInputRequest(CancellationToken cancellationToken)
     {
         _cancellationRegistration = cancellationToken.Register(
             () => _completion.TrySetCanceled(cancellationToken));
     }
 
-    internal string Wait()
+    public string Wait()
     {
         return _completion.Task.GetAwaiter().GetResult();
     }
 
-    internal void Submit(string value)
+    public void Submit(string value)
     {
         _completion.TrySetResult(value);
     }
 
-    internal void Cancel()
+    public void Cancel()
     {
         _completion.TrySetException(new OperationCanceledException("Script input was cancelled."));
     }
 
-    internal void Fail(Exception exception)
+    public void Fail(Exception exception)
     {
         _completion.TrySetException(exception);
     }

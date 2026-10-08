@@ -435,9 +435,9 @@ public partial class ScriptEditorView : UserControl
         // locals declared above the caret (small set — always included, filtered live by the window)
         foreach (var local in FishboneLocalSymbolScanner.Scan(document.GetText(0, caret)))
             if (added.Add(local.Text))
-                items.Add(local);
+                items.Add(new FishboneCompletionData(local));
 
-        IReadOnlyList<FishboneCompletionData>? globals;
+        IReadOnlyList<FishboneCompletionItem>? globals;
         if (caret > start)
             catalog.GlobalsByInitial.TryGetValue(char.ToLowerInvariant(document.GetCharAt(start)), out globals);
         else
@@ -446,11 +446,11 @@ public partial class ScriptEditorView : UserControl
         if (globals is not null)
             foreach (var global in globals)
                 if (added.Add(global.Text))
-                    items.Add(global);
+                    items.Add(new FishboneCompletionData(global));
 
         foreach (var keyword in catalog.Keywords)
             if (added.Add(keyword.Text))
-                items.Add(keyword);
+                items.Add(new FishboneCompletionData(keyword));
 
         if (items.Count == 0)
             return;
