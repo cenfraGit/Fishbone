@@ -44,6 +44,43 @@ public class SessionHandlerTests
     }
 
     [Fact]
+    public async Task SetBreakpointsBindsToNextStatementLine()
+    {
+        // like visual studio: a breakpoint on a line with no statement (a brace, a comment, a
+        // blank line) binds to the next statement. after the last statement it can't bind
+        const string source = """
+let c = [1, 2];
+foreach (i in c)
+{
+    // print it
+    println(i);
+}
+
+let done = true;
+// end
+""";
+        using var coordinator = new BreakpointCoordinator("test.fb");
+        using var session = new FishboneDebugAdapterSession(
+            coordinator, "test.fb", "test.fb", source, 9, _ => Task.CompletedTask);
+
+        var response = await session.Handle(new SetBreakpointsArguments
+        {
+            Source = new Source { Path = "test.fb" },
+            Breakpoints = new Container<SourceBreakpoint>(
+                new SourceBreakpoint { Line = 1 },
+                new SourceBreakpoint { Line = 3 },
+                new SourceBreakpoint { Line = 4 },
+                new SourceBreakpoint { Line = 7 },
+                new SourceBreakpoint { Line = 9 })
+        }, CancellationToken.None);
+
+        var breakpoints = response.Breakpoints.ToArray();
+        Assert.Equal(new[] { 1, 5, 5, 8 }, breakpoints.Take(4).Select(breakpoint => breakpoint.Line!.Value).ToArray());
+        Assert.All(breakpoints.Take(4), breakpoint => Assert.True(breakpoint.Verified));
+        Assert.False(breakpoints[4].Verified);
+    }
+
+    [Fact]
     public async Task ExceptionFilterControlsCoordinator()
     {
         using var coordinator = new BreakpointCoordinator("test.fb");

@@ -76,6 +76,50 @@ public class FishboneDebugClientIntegrationTests
     }
 
     [Fact]
+    public async Task BreakpointOnBraceLineHitsTheNextStatementAndStaysOnItsLine()
+    {
+        const string sourceCode = """
+let c = [1, 2];
+foreach (i in c)
+{
+    println(i);
+}
+""";
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await using FishboneDebugServerSession server = await FishboneDebugServer.StartAsync(new FishboneDebugServerOptions
+        {
+            SourceCode = sourceCode,
+            SourceName = "brace.fb",
+            SourceIdentity = "fishbone://tests/brace.fb",
+            ListenEndpoint = new IPEndPoint(IPAddress.Loopback, 0)
+        }, timeout.Token);
+        await using FishboneDebugClientSession client = FishboneDebugClientSession.Attach("127.0.0.1", server.Endpoint.Port);
+        var pauses = Channel.CreateUnbounded<FishbonePauseSnapshot>();
+        client.EventReceived += (_, debugEvent) =>
+        {
+            if (debugEvent is FishboneDebugPaused paused)
+                pauses.Writer.TryWrite(paused.Snapshot);
+        };
+
+        await client.ConnectAsync(stopOnEntry: false, timeout.Token);
+        var results = await client.ConfigureAsync([3], timeout.Token);
+
+        // the result keeps the line the user clicked, so the editor's dot stays on the brace
+        var result = Assert.Single(results);
+        Assert.Equal(3, result.Line);
+        Assert.True(result.Verified);
+
+        // it hits on the println line, once per iteration
+        Assert.Equal(4, (await pauses.Reader.ReadAsync(timeout.Token)).Frames[0].Line);
+        await client.ContinueAsync(timeout.Token);
+        Assert.Equal(4, (await pauses.Reader.ReadAsync(timeout.Token)).Frames[0].Line);
+        await client.ContinueAsync(timeout.Token);
+
+        FishboneDebugServerResult final = await server.Completion.WaitAsync(timeout.Token);
+        Assert.Equal(0, final.ExitCode);
+    }
+
+    [Fact]
     public async Task HostCancellationUnblocksAnEntryPausedExecution()
     {
         using var hostCancellation = new CancellationTokenSource();

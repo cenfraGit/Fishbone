@@ -27,9 +27,9 @@ public class DebugSnapshotHandlesTests
         var entry = Assert.Single(handles.GetVariables(variable.VariablesReference));
         var children = handles.GetVariables(entry.VariablesReference);
 
-        Assert.Equal("dictionary (1)", variable.Value);
+        Assert.Equal("""{"items": [1, "two"]}""", variable.Value);
         Assert.Equal(["[0]", "[1]"], children.Select(child => child.Name));
-        Assert.Equal("\"two\"", children[1].Value);
+        Assert.Equal("two", children[1].Value);
     }
 
     [Fact]
@@ -49,6 +49,32 @@ public class DebugSnapshotHandlesTests
         handles.Clear();
         Assert.Throws<InvalidOperationException>(() => handles.GetVariables(collectionReference));
     }
+
+    [Theory]
+    [MemberData(nameof(DisplayCases))]
+    public void FormatsTypesAndValuesLikeANormalRun(object? value, string type, string display)
+    {
+        // the same text the variable explorer shows after a run without the debugger
+        var handles = new DebugSnapshotHandles();
+        handles.SetSnapshot(Snapshot(new DebugVariableSnapshot("value", value)));
+        long scopeReference = handles.GetScopes(handles.GetFrames()[0].Id)[0].VariablesReference;
+
+        var variable = Assert.Single(handles.GetVariables(scopeReference));
+
+        Assert.Equal(type, variable.Type);
+        Assert.Equal(display, variable.Value);
+    }
+
+    public static TheoryData<object?, string, string> DisplayCases() => new()
+    {
+        { new List<object?> { 1, "two" }, "List", """[1, "two"]""" },
+        { new Dictionary<object, object?> { ["a"] = 1 }, "Dictionary", """{"a": 1}""" },
+        { new KeyValuePair<string, int>("a", 1), "KeyValuePair", "[a, 1]" },
+        { "hi", "String", "hi" },
+        { 2.5, "Double", "2.5" },
+        { true, "Boolean", "true" },
+        { null, "null", "null" },
+    };
 
     private static DebugPauseSnapshot Snapshot(DebugVariableSnapshot variable) => new(
         new DebugSourceLocation("test.fb", 1, 1),
