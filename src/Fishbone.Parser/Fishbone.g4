@@ -63,7 +63,7 @@ expr
     | MINUS expr                              #UnaryExpr
     | expr (MUL|DIV|MOD) expr                 #BinaryExpr
     | expr (PLUS|MINUS) expr                  #BinaryExpr
-    | expr AS ID                              #CastExpr
+    | expr AS ID ('[' ']')*                   #CastExpr
     | expr (GE|LE|GT|LT) expr                 #BinaryExpr
     | expr (EQ|NEQ) expr                      #BinaryExpr
     | NOT expr                                #UnaryExpr

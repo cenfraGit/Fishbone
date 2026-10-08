@@ -316,7 +316,9 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
     public override AstNode VisitCastExpr(FishboneParser.CastExprContext context)
     {
         var value = Visit(context.expr());
-        var typeName = context.ID().GetText();
+        // each [] after the name makes an array type: int[], int[][]
+        var arrayDepth = (context.ChildCount - 3) / 2;
+        var typeName = context.ID().GetText() + string.Concat(Enumerable.Repeat("[]", arrayDepth));
         return new CastNode(value, typeName) { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }
 

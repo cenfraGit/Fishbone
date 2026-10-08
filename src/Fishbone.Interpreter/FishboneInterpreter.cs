@@ -358,9 +358,13 @@ public class FishboneInterpreter
         // them up through the environment normally. regardless,
         // we'll check primitive types first.
 
-        if (ReservedTypes.PrimitiveTypeNames.TryGetValue(node.TypeName, out var primitive))
+        // "int[]" resolves "int", then wraps it once per []
+        var baseName = node.TypeName.TrimEnd('[', ']');
+        var arrayDepth = (node.TypeName.Length - baseName.Length) / 2;
+
+        if (ReservedTypes.PrimitiveTypeNames.TryGetValue(baseName, out var primitive))
             targetType = primitive;
-        else if (env.TryGetValue(node.TypeName, out var resolved) && resolved is RegisteredType registeredType)
+        else if (env.TryGetValue(baseName, out var resolved) && resolved is RegisteredType registeredType)
             targetType = registeredType.Type;
         else if (resolved is Type type)
             targetType = type;
@@ -368,6 +372,9 @@ public class FishboneInterpreter
             throw new FishboneRuntimeException($"Couldn't cast to '{node.TypeName}' since it's not a type.",
                                                node.Line,
                                                node.Column);
+
+        for (int i = 0; i < arrayDepth; i++)
+            targetType = targetType.MakeArrayType();
 
         //  --------------- converting the value --------------- //
 
