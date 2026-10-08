@@ -244,12 +244,19 @@ public class FishboneInterpreter
     {
         dynamic right = Evaluate(env, node.Right);
 
-        return node.Operator switch
+        try
         {
-            "-" => -right,
-            "not" => !IsTruthy(right),
-            _ => throw new FishboneRuntimeException($"Unknown unary operator: {node.Operator}")
-        };
+            return node.Operator switch
+            {
+                "-" => checked(-right),
+                "not" => !IsTruthy(right),
+                _ => throw new FishboneRuntimeException($"Unknown unary operator: {node.Operator}")
+            };
+        }
+        catch (OverflowException) when (right is int or long)
+        {
+            throw new FishboneRuntimeException(DescribeOverflow("-", right is long, "-(a as long)"));
+        }
     }
 
     internal object EvaluateBinary(FishboneEnvironment env, BinaryOpNode node)
@@ -283,23 +290,37 @@ public class FishboneInterpreter
             return Equals(left, right);
         }
 
-        return node.Operator switch
+        try
         {
-            "+" => left + right,
-            "-" => left - right,
-            "*" => left * right,
-            "/" => Divide(left, right),
-            "%" => left % right,
-            // comparison
-            "==" => AreEqual(left, right),
-            "!=" => !AreEqual(left, right),
-            "<"  => left < right,
-            ">"  => left > right,
-            "<=" => left <= right,
-            ">=" => left >= right,
-            _ => throw new FishboneRuntimeException($"Unknown binary operator: {node.Operator}")
-        };
+            return node.Operator switch
+            {
+                // integer arithmetic is checked: overflow is an error, not a silent wrap
+                "+" => checked(left + right),
+                "-" => checked(left - right),
+                "*" => checked(left * right),
+                "/" => Divide(left, right),
+                "%" => left % right,
+                // comparison
+                "==" => AreEqual(left, right),
+                "!=" => !AreEqual(left, right),
+                "<"  => left < right,
+                ">"  => left > right,
+                "<=" => left <= right,
+                ">=" => left >= right,
+                _ => throw new FishboneRuntimeException($"Unknown binary operator: {node.Operator}")
+            };
+        }
+        catch (OverflowException) when (left is int or long && right is int or long)
+        {
+            bool isLong = left is long || right is long;
+            throw new FishboneRuntimeException(DescribeOverflow(node.Operator, isLong, $"(a as long) {node.Operator} b"));
+        }
     }
+
+    // an int overflow points to long as the way out. long has no wider integer type
+    private static string DescribeOverflow(string op, bool isLong, string example) => isLong
+        ? $"Integer overflow in '{op}' (long). The result doesn't fit in a long."
+        : $"Integer overflow in '{op}' (int). Use 'as long' for larger values, e.g. {example}.";
 
     // --------------------------------------------------------------------------------
     // casts
