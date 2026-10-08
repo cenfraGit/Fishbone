@@ -151,7 +151,7 @@ Fishbone is dynamically typed. Every value is one of these:
 
 | Type         | Examples                | Notes                                                 |
 |--------------|-------------------------|-------------------------------------------------------|
-| `int`        | `42`, `-1`, `1_000_000` | 32-bit signed integer (wraps on overflow)             |
+| `int`        | `42`, `-1`, `1_000_000` | 32-bit signed integer. Overflow is an error           |
 | `long`       | `999_999_999_999`       | 64-bit signed integer. Literals too big for `int` promote to `long` |
 | `double`     | `3.14`, `.5`, `-2.0`    | 64-bit double-precision float                         |
 | `string`     | `"hello"`, `""`         | Unicode text                                          |
@@ -234,6 +234,7 @@ Two of those are worth pointing at, because they differ from C#.
 ### Arithmetic
 
 - `+`, `-` and `*` keep `int` when both sides are `int`, and give you a `double` as soon as either side is one
+- Integer arithmetic is checked, like C# `checked`. If an `int` or `long` result doesn't fit, it's a runtime error instead of silently wrapping around. So `2147483647 + 1` is an error, not `-2147483648`. Cast first when you need a bigger range: `(a as long) * b`. `double` math never errors. A result too big becomes `Infinity`
 - `/` is always true division. It gives a `double` no matter what the operands are, so `5 / 2` is `2.5` and `4 / 2` is `2.0`. Integer division by zero therefore produces `double` infinity rather than an error. There's no floor-division operator, so use `a / b as int` when you need an integer quotient. The cast truncates toward zero, like C# integer division
 - `%` is the remainder. It keeps `int` when both sides are `int` (only `/` promotes), and follows C#'s truncated convention, where the sign follows the dividend. So `-5 % 3` is `-2` and `5 % -3` is `2`. Integer remainder by zero raises an error, and `double` remainder by zero gives you `NaN`
 
