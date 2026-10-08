@@ -17,6 +17,7 @@
     <Project Path="ide/Fishbone.SpineCLI/Fishbone.SpineCLI.csproj" />
     <Project Path="ide/Fishbone.SpineIDE/Fishbone.SpineIDE.csproj" />
     <Project Path="ide/Fishbone.SpineIDE.Shared/Fishbone.SpineIDE.Shared.csproj" />
+    <Project Path="ide/Fishbone.SpineIDE.Win32/Fishbone.SpineIDE.Win32.csproj" />
   </Folder>
   <Folder Name="/Plugins/">
     <Project Path="plugins/Fishbone.Plugins.Halcon24111/Fishbone.Plugins.Halcon24111.csproj" />
