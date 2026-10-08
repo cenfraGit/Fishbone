@@ -1,4 +1,4 @@
-using Fishbone.DebugClient;
+using Fishbone;
 using System.Runtime.InteropServices;
 
 namespace SpineIDE.Win32;
@@ -15,24 +15,105 @@ internal static partial class Program
     private static readonly Dictionary<IntPtr, (IntPtr Bitmap, int Width, int Height)> _images = [];
     private static IntPtr _gdiplusToken;
 
-    // double-clicking an image variable opens it in its own window
-    private static void OnVariableDoubleClick()
+    // the docked preview. it follows a variable by name, so stepping keeps showing the same one
+    private static IntPtr _preview, _previewHeader;
+    private static string? _previewName;
+    // bumped on every change, so an image that finishes loading late is dropped
+    private static int _previewVersion;
+
+    // the docked preview and the pop-out windows share one window class
+    private static void RegisterImageClass()
+    {
+        var windowClass = new WNDCLASSEX
+        {
+            cbSize = (uint)Marshal.SizeOf<WNDCLASSEX>(),
+            style = 0x3, // CS_HREDRAW | CS_VREDRAW
+            lpfnWndProc = Marshal.GetFunctionPointerForDelegate(_imageWndProc),
+            hInstance = GetModuleHandleW(null),
+            hCursor = LoadCursorW(IntPtr.Zero, 32512),
+            hbrBackground = 13, // COLOR_GRAYTEXT + 1, so the image's edges stand out
+            lpszClassName = "SpineIDE.Image",
+        };
+        RegisterClassExW(ref windowClass);
+    }
+
+    // a paused image comes from the debug host. a final value is rendered here, with the run's visualizers
+    private static async Task<byte[]?> LoadPng(VariableNode node)
+    {
+        if (node.Debug is not null)
+            return node.Debug.ImageHandle is { } handle && _pausedSession is { } session
+                ? await session.GetImageAsync(handle)
+                : null;
+        FishboneConfiguration? configuration = _finalConfiguration;
+        object? value = node.Value;
+        return await Task.Run(() => configuration?.Visualize(value)?.ToPng());
+    }
+
+    private static async void ShowPreview(VariableNode node)
+    {
+        _previewName = node.Name;
+        int version = ++_previewVersion;
+        try
+        {
+            byte[]? png = await LoadPng(node);
+            Post(() =>
+            {
+                if (version == _previewVersion)
+                    SetPreview(node.Name, png);
+            });
+        }
+        catch (Exception exception)
+        {
+            Post(() =>
+            {
+                if (version != _previewVersion)
+                    return;
+                ClearPreview();
+                SetWindowTextW(_previewHeader, $"Image: {node.Name} couldn't be shown ({exception.Message})");
+            });
+        }
+    }
+
+    private static void SetPreview(string name, byte[]? png)
+    {
+        ClearPreview();
+        var (bitmap, width, height) = png is null ? (0, 0, 0) : DecodePng(png);
+        if (bitmap == 0)
+        {
+            SetWindowTextW(_previewHeader, $"Image: {name} has nothing to show");
+            return;
+        }
+        _images[_preview] = (bitmap, width, height);
+        SetWindowTextW(_previewHeader, $"Image: {name} ({width}x{height})");
+        InvalidateRect(_preview, IntPtr.Zero, true);
+    }
+
+    // keeps _previewName, so the variable shows again once it has an image
+    private static void ClearPreview()
+    {
+        _previewVersion++;
+        if (_images.Remove(_preview, out var image))
+            DeleteObject(image.Bitmap);
+        SetWindowTextW(_previewHeader, "Image");
+        InvalidateRect(_preview, IntPtr.Zero, true);
+    }
+
+    private static VariableNode? SelectedNode()
     {
         IntPtr selected = SendMessageW(_variables, TVM_GETNEXTITEM, (nint)TVGN_CARET, 0);
         var item = new TVITEMW { mask = TVIF_PARAM, hItem = selected };
         SendMessageW(_variables, TVM_GETITEMW, 0, ref item);
-        if (_nodes.TryGetValue(item.lParam, out VariableNode? node)
-            && node.Debug is { ImageHandle: { } handle } variable
-            && _pausedSession is { } session)
-            ShowImage(variable.Name, session, handle);
+        return _nodes.GetValueOrDefault(item.lParam);
     }
 
-    private static async void ShowImage(string name, IFishboneDebugClientSession session, FishboneVariableHandle handle)
+    // double-clicking an image variable also opens it in its own, bigger window
+    private static async void OpenImage(VariableNode node)
     {
         try
         {
-            byte[] png = await session.GetImageAsync(handle);
-            Post(() => OpenImageWindow(name, png));
+            byte[]? png = await LoadPng(node);
+            if (png is not null)
+                Post(() => OpenImageWindow(node.Name, png));
         }
         catch (Exception exception)
         {
@@ -42,24 +123,6 @@ internal static partial class Program
 
     private static void OpenImageWindow(string name, byte[] png)
     {
-        if (_gdiplusToken == 0)
-        {
-            var input = new GdiplusStartupInput { GdiplusVersion = 1 };
-            GdiplusStartup(out _gdiplusToken, ref input, IntPtr.Zero);
-
-            var windowClass = new WNDCLASSEX
-            {
-                cbSize = (uint)Marshal.SizeOf<WNDCLASSEX>(),
-                style = 0x3, // CS_HREDRAW | CS_VREDRAW
-                lpfnWndProc = Marshal.GetFunctionPointerForDelegate(_imageWndProc),
-                hInstance = GetModuleHandleW(null),
-                hCursor = LoadCursorW(IntPtr.Zero, 32512),
-                hbrBackground = 13, // COLOR_GRAYTEXT + 1, so the image's edges stand out
-                lpszClassName = "SpineIDE.Image",
-            };
-            RegisterClassExW(ref windowClass);
-        }
-
         var (bitmap, width, height) = DecodePng(png);
         if (bitmap == 0)
         {
@@ -79,6 +142,12 @@ internal static partial class Program
     // the GDI+ flat api decodes PNG with plain calls, no COM wrappers
     private static (IntPtr Bitmap, int Width, int Height) DecodePng(byte[] png)
     {
+        if (_gdiplusToken == 0)
+        {
+            var input = new GdiplusStartupInput { GdiplusVersion = 1 };
+            GdiplusStartup(out _gdiplusToken, ref input, IntPtr.Zero);
+        }
+
         IntPtr stream = SHCreateMemStream(png, (uint)png.Length);
         if (stream == 0)
             return (0, 0, 0);
@@ -111,6 +180,9 @@ internal static partial class Program
             case WM_PAINT when _images.TryGetValue(hwnd, out var image):
                 PaintImage(hwnd, image.Bitmap, image.Width, image.Height);
                 return 0;
+            case WM_PAINT when hwnd == _preview:
+                PaintPlaceholder(hwnd);
+                return 0;
             case WM_SIZE:
                 InvalidateRect(hwnd, IntPtr.Zero, true);
                 return 0;
@@ -119,6 +191,18 @@ internal static partial class Program
                 return 0;
         }
         return DefWindowProcW(hwnd, msg, wParam, lParam);
+    }
+
+    private static void PaintPlaceholder(IntPtr hwnd)
+    {
+        IntPtr dc = BeginPaint(hwnd, out PAINTSTRUCT paint);
+        GetClientRect(hwnd, out RECT client);
+        SetBkMode(dc, 1); // TRANSPARENT
+        SetTextColor(dc, 0xE0E0E0);
+        IntPtr previous = SelectObject(dc, _guiFont);
+        DrawTextW(dc, "select an image variable to preview it", -1, ref client, 0x25); // DT_CENTER | DT_VCENTER | DT_SINGLELINE
+        SelectObject(dc, previous);
+        EndPaint(hwnd, ref paint);
     }
 
     // fits the image in the window, keeping its proportions
@@ -204,6 +288,15 @@ internal static partial class Program
 
     [DllImport("gdi32.dll")]
     private static extern bool DeleteObject(IntPtr obj);
+
+    [DllImport("gdi32.dll")]
+    private static extern int SetBkMode(IntPtr dc, int mode);
+
+    [DllImport("gdi32.dll")]
+    private static extern uint SetTextColor(IntPtr dc, uint color);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int DrawTextW(IntPtr dc, string text, int length, ref RECT rect, uint format);
 
     [DllImport("gdi32.dll")]
     private static extern int SetStretchBltMode(IntPtr dc, int mode);

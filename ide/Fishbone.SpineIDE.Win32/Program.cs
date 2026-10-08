@@ -1,9 +1,9 @@
 // --------------------------------------------------------------------------------
 // Program.cs
 //
-// SpineIDE for Windows: a raw win32 front end with a scintilla editor on top, and
-// output and variables below. running and debugging go through the shared
-// ScriptSession, like the Avalonia SpineIDE.
+// SpineIDE for Windows: a raw win32 front end with a scintilla editor and the output
+// on the left, and an image preview over the variables on the right. running and
+// debugging go through the shared ScriptSession, like the Avalonia SpineIDE.
 // --------------------------------------------------------------------------------
 
 using Antlr4.Runtime;
@@ -21,14 +21,14 @@ namespace SpineIDE.Win32;
 internal static partial class Program
 {
     private const uint WS_OVERLAPPEDWINDOW = 0x00CF0000, WS_CHILD = 0x40000000, WS_VISIBLE = 0x10000000,
-        WS_VSCROLL = 0x00200000, WS_HSCROLL = 0x00100000, WS_BORDER = 0x00800000;
+        WS_VSCROLL = 0x00200000, WS_HSCROLL = 0x00100000, WS_BORDER = 0x00800000, SS_CENTERIMAGE = 0x200;
     private const uint ES_MULTILINE = 0x4, ES_AUTOVSCROLL = 0x40, ES_AUTOHSCROLL = 0x80, ES_READONLY = 0x800;
     private const uint WM_DESTROY = 0x2, WM_SIZE = 0x5, WM_CLOSE = 0x10, WM_SETFONT = 0x30, WM_NOTIFY = 0x4E,
-        WM_KEYDOWN = 0x100, WM_SYSKEYDOWN = 0x104, WM_COMMAND = 0x111, WM_DPICHANGED = 0x2E0, WM_APP_INVOKE = 0x8001;
+        WM_KEYDOWN = 0x100, WM_SYSKEYDOWN = 0x104, WM_COMMAND = 0x111, WM_CTLCOLORSTATIC = 0x138, WM_DPICHANGED = 0x2E0, WM_APP_INVOKE = 0x8001;
     private const uint EM_SETSEL = 0xB1, EM_REPLACESEL = 0xC2, EM_SETLIMITTEXT = 0xC5, EM_SETCUEBANNER = 0x1501;
     private const int VK_RETURN = 0x0D, VK_SPACE = 0x20, VK_F5 = 0x74, VK_F9 = 0x78, VK_F10 = 0x79, VK_F11 = 0x7A,
         VK_SHIFT = 0x10, VK_CONTROL = 0x11, VK_N = 0x4E, VK_O = 0x4F, VK_S = 0x53;
-    private const int RunButtonId = 1, DebugButtonId = 2, TopBarHeight = 32, InputHeight = 24;
+    private const int RunButtonId = 1, DebugButtonId = 2, TopBarHeight = 32, InputHeight = 24, HeaderHeight = 22, Gap = 4;
 
     private const string DefaultScript = """
         // F5 debug / continue    Ctrl+F5 run    Shift+F5 stop
@@ -52,6 +52,7 @@ internal static partial class Program
     private static readonly WndProcDelegate _wndProc = WndProc;
 
     private static IntPtr _window, _editor, _output, _input, _variables, _runButton, _debugButton, _status;
+    private static IntPtr _outputHeader, _variablesHeader;
 
     // lets background threads (the debug client) run code on the ui thread
     private static readonly ConcurrentQueue<Action> _uiQueue = new();
@@ -109,10 +110,20 @@ internal static partial class Program
         var controls = new INITCOMMONCONTROLSEX { dwSize = (uint)Marshal.SizeOf<INITCOMMONCONTROLSEX>(), dwICC = 0x2 };
         InitCommonControlsEx(ref controls);
         _variables = CreateChild("SysTreeView32", "",
-            WS_CHILD | WS_VISIBLE | WS_BORDER | TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT | TVS_SHOWSELALWAYS, 0);
+            WS_CHILD | WS_VISIBLE | WS_BORDER | TVS_HASBUTTONS | TVS_LINESATROOT | TVS_SHOWSELALWAYS | TVS_FULLROWSELECT, 0);
+        // the explorer look: arrows instead of plus boxes, and a full-row hover highlight
+        SetWindowTheme(_variables, "Explorer", null);
+        SendMessageW(_variables, TVM_SETEXTENDEDSTYLE, (nint)TVS_EX_DOUBLEBUFFER, (nint)TVS_EX_DOUBLEBUFFER);
+
+        RegisterImageClass();
+        _preview = CreateWindowExW(0, "SpineIDE.Image", "", WS_CHILD | WS_VISIBLE | WS_BORDER,
+            0, 0, 0, 0, _window, IntPtr.Zero, instance, IntPtr.Zero);
         _runButton = CreateChild("BUTTON", "Run (Ctrl+F5)", WS_CHILD | WS_VISIBLE, RunButtonId);
         _debugButton = CreateChild("BUTTON", "Debug (F5)", WS_CHILD | WS_VISIBLE, DebugButtonId);
         _status = CreateChild("STATIC", "", WS_CHILD | WS_VISIBLE, 0);
+        _outputHeader = CreateChild("STATIC", "Output", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE, 0);
+        _previewHeader = CreateChild("STATIC", "Image", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE, 0);
+        _variablesHeader = CreateChild("STATIC", "Variables", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE, 0);
 
         // multiline edits cap at 32k chars by default, 0 lifts that
         SendMessageW(_output, EM_SETLIMITTEXT, 0, 0);
@@ -173,6 +184,10 @@ internal static partial class Program
             case WM_COMMAND:
                 RunCommand((int)(wParam & 0xFFFF));
                 return 0;
+            // a read-only edit paints gray by default. the output reads better on white, like the editor
+            case WM_CTLCOLORSTATIC when lParam == _output:
+                SetBkColor(wParam, GetSysColor(5)); // COLOR_WINDOW
+                return GetSysColorBrush(5);
             case WM_CLOSE:
                 if (ConfirmDiscard())
                 {
@@ -241,40 +256,58 @@ internal static partial class Program
 
     // the monitor's dpi, 96 at 100% scale. sizes in this file are written for 96
     private static int _dpi = 96;
-    private static IntPtr _monoFont, _guiFont;
+    private static IntPtr _monoFont, _guiFont, _headerFont, _treeFont;
 
     private static int Scale(int pixels) => pixels * _dpi / 96;
 
     // fonts and fixed sizes, for the current monitor
     private static void ApplyDpi()
     {
-        DeleteObject(_monoFont);
-        DeleteObject(_guiFont);
+        foreach (IntPtr font in new[] { _monoFont, _guiFont, _headerFont, _treeFont })
+            DeleteObject(font);
         _monoFont = CreateFontW(-Scale(16), 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 0, 0, "Consolas");
         _guiFont = CreateFontW(-Scale(12), 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 0, 0, "Segoe UI");
-        foreach (IntPtr control in new[] { _output, _input, _variables })
+        _headerFont = CreateFontW(-Scale(12), 0, 0, 0, 600, 0, 0, 0, 1, 0, 0, 0, 0, "Segoe UI");
+        _treeFont = CreateFontW(-Scale(14), 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 0, 0, "Segoe UI");
+        foreach (IntPtr control in new[] { _output, _input })
             SendMessageW(control, WM_SETFONT, _monoFont, 1);
         foreach (IntPtr control in new[] { _runButton, _debugButton, _status })
             SendMessageW(control, WM_SETFONT, _guiFont, 1);
+        foreach (IntPtr control in new[] { _outputHeader, _previewHeader, _variablesHeader })
+            SendMessageW(control, WM_SETFONT, _headerFont, 1);
+        SendMessageW(_variables, WM_SETFONT, _treeFont, 1);
+        SendMessageW(_variables, TVM_SETITEMHEIGHT, Scale(24), 0);
         SetMarginWidths();
 
         GetClientRect(_window, out RECT client);
         Layout(client.right, client.bottom);
     }
 
+    // fixed panes: the editor over the output on the left, the image over the variables on the right
     private static void Layout(int width, int height)
     {
-        int top = Scale(TopBarHeight), input = Scale(InputHeight);
-        int editorHeight = (height - top) * 6 / 10;
-        int bottomHeight = height - top - editorHeight;
-        int outputWidth = width * 6 / 10;
+        int top = Scale(TopBarHeight), input = Scale(InputHeight), header = Scale(HeaderHeight), gap = Scale(Gap);
+        int indent = Scale(6);
         MoveWindow(_runButton, Scale(8), Scale(4), Scale(110), Scale(24), true);
         MoveWindow(_debugButton, Scale(124), Scale(4), Scale(110), Scale(24), true);
         MoveWindow(_status, Scale(246), Scale(9), width - Scale(254), Scale(20), true);
-        MoveWindow(_editor, 0, top, width, editorHeight, true);
-        MoveWindow(_output, 0, top + editorHeight, outputWidth, bottomHeight - input, true);
-        MoveWindow(_input, 0, top + editorHeight + bottomHeight - input, outputWidth, input, true);
-        MoveWindow(_variables, outputWidth, top + editorHeight, width - outputWidth, bottomHeight, true);
+
+        int rightWidth = width * 35 / 100;
+        int leftWidth = width - rightWidth - gap;
+        int editorHeight = (height - top) * 62 / 100;
+        MoveWindow(_editor, 0, top, leftWidth, editorHeight, true);
+        int outputTop = top + editorHeight + gap;
+        MoveWindow(_outputHeader, indent, outputTop, leftWidth - indent, header, true);
+        MoveWindow(_output, 0, outputTop + header, leftWidth, height - outputTop - header - input, true);
+        MoveWindow(_input, 0, height - input, leftWidth, input, true);
+
+        int rightX = leftWidth + gap;
+        int imageHeight = (height - top - 2 * header - gap) / 2;
+        MoveWindow(_previewHeader, rightX + indent, top, rightWidth - indent, header, true);
+        MoveWindow(_preview, rightX, top + header, rightWidth, imageHeight, true);
+        int variablesTop = top + header + imageHeight + gap;
+        MoveWindow(_variablesHeader, rightX + indent, variablesTop, rightWidth - indent, header, true);
+        MoveWindow(_variables, rightX, variablesTop + header, rightWidth, height - variablesTop - header, true);
     }
 
 }

@@ -234,6 +234,18 @@ internal static partial class Program
         uint italic, uint underline, uint strikeOut, uint charSet, uint outPrecision, uint clipPrecision,
         uint quality, uint pitchAndFamily, string faceName);
 
+    [DllImport("gdi32.dll")]
+    private static extern uint SetBkColor(IntPtr dc, uint color);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetSysColor(int index);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetSysColorBrush(int index);
+
+    [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
+    private static extern int SetWindowTheme(IntPtr hwnd, string appName, string? idList);
+
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 }

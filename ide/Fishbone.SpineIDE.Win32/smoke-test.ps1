@@ -12,6 +12,7 @@ public static class W {
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr SendMessageW(IntPtr h, uint m, IntPtr w, StringBuilder l);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+  [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h, IntPtr dc, uint flags);
   public struct RECT { public int l, t, r, b; }
   public static string Text(IntPtr h) { var s = new StringBuilder(200000); SendMessageW(h, 0x0D, (IntPtr)200000, s); return s.ToString(); }
 }
@@ -43,11 +44,13 @@ $vars = [W]::FindWindowExW($w, $outBox, "Edit", $null)
 $st = [W]::FindWindowExW($w, [IntPtr]::Zero, "Static", $null)
 function Key($vk) { [W]::PostMessageW($ed, 0x100, [IntPtr]$vk, [IntPtr]::Zero) | Out-Null; [W]::PostMessageW($ed, 0x101, [IntPtr]$vk, [IntPtr]::Zero) | Out-Null }
 function Send-Text($s) { foreach ($c in $s.ToCharArray()) { if ($c -eq "`n") { Key 0x0D } else { [W]::PostMessageW($ed, 0x102, [IntPtr][int]$c, [IntPtr]::Zero) | Out-Null }; Start-Sleep -Milliseconds 30 } }
+# PrintWindow draws the window itself, so the shot works even when another window is in front
 function Shot($name) {
-  [W]::SetForegroundWindow($w) | Out-Null; Start-Sleep -Milliseconds 300
   $r = New-Object W+RECT; [W]::GetWindowRect($w, [ref]$r) | Out-Null
   $bmp = New-Object System.Drawing.Bitmap ($r.r - $r.l), ($r.b - $r.t)
-  $g = [System.Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($r.l, $r.t, 0, 0, $bmp.Size); $g.Dispose()
+  $g = [System.Drawing.Graphics]::FromImage($bmp); $dc = $g.GetHdc()
+  [W]::PrintWindow($w, $dc, 2) | Out-Null   # PW_RENDERFULLCONTENT
+  $g.ReleaseHdc($dc); $g.Dispose()
   $bmp.Save("$Out\$name.png")
 }
 function Status { $p.Refresh(); "  status: " + [W]::Text($st) + " | title: " + $p.MainWindowTitle }

@@ -6,9 +6,13 @@ namespace SpineIDE.Services;
 
 /// <summary>
 /// What a run, debug session or attach ended with. <see cref="Environment"/> is set only when a
-/// run finished normally and wasn't replaced by a newer one.
+/// run finished normally and wasn't replaced by a newer one. <see cref="Configuration"/> comes with it,
+/// so a front end can show the final values with the same visualizers the run had.
 /// </summary>
-public sealed record ScriptRunOutcome(FishboneEnvironment? Environment, IReadOnlyList<ScriptExecutionError> Errors);
+public sealed record ScriptRunOutcome(
+    FishboneEnvironment? Environment,
+    IReadOnlyList<ScriptExecutionError> Errors,
+    FishboneConfiguration? Configuration = null);
 
 /// <summary>
 /// Runs, debugs and attaches to scripts for a SpineIDE front end, one at a time: starting a new one
@@ -157,7 +161,8 @@ public sealed class ScriptSession
                 {
                     return new ScriptRunOutcome(
                         FishboneProgram.Run(code, configuration, cancellationToken: cancellationToken),
-                        []);
+                        [],
+                        configuration);
                 }
                 catch (OperationCanceledException)
                 {

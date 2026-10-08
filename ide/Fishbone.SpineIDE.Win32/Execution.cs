@@ -22,6 +22,7 @@ internal static partial class Program
         {
             SetWindowTextW(_output, "");
             ClearVariables();
+            ClearPreview();
         });
         _session.Output += text => Post(() => AppendOutput(text));
         _session.Paused += (snapshot, session, isProgramExit) => Post(() => OnPaused(snapshot, session, isProgramExit));
@@ -117,7 +118,7 @@ internal static partial class Program
                 : $"error: {error.ExMessage}{Environment.NewLine}");
 
         if (outcome.Environment is not null)
-            ShowFinalVariables(outcome.Environment);
+            ShowFinalVariables(outcome.Environment, outcome.Configuration);
 
         string result = outcome.Errors.Count > 0 ? "finished with errors" : "finished";
         SetWindowTextW(_status, $"{result} in {_runClock.Elapsed.TotalMilliseconds:F0} ms");

@@ -1,0 +1,26 @@
+// title: HALCON Images
+// note: requires the Fishbone.Plugins.Halcon24111 plugin installed in ~/.fishbone/plugins
+// the images come from HALCON's own examples folder, which read_image finds by name
+// select an image variable in the tree to preview it, or double-click it for its own window
+
+println("HALCON images\n");
+
+// a gray byte image
+read_image(out fabrik, "fabrik");
+get_image_size(fabrik, out width, out height);
+println("fabrik is " + width + "x" + height);
+
+// a color image, three channels
+read_image(out patras, "patras");
+count_channels(patras, out channels);
+println("patras has " + channels + " channels");
+
+// filters on the gray image
+sobel_amp(fabrik, out edges, "sum_abs", 3);
+mean_image(fabrik, out blurred, 15, 15);
+
+// a real image. the preview stretches its values to 0..255, like HDevelop does,
+// so it looks the same as fabrik
+convert_image_type(fabrik, out real, "real");
+
+println("done");
