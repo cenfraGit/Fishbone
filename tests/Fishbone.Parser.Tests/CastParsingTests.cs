@@ -18,6 +18,22 @@ public class CastParsingTests
         Assert.Equal(expectedAst, ast);
     }
 
+    [Theory]
+    [InlineData("let n = value as int[];", "int[]")]
+    [InlineData("let n = value as int[][];", "int[][]")]
+    [InlineData("let n = value as Point [ ];", "Point[]")]
+    public void Parse_CastToArrayType_KeepsBracketsInTypeName(string code, string typeName)
+    {
+        var ast = ParserTestHelpers.ParseProgram(code);
+
+        var expectedAst = new ProgramNode(new List<AstNode>
+        {
+            new DeclarationNode("n", new CastNode(new IdentifierNode("value"), typeName))
+        });
+
+        Assert.Equal(expectedAst, ast);
+    }
+
     [Fact]
     public void Parse_CastBindsLooserThanAdditive_AndTighterThanComparison()
     {

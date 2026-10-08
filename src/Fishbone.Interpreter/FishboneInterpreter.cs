@@ -358,9 +358,13 @@ public class FishboneInterpreter
         // them up through the environment normally. regardless,
         // we'll check primitive types first.
 
-        if (ReservedTypes.PrimitiveTypeNames.TryGetValue(node.TypeName, out var primitive))
+        // "int[]" resolves "int", then wraps it once per []
+        var baseName = node.TypeName.TrimEnd('[', ']');
+        var arrayDepth = (node.TypeName.Length - baseName.Length) / 2;
+
+        if (ReservedTypes.PrimitiveTypeNames.TryGetValue(baseName, out var primitive))
             targetType = primitive;
-        else if (env.TryGetValue(node.TypeName, out var resolved) && resolved is RegisteredType registeredType)
+        else if (env.TryGetValue(baseName, out var resolved) && resolved is RegisteredType registeredType)
             targetType = registeredType.Type;
         else if (resolved is Type type)
             targetType = type;
@@ -368,6 +372,9 @@ public class FishboneInterpreter
             throw new FishboneRuntimeException($"Couldn't cast to '{node.TypeName}' since it's not a type.",
                                                node.Line,
                                                node.Column);
+
+        for (int i = 0; i < arrayDepth; i++)
+            targetType = targetType.MakeArrayType();
 
         //  --------------- converting the value --------------- //
 
@@ -1065,9 +1072,56 @@ public class FishboneInterpreter
     }
 
     // builds the diagnostic shown when an argument cannot be converted to its parameter type
-    private static string DescribeConversionFailure(int index, object? rawArg, string parameterName, Type targetType) =>
-        $"Argument {index + 1} of type '{rawArg?.GetType().Name ?? "null"}' is not compatible with parameter " +
-        $"'{parameterName}' of type '{targetType.Name}'.";
+    private string DescribeConversionFailure(int index, object? rawArg, string parameterName, Type targetType)
+    {
+        var message = $"Argument {index + 1} of type '{FormatTypeName(rawArg?.GetType())}' is not compatible with " +
+            $"parameter '{parameterName}' of type '{FormatTypeName(targetType)}'";
+
+        // a list going to a collection names the first element that doesn't fit
+        if (rawArg is List<object?> list && GetCollectionElementType(targetType) is { } elementType)
+        {
+            var bad = list.FindIndex(element => !TryConvertArgument(element, elementType, out _));
+            if (bad >= 0)
+                message += $": element {bad + 1} of type '{FormatTypeName(list[bad]?.GetType())}' " +
+                    $"is not compatible with '{FormatTypeName(elementType)}'";
+        }
+
+        return message + ".";
+    }
+
+    // the T in T[], List<T>, IList<T>, ICollection<T>, IEnumerable<T> or IReadOnlyList<T>,
+    // or null for any other type
+    private static Type? GetCollectionElementType(Type type)
+    {
+        // single-dimension arrays only. int[,] isn't built from a list
+        if (type.IsSZArray)
+            return type.GetElementType();
+        if (!type.IsGenericType)
+            return null;
+
+        var definition = type.GetGenericTypeDefinition();
+        var isCollection = definition == typeof(List<>)
+            || definition == typeof(IList<>)
+            || definition == typeof(ICollection<>)
+            || definition == typeof(IEnumerable<>)
+            || definition == typeof(IReadOnlyList<>);
+        return isCollection ? type.GetGenericArguments()[0] : null;
+    }
+
+    // List`1 -> List<Int32>
+    private static string FormatTypeName(Type? type)
+    {
+        if (type is null)
+            return "null";
+        if (type.IsArray)
+            return $"{FormatTypeName(type.GetElementType())}[{new string(',', type.GetArrayRank() - 1)}]";
+        if (!type.IsGenericType)
+            return type.Name;
+
+        var tick = type.Name.IndexOf('`');
+        var name = tick < 0 ? type.Name : type.Name[..tick];
+        return $"{name}<{string.Join(", ", type.GetGenericArguments().Select(FormatTypeName))}>";
+    }
 
     private void WriteBackByRefArguments(
         FishboneEnvironment env,
@@ -1256,6 +1310,32 @@ public class FishboneInterpreter
                 return ArgumentMatch.None;
             }
 
+            return ArgumentMatch.Convertible;
+        }
+
+        //  ------------- script list to collection ------------- //
+        //
+        // a script list going to T[], List<T>, IList<T>, etc. is
+        // copied into a new collection, converting each element with
+        // these same rules
+
+        if (rawArg is List<object?> list && GetCollectionElementType(conversionType) is { } elementType)
+        {
+            var array = Array.CreateInstance(elementType, list.Count);
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (ConvertArgument(list[i], elementType, out var element) == ArgumentMatch.None)
+                {
+                    convertedArg = null;
+                    return ArgumentMatch.None;
+                }
+                array.SetValue(element, i);
+            }
+
+            // the interfaces get a List<T>, since an array can't grow if .NET adds to it
+            convertedArg = conversionType.IsArray
+                ? array
+                : Activator.CreateInstance(typeof(List<>).MakeGenericType(elementType), array);
             return ArgumentMatch.Convertible;
         }
 

@@ -138,6 +138,11 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
 
     public override AstNode VisitDictionaryExpr(FishboneParser.DictionaryExprContext context)
     {
+        // {} is kept free for a future meaning. the empty dictionary is {:}
+        if (context.COLON() is null && context.dictPair().Length == 0)
+            throw new FishboneParseException([new ParseError(context.Start.Line, context.Start.Column + 1,
+                "'{}' isn't an empty dictionary. Use '{:}' for an empty dictionary.", null)]);
+
         var keyValuePairs = new List<KeyValuePairNode>();
         for (int i = 0; i < context.dictPair().Count(); i++)
         {
@@ -316,7 +321,9 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
     public override AstNode VisitCastExpr(FishboneParser.CastExprContext context)
     {
         var value = Visit(context.expr());
-        var typeName = context.ID().GetText();
+        // each [] after the name makes an array type: int[], int[][]
+        var arrayDepth = (context.ChildCount - 3) / 2;
+        var typeName = context.ID().GetText() + string.Concat(Enumerable.Repeat("[]", arrayDepth));
         return new CastNode(value, typeName) { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }
 

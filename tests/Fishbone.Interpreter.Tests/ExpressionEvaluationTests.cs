@@ -184,7 +184,7 @@ let nested = [[1, 2], [3]];
         var env = InterpreterTestHelpers.Run("""
 let key = "answer";
 let x = 10;
-let empty = {};
+let empty = {:};
 let values = {key: x + 5, 2: "two", true: false};
 let nested = {"list": [1, x], "dict": {"inner": x + 1}};
 """);

@@ -56,14 +56,14 @@ dictPair     : expr COLON expr ;
 expr
     : '(' expr ')'                            #ParenthesesExpr
     | '[' (expr (COMMA expr)*)? ']'           #ListExpr
-    | '{' (dictPair (COMMA dictPair)*)? '}'   #DictionaryExpr
+    | '{' (COLON | dictPair (COMMA dictPair)*)? '}'  #DictionaryExpr
     | expr '(' (argument (COMMA argument)*)? ')'  #CallExpr
     | expr '.' ID                             #MemberAccessExpr
     | expr '[' expr ']'                       #IndexingExpr
     | MINUS expr                              #UnaryExpr
     | expr (MUL|DIV|MOD) expr                 #BinaryExpr
     | expr (PLUS|MINUS) expr                  #BinaryExpr
-    | expr AS ID                              #CastExpr
+    | expr AS ID ('[' ']')*                   #CastExpr
     | expr (GE|LE|GT|LT) expr                 #BinaryExpr
     | expr (EQ|NEQ) expr                      #BinaryExpr
     | NOT expr                                #UnaryExpr
