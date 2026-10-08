@@ -79,4 +79,15 @@ let Int = 3;
         Assert.ThrowsAny<ArgumentException>(() => config.AddBuiltIn("double", new Func<int>(() => 1)));
         Assert.ThrowsAny<ArgumentException>(() => config.AddType<Version>("string"));
     }
+
+    [Fact]
+    public void Configuration_TypeWhoseOwnNameIsReserved_IsRejected()
+    {
+        // with no name given, AddType uses the type's own name, which is checked too
+        var config = new FishboneConfiguration();
+
+        Assert.ThrowsAny<ArgumentException>(() => config.AddType<@string>());
+    }
+
+    private sealed class @string { }
 }

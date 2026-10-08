@@ -49,6 +49,12 @@ public class FishboneConfiguration
     // setup methods
     // --------------------------------------------------------------------------------
 
+    /// <summary>
+    /// Describes every name this configuration puts into scripts, and the members scripts can reach
+    /// on them. For tools like completion and the static analyzer.
+    /// </summary>
+    public FishboneDescription Describe() => throw new NotImplementedException();
+
     /// <summary>Binds an ambient built-in (function, value, or registered type) under a name.</summary>
     public FishboneConfiguration AddBuiltIn(string name, object value)
     {
