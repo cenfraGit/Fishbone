@@ -36,14 +36,8 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
 
     private static int _newFileCounter = 1;
 
-    private readonly SemaphoreSlim _executionGate = new(1, 1);
-    private readonly SemaphoreSlim _breakpointSyncGate = new(1, 1);
-    private readonly IFishboneDebugClientSessionFactory _debugSessionFactory;
-    private CancellationTokenSource? _scriptCTS;
-    private IFishboneDebugClientSession? _debugSession;
+    private readonly ScriptSession _session;
     private ScriptEditorVM? _debugEditor;
-    private int _breakpointRevision;
-    private int _executionVersion;
 
     [ObservableProperty] private FishboneDebugSessionState _debugState = FishboneDebugSessionState.Completed;
 
@@ -134,7 +128,16 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         this._dialogService = dialogService;
         this.ErrorService = errorService;
         this._outputPanel = outputPanel;
-        _debugSessionFactory = debugSessionFactory ?? new FishboneDebugClientSessionFactory(new FishboneDapHostLocator());
+        _session = new ScriptSession(debugSessionFactory ?? new FishboneDebugClientSessionFactory(new FishboneDapHostLocator()));
+        _session.Started += () => OnUi(() =>
+        {
+            ErrorService.ClearErrors();
+            _outputPanel.Clear();
+        });
+        _session.Output += text => OnUi(() => _outputPanel.AppendBatch(text));
+        _session.StateChanged += state => OnUi(() => DebugState = state);
+        _session.Paused += (snapshot, session, isProgramExit) => OnUi(() => OnDebugPaused(snapshot, session, isProgramExit));
+        _session.Continued += () => OnUi(() => WeakReferenceMessenger.Default.Send(new MessageDebugContinued()));
 
         Factory = new DockFactory(outputPanel, errorPanel);
         Layout = Factory?.CreateLayout();
@@ -158,105 +161,48 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
     public async void Receive(MessageExecute m)
     {
         // whenever we receive the requested script code, execute it
-
-        int executionVersion = Interlocked.Increment(ref _executionVersion);
-        _scriptCTS?.Cancel();
-        await _executionGate.WaitAsync();
-
         try
         {
-            if (executionVersion != Volatile.Read(ref _executionVersion))
+            if (m.Mode == ScriptLaunchMode.Debug)
+            {
+                MessageExecute executionMessage = await PrepareDebugExecutionAsync(m);
+                if (executionMessage.Script.Path is not null)
+                    await DebugScriptAsync(executionMessage);
                 return;
-
-            using var currentCTS = new CancellationTokenSource();
-            _scriptCTS = currentCTS;
-            CancellationToken localToken = currentCTS.Token;
-
-            this.ErrorService.ClearErrors();
-            _outputPanel.Clear();
-
-            string currentDirectory = Directory.GetCurrentDirectory();
-
-            try
-            {
-                MessageExecute executionMessage = m;
-                if (m.Mode == ScriptLaunchMode.Debug)
-                {
-                    executionMessage = await PrepareDebugExecutionAsync(m);
-                    if (executionMessage.Script.Path is null)
-                        return;
-                }
-
-                if (executionMessage.Script.Directory is not null && Directory.Exists(executionMessage.Script.Directory))
-                    Directory.SetCurrentDirectory(executionMessage.Script.Directory);
-
-                var result = executionMessage.Mode == ScriptLaunchMode.Debug
-                    ? await ExecuteDebugSessionAsync(executionMessage, executionVersion, localToken)
-                    : await ExecuteScriptAsync(executionMessage, executionVersion, localToken);
-                if (result.Error is not null)
-                {
-                    await ReportScriptErrorAsync(result.Error);
-                    return;
-                }
-
-                if (executionMessage.Mode == ScriptLaunchMode.Run &&
-                    executionVersion == Volatile.Read(ref _executionVersion) && !localToken.IsCancellationRequested)
-                    WeakReferenceMessenger.Default.Send(new MessageExecutionFinished(executionMessage.Script.Name, result.Environment!));
             }
-            catch (OperationCanceledException)
-            {
-                if (executionVersion == Volatile.Read(ref _executionVersion))
-                    _outputPanel.AppendLine("[FishboneProgram] Execution cancelled.");
-            }
-            catch (Exception ex)
-            {
-                if (executionVersion == Volatile.Read(ref _executionVersion))
-                    await ReportScriptErrorAsync(ex);
-            }
-            finally
-            {
-                Directory.SetCurrentDirectory(currentDirectory);
-                if (ReferenceEquals(_scriptCTS, currentCTS))
-                    _scriptCTS = null;
-            }
+
+            ScriptRunOutcome? outcome = await _session.RunAsync(m.Script.Code, m.Script.Directory, token =>
+                OnUiAsync(() => _dialogService.ShowScriptInputAsync(token)));
+            if (outcome is null)
+                return;
+            ReportErrors(outcome.Errors);
+            if (outcome.Errors.Count == 0 && outcome.Environment is not null)
+                WeakReferenceMessenger.Default.Send(new MessageExecutionFinished(m.Script.Name, outcome.Environment));
         }
-        finally
+        catch (Exception ex)
         {
-            _executionGate.Release();
+            ReportErrors(ScriptExecutionError.From(ex));
         }
     }
 
-    private async Task ReportScriptErrorAsync(Exception exception)
+    private void ReportErrors(IReadOnlyList<ScriptExecutionError> errors)
     {
-        if (exception is FishboneParseException parseException)
-        {
-            foreach (var error in parseException.Errors)
-                await AddErrorAsync(error.Message, error.Line > 0 ? error.Line : null, error.Column > 0 ? error.Column : null);
-            return;
-        }
-
-        int? line = null;
-        int? column = null;
-        if (exception is FishboneRuntimeException runtimeException)
-        {
-            line = runtimeException.Line > 0 ? runtimeException.Line : null;
-            column = runtimeException.Column > 0 ? runtimeException.Column : null;
-        }
-        await AddErrorAsync(exception.Message, line, column);
-
-        async Task AddErrorAsync(string message, int? line, int? column)
-        {
-            if (Avalonia.Application.Current is null || Dispatcher.UIThread.CheckAccess())
-            {
-                ErrorService.AddError(new ScriptExecutionError(message, line, column));
-                return;
-            }
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                ErrorService.AddError(new ScriptExecutionError(message, line, column));
-            });
-        }
+        foreach (var error in errors)
+            OnUi(() => ErrorService.AddError(error));
     }
+
+    // session events can come from any thread. posting them keeps them in order. without an
+    // app (in tests) they run inline: touching the dispatcher would start a loop that never ends
+    private static void OnUi(Action action)
+    {
+        if (Avalonia.Application.Current is null)
+            action();
+        else
+            Dispatcher.UIThread.Post(action);
+    }
+
+    private static Task<T> OnUiAsync<T>(Func<Task<T>> action) =>
+        Avalonia.Application.Current is null ? action() : Dispatcher.UIThread.InvokeAsync(action);
 
     public async void Receive(MessageVariableDetailsRequested m)
     {
@@ -301,104 +247,22 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         //}
     }
 
-    private async Task<ScriptExecutionResult> ExecuteScriptAsync(
-        MessageExecute m,
-        int executionVersion,
-        CancellationToken cancellationToken)
+    private async Task DebugScriptAsync(MessageExecute message)
     {
-        string scriptCode = m.Script.Code;
-        var outputBuffer = new ScriptOutputBuffer();
-        var configuration = SpineConfiguration.Create(
-            outputBuffer.Append,
-            outputBuffer.AppendLine,
-            () => ReadScriptInput(outputBuffer, executionVersion, cancellationToken));
-
-        Task<ScriptExecutionResult> executionTask = Task.Run(
-            () =>
-            {
-                try
-                {
-                    return new ScriptExecutionResult(
-                        FishboneProgram.Run(scriptCode, configuration, cancellationToken:cancellationToken),
-                        null);
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    return new ScriptExecutionResult(null, ex);
-                }
-            },
-            cancellationToken);
-
-        try
-        {
-            while (!executionTask.IsCompleted)
-            {
-                await Task.WhenAny(executionTask, Task.Delay(50));
-                FlushOutput(outputBuffer, executionVersion, cancellationToken);
-            }
-
-            return await executionTask;
-        }
-        finally
-        {
-            FlushOutput(outputBuffer, executionVersion, cancellationToken);
-        }
-    }
-
-    private async Task<ScriptExecutionResult> ExecuteDebugSessionAsync(
-        MessageExecute message,
-        int executionVersion,
-        CancellationToken cancellationToken)
-    {
-        string scriptPath = message.Script.Path!;
-        var completion = new TaskCompletionSource<ScriptExecutionResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-        IFishboneDebugClientSession session = _debugSessionFactory.CreateLaunched(scriptPath);
-        _debugSession = session;
         _debugEditor = FindEditor(message.Script.SourceId);
         if (_debugEditor is not null)
             _debugEditor.BreakpointsChanged += OnDebugBreakpointsChanged;
-        session.EventReceived += OnDebugEventReceived;
         WeakReferenceMessenger.Default.Send(new MessageDebugEditingChanged(message.Script.SourceId, true));
-
-        void Complete(ScriptExecutionResult result) => completion.TrySetResult(result);
-        void HandleCompletion(object? sender, FishboneDebugEvent debugEvent)
-        {
-            switch (debugEvent)
-            {
-                case FishboneDebugTerminated terminated:
-                    Complete(terminated.ExitCode is null or 0
-                        ? new ScriptExecutionResult(null, null)
-                        : new ScriptExecutionResult(null, new InvalidOperationException($"fishbone-dap exited with code {terminated.ExitCode}.")));
-                    break;
-                case FishboneDebugFailed failed:
-                    Complete(new ScriptExecutionResult(null, failed.Exception));
-                    break;
-            }
-        }
-
-        session.EventReceived += HandleCompletion;
-        using CancellationTokenRegistration registration = cancellationToken.Register(() => completion.TrySetCanceled(cancellationToken));
         try
         {
-            await session.ConnectAsync(stopOnEntry: false, cancellationToken);
-            IReadOnlyList<FishboneBreakpointResult> breakpointResults =
-                await session.ConfigureAsync(message.BreakpointLines, cancellationToken);
-            _debugEditor?.ApplyBreakpointResults(breakpointResults);
-            return await completion.Task;
+            ScriptRunOutcome? outcome = await _session.DebugAsync(message.Script.Path!, message.BreakpointLines, ApplyBreakpointResults);
+            if (outcome is not null)
+                ReportErrors(outcome.Errors);
         }
         finally
         {
-            session.EventReceived -= HandleCompletion;
-            session.EventReceived -= OnDebugEventReceived;
             if (_debugEditor is not null)
                 _debugEditor.BreakpointsChanged -= OnDebugBreakpointsChanged;
-            await session.DisposeAsync();
-            if (ReferenceEquals(_debugSession, session))
-                _debugSession = null;
             _debugEditor = null;
             DebugState = FishboneDebugSessionState.Completed;
             WeakReferenceMessenger.Default.Send(new MessageDebugEditingChanged(message.Script.SourceId, false));
@@ -406,57 +270,10 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         }
     }
 
-    private async Task ExecuteRemoteAttachAsync(string host, int port, CancellationToken cancellationToken)
+    private void ApplyBreakpointResults(IReadOnlyList<FishboneBreakpointResult> results)
     {
-        var completion = new TaskCompletionSource<Exception?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        IFishboneDebugClientSession session = _debugSessionFactory.CreateAttached(host, port);
-        _debugSession = session;
-        session.EventReceived += OnDebugEventReceived;
-
-        void HandleCompletion(object? sender, FishboneDebugEvent debugEvent)
-        {
-            if (debugEvent is FishboneDebugTerminated)
-                completion.TrySetResult(null);
-            else if (debugEvent is FishboneDebugFailed failed)
-                completion.TrySetResult(failed.Exception);
-        }
-
-        session.EventReceived += HandleCompletion;
-        using CancellationTokenRegistration registration = cancellationToken.Register(() => completion.TrySetCanceled(cancellationToken));
-        string? sourceId = null;
-        try
-        {
-            FishboneDebugSource source = await session.ConnectAsync(stopOnEntry: true, cancellationToken);
-            _debugEditor = OpenRemoteSource(source, host, port);
-            sourceId = _debugEditor.SourceId;
-            _debugEditor.BreakpointsChanged += OnDebugBreakpointsChanged;
-            WeakReferenceMessenger.Default.Send(new MessageDebugEditingChanged(sourceId, true));
-
-            IReadOnlyList<FishboneBreakpointResult> results =
-                await session.ConfigureAsync(_debugEditor.BreakpointLines, cancellationToken);
-            _debugEditor.ApplyBreakpointResults(results);
-
-            Exception? error = await completion.Task;
-            if (error is not null)
-                throw error;
-        }
-        finally
-        {
-            session.EventReceived -= HandleCompletion;
-            session.EventReceived -= OnDebugEventReceived;
-            if (_debugEditor is not null)
-                _debugEditor.BreakpointsChanged -= OnDebugBreakpointsChanged;
-            await session.DisposeAsync();
-            if (ReferenceEquals(_debugSession, session))
-                _debugSession = null;
-            if (sourceId is not null)
-            {
-                WeakReferenceMessenger.Default.Send(new MessageDebugEditingChanged(sourceId, false));
-                WeakReferenceMessenger.Default.Send(new MessageDebugLocationChanged(sourceId, null));
-            }
-            _debugEditor = null;
-            DebugState = FishboneDebugSessionState.Completed;
-        }
+        ScriptEditorVM? editor = _debugEditor;
+        OnUi(() => editor?.ApplyBreakpointResults(results));
     }
 
     private ScriptEditorVM OpenRemoteSource(FishboneDebugSource source, string host, int port)
@@ -484,63 +301,35 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         return editor;
     }
 
-    private void OnDebugEventReceived(object? sender, FishboneDebugEvent debugEvent)
+    private void OnDebugPaused(FishbonePauseSnapshot snapshot, IFishboneDebugClientSession session, bool isProgramExit)
     {
-        Dispatcher.UIThread.Post(() =>
-        {
-            switch (debugEvent)
-            {
-                case FishboneDebugStateChanged state:
-                    DebugState = state.State;
-                    break;
-                case FishboneDebugOutput output:
-                    _outputPanel.AppendBatch(output.Text);
-                    break;
-                case FishboneDebugPaused paused when sender is IFishboneDebugClientSession session:
-                    FishboneDebugFrame? frame = paused.Snapshot.Frames.FirstOrDefault();
-                    bool isProgramExit = string.Equals(
-                        paused.Snapshot.Reason, FishbonePauseSnapshot.ProgramExitReason, StringComparison.OrdinalIgnoreCase);
+        FishboneDebugFrame? frame = snapshot.Frames.FirstOrDefault();
 
-                    // always surface the final variables. At the end-of-program pause, don't steal
-                    // focus or highlight a current line. The session stays paused there until the user
-                    // continues or stops, so collections in the variable panel can still be expanded:
-                    // their children are fetched from the debug host, which goes away once it finishes.
-                    if (_debugEditor is not null && !isProgramExit)
-                        ActivateEditor(_debugEditor.SourceId);
-                    WeakReferenceMessenger.Default.Send(new MessageDebugPaused(paused.Snapshot, session));
-                    WeakReferenceMessenger.Default.Send(new MessageDebugLocationChanged(
-                        _debugEditor?.SourceId ?? string.Empty, isProgramExit ? null : frame?.Line));
-                    break;
-                case FishboneDebugContinued:
-                    WeakReferenceMessenger.Default.Send(new MessageDebugContinued());
-                    break;
-            }
-        });
+        // always surface the final variables. At the end-of-program pause, don't steal
+        // focus or highlight a current line. The session stays paused there until the user
+        // continues or stops, so collections in the variable panel can still be expanded:
+        // their children are fetched from the debug host, which goes away once it finishes.
+        if (_debugEditor is not null && !isProgramExit)
+            ActivateEditor(_debugEditor.SourceId);
+        WeakReferenceMessenger.Default.Send(new MessageDebugPaused(snapshot, session));
+        WeakReferenceMessenger.Default.Send(new MessageDebugLocationChanged(
+            _debugEditor?.SourceId ?? string.Empty, isProgramExit ? null : frame?.Line));
     }
 
     private async void OnDebugBreakpointsChanged(object? sender, EventArgs e)
     {
-        IFishboneDebugClientSession? session = _debugSession;
         ScriptEditorVM? editor = _debugEditor;
-        int requestedRevision = Interlocked.Increment(ref _breakpointRevision);
-        if (session is null || editor is null || session.State is FishboneDebugSessionState.Completed or FishboneDebugSessionState.Faulted)
+        if (editor is null)
             return;
-        await _breakpointSyncGate.WaitAsync();
         try
         {
-            if (requestedRevision != Volatile.Read(ref _breakpointRevision))
-                return;
-            IReadOnlyList<FishboneBreakpointResult> results = await session.SetBreakpointsAsync(editor.BreakpointLines);
-            if (requestedRevision == Volatile.Read(ref _breakpointRevision))
-                await Dispatcher.UIThread.InvokeAsync(() => editor.ApplyBreakpointResults(results));
+            IReadOnlyList<FishboneBreakpointResult>? results = await _session.UpdateBreakpointsAsync(editor.BreakpointLines);
+            if (results is not null)
+                OnUi(() => editor.ApplyBreakpointResults(results));
         }
         catch (Exception exception)
         {
-            await ReportScriptErrorAsync(exception);
-        }
-        finally
-        {
-            _breakpointSyncGate.Release();
+            ReportErrors(ScriptExecutionError.From(exception));
         }
     }
 
@@ -567,62 +356,6 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         StepOutCommand.NotifyCanExecuteChanged();
         StopCommand.NotifyCanExecuteChanged();
         AttachRemoteCommand.NotifyCanExecuteChanged();
-    }
-
-    private void FlushOutput(
-        ScriptOutputBuffer outputBuffer,
-        int executionVersion,
-        CancellationToken cancellationToken)
-    {
-        string output = outputBuffer.DrainPending();
-        if (output.Length == 0)
-            return;
-
-        if (executionVersion == Volatile.Read(ref _executionVersion) && !cancellationToken.IsCancellationRequested)
-            _outputPanel.AppendBatch(output);
-    }
-
-    private string ReadScriptInput(
-        ScriptOutputBuffer outputBuffer,
-        int executionVersion,
-        CancellationToken cancellationToken)
-    {
-        using var request = new ScriptInputRequest(cancellationToken);
-
-        Dispatcher.UIThread.Post(async () =>
-        {
-            try
-            {
-                if (executionVersion != Volatile.Read(ref _executionVersion) || cancellationToken.IsCancellationRequested)
-                {
-                    request.Cancel();
-                    return;
-                }
-
-                FlushOutput(outputBuffer, executionVersion, cancellationToken);
-                string value = await _dialogService.ShowScriptInputAsync(cancellationToken);
-
-                if (executionVersion != Volatile.Read(ref _executionVersion) || cancellationToken.IsCancellationRequested)
-                {
-                    request.Cancel();
-                    return;
-                }
-
-                outputBuffer.AppendLine(value);
-                FlushOutput(outputBuffer, executionVersion, cancellationToken);
-                request.Submit(value);
-            }
-            catch (OperationCanceledException)
-            {
-                request.Cancel();
-            }
-            catch (Exception ex)
-            {
-                request.Fail(ex);
-            }
-        });
-
-        return request.Wait();
     }
 
     // --------------------------------------------------------------------------------
@@ -663,59 +396,52 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
         IsVariableExplorerVisible = true;
         IsErrorsVisible = true;
 
-        Interlocked.Increment(ref _executionVersion);
-        _scriptCTS?.Cancel();
-        await _executionGate.WaitAsync();
+        string? sourceId = null;
         try
         {
-            using var currentCTS = new CancellationTokenSource();
-            _scriptCTS = currentCTS;
-            ErrorService.ClearErrors();
-            _outputPanel.Clear();
-            try
-            {
-                await ExecuteRemoteAttachAsync(host, port, currentCTS.Token);
-            }
-            catch (OperationCanceledException) { }
-            catch (Exception exception)
-            {
-                await ReportScriptErrorAsync(exception);
-            }
-            finally
-            {
-                if (ReferenceEquals(_scriptCTS, currentCTS))
-                    _scriptCTS = null;
-            }
+            ScriptRunOutcome? outcome = await _session.AttachAsync(host, port, source =>
+                OnUiAsync(() =>
+                {
+                    _debugEditor = OpenRemoteSource(source, host, port);
+                    sourceId = _debugEditor.SourceId;
+                    _debugEditor.BreakpointsChanged += OnDebugBreakpointsChanged;
+                    WeakReferenceMessenger.Default.Send(new MessageDebugEditingChanged(sourceId, true));
+                    return Task.FromResult(_debugEditor.BreakpointLines);
+                }), ApplyBreakpointResults);
+            if (outcome is not null)
+                ReportErrors(outcome.Errors);
         }
         finally
         {
-            _executionGate.Release();
+            if (_debugEditor is not null)
+                _debugEditor.BreakpointsChanged -= OnDebugBreakpointsChanged;
+            if (sourceId is not null)
+            {
+                WeakReferenceMessenger.Default.Send(new MessageDebugEditingChanged(sourceId, false));
+                WeakReferenceMessenger.Default.Send(new MessageDebugLocationChanged(sourceId, null));
+            }
+            _debugEditor = null;
+            DebugState = FishboneDebugSessionState.Completed;
         }
     }
 
     [RelayCommand(CanExecute = nameof(CanResume))]
-    private async Task Continue() { if (_debugSession is not null) await _debugSession.ContinueAsync(); }
+    private Task Continue() => _session.ContinueAsync();
 
     [RelayCommand(CanExecute = nameof(CanPause))]
-    private async Task Pause() { if (_debugSession is not null) await _debugSession.PauseAsync(); }
+    private Task Pause() => _session.PauseAsync();
 
     [RelayCommand(CanExecute = nameof(CanResume))]
-    private async Task StepInto() { if (_debugSession is not null) await _debugSession.StepIntoAsync(); }
+    private Task StepInto() => _session.StepIntoAsync();
 
     [RelayCommand(CanExecute = nameof(CanResume))]
-    private async Task StepOver() { if (_debugSession is not null) await _debugSession.StepOverAsync(); }
+    private Task StepOver() => _session.StepOverAsync();
 
     [RelayCommand(CanExecute = nameof(CanResume))]
-    private async Task StepOut() { if (_debugSession is not null) await _debugSession.StepOutAsync(); }
+    private Task StepOut() => _session.StepOutAsync();
 
     [RelayCommand(CanExecute = nameof(CanStop))]
-    private async Task Stop()
-    {
-        if (_debugSession is not null)
-            await _debugSession.StopAsync();
-        if (_debugSession?.Ownership != FishboneDebugSessionOwnership.Attached)
-            _scriptCTS?.Cancel();
-    }
+    private Task Stop() => _session.StopAsync();
 
     [RelayCommand]
     private async Task OnNewFile()
@@ -910,7 +636,6 @@ public partial class MainWindowVM : ObservableObject, IRecipient<MessageExecute>
     }
 }
 
-internal record ScriptExecutionResult(FishboneEnvironment? Environment, Exception? Error);
 
 public class MenuItemViewModel
 {
