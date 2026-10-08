@@ -1,4 +1,5 @@
 using Fishbone.Debugging;
+using Fishbone.Parser;
 using MediatR;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Events;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Models;
@@ -24,6 +25,7 @@ public sealed class FishboneDebugAdapterSession :
     private readonly string _sourceCode;
     private readonly Source _source;
     private readonly int _lineCount;
+    private readonly SortedSet<int>? _statementLines;
     private readonly Func<CancellationToken, Task> _execute;
     private readonly CancellationTokenSource _executionCancellation = new();
     private readonly DebugSnapshotHandles _handles = new();
@@ -64,6 +66,7 @@ public sealed class FishboneDebugAdapterSession :
             Origin = "Fishbone debug host"
         };
         _lineCount = lineCount;
+        _statementLines = FindStatementLines(sourceCode);
         _execute = execute;
         _coordinator.Paused += OnPaused;
         _coordinator.Resumed += OnResumed;
@@ -113,18 +116,46 @@ public sealed class FishboneDebugAdapterSession :
         var accepted = new List<int>();
         var breakpoints = requested.Select(item =>
         {
-            bool verified = sourceMatches && item.Line >= 1 && item.Line <= _lineCount;
-            if (verified) accepted.Add(checked((int)item.Line));
+            bool inScript = sourceMatches && item.Line >= 1 && item.Line <= _lineCount;
+            int? bound = inScript ? BindLine(checked((int)item.Line)) : null;
+            if (bound is not null) accepted.Add(bound.Value);
             return new Breakpoint
             {
-                Verified = verified,
-                Line = item.Line,
+                Verified = bound is not null,
+                Line = bound ?? item.Line,
                 Source = _source,
-                Message = verified ? null : "Breakpoint source or line is outside the active Fishbone script."
+                Message = bound is not null ? null
+                    : inScript ? "No statement starts on or after this line."
+                    : "Breakpoint source or line is outside the active Fishbone script."
             };
         }).ToArray();
         _coordinator.ReplaceBreakpoints(accepted);
         return Task.FromResult(new SetBreakpointsResponse { Breakpoints = new Container<Breakpoint>(breakpoints) });
+    }
+
+    // like visual studio, a line with no statement (a brace, a comment, a blank line) binds to
+    // the next line that starts one. without source to parse, a line binds as is
+    private int? BindLine(int line)
+    {
+        if (_statementLines is null)
+            return line;
+        var next = _statementLines.GetViewBetween(line, int.MaxValue);
+        return next.Count > 0 ? next.Min : null;
+    }
+
+    private static SortedSet<int>? FindStatementLines(string sourceCode)
+    {
+        if (string.IsNullOrEmpty(sourceCode))
+            return null;
+        try
+        {
+            return StatementLines.Find(ASTParser.Parse(sourceCode));
+        }
+        catch (FishboneParseException)
+        {
+            // the run reports the parse error itself
+            return null;
+        }
     }
 
     public Task<ContinueResponse> Handle(ContinueArguments request, CancellationToken cancellationToken)

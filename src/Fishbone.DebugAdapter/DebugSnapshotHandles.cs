@@ -119,8 +119,8 @@ public sealed class DebugSnapshotHandles
         return new Variable
         {
             Name = variable.Name,
-            Value = FormatValue(variable.Value),
-            Type = variable.Value?.GetType().Name ?? "null",
+            Value = DebugValueFormatter.FormatValue(variable.Value),
+            Type = DebugValueFormatter.FormatType(variable.Value),
             VariablesReference = reference,
             IndexedVariables = variable.Value is IList list ? list.Count : null,
             NamedVariables = variable.Value is IDictionary dictionary ? dictionary.Count : null
@@ -136,21 +136,11 @@ public sealed class DebugSnapshotHandles
         return handle;
     }
 
-    private static string FormatValue(object? value) => value switch
-    {
-        null => "null",
-        string text => $"\"{text}\"",
-        bool boolean => boolean ? "true" : "false",
-        IList list => $"list ({list.Count})",
-        IDictionary dictionary => $"dictionary ({dictionary.Count})",
-        _ => value.ToString() ?? string.Empty
-    };
-
     private static IEnumerable<DebugVariableSnapshot> EnumerateDictionary(IDictionary dictionary)
     {
         IDictionaryEnumerator enumerator = dictionary.GetEnumerator();
         while (enumerator.MoveNext())
-            yield return new DebugVariableSnapshot($"[{FormatValue(enumerator.Key)}]", enumerator.Value);
+            yield return new DebugVariableSnapshot($"[{DebugValueFormatter.FormatDictionaryKey(enumerator.Key)}]", enumerator.Value);
     }
 
     private void ClearLocked()

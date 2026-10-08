@@ -23,6 +23,7 @@
   <ItemGroup>
     <!-- already ships inside Fishbone, so don't bundle again -->
     <ProjectReference Include="..\Fishbone.Debugging\Fishbone.Debugging.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\Fishbone.Parser\Fishbone.Parser.csproj" PrivateAssets="all" />
     <ProjectReference Include="..\Fishbone\Fishbone.csproj" />
   </ItemGroup>
 </Project>
