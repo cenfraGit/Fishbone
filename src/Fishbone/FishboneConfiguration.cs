@@ -53,7 +53,7 @@ public class FishboneConfiguration
     /// Describes every name this configuration puts into scripts, and the members scripts can reach
     /// on them. For tools like completion and the static analyzer.
     /// </summary>
-    public FishboneDescription Describe() => throw new NotImplementedException();
+    public FishboneDescription Describe() => new(this);
 
     /// <summary>Binds an ambient built-in (function, value, or registered type) under a name.</summary>
     public FishboneConfiguration AddBuiltIn(string name, object value)
@@ -107,8 +107,9 @@ public class FishboneConfiguration
     /// </summary>
     public FishboneConfiguration AddType(Type type, string? name = null)
     {
+        name ??= type.Name;
         ReservedTypes.ThrowIfReserved(name);
-        BuiltIns[name ?? type.Name] = new RegisteredType(type);
+        BuiltIns[name] = new RegisteredType(type);
         return this;
     }
 

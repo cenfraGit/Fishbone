@@ -5,6 +5,11 @@
     <ProjectReference Include="..\Fishbone.Debugging\Fishbone.Debugging.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- FishboneConfiguration.Describe lists members with the same rules as ResolveMember -->
+    <InternalsVisibleTo Include="Fishbone" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <LangVersion>latest</LangVersion>
