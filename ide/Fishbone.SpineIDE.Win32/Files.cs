@@ -22,6 +22,7 @@ internal static partial class Program
 
     private static void LoadDocument(string text, string? path)
     {
+        _analysis = null;
         Sci(SCI_SETTEXT, 0, Utf8(text));
         Sci(SCI_EMPTYUNDOBUFFER);
         Sci(SCI_SETSAVEPOINT);

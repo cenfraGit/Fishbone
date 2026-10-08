@@ -80,9 +80,17 @@ public sealed class FishboneDescription
                 .Where(entry => !configuration.Values.ContainsKey(entry.Key))
                 .Select(entry => DescribeBuiltIn(entry.Key, entry.Value)))
             .ToArray();
+        ConvertedTypes = configuration.TypeConverters
+            .Where(entry => entry.Value.FromNet is not null)
+            .Select(entry => entry.Key)
+            .ToArray();
     }
 
     public IReadOnlyList<FishboneSymbol> Symbols { get; }
+
+    // types a registered converter changes on their way back from a call, so a call's
+    // declared return type isn't what the script gets
+    internal IReadOnlyList<Type> ConvertedTypes { get; }
 
     /// <summary>
     /// The members a script reaches with <c>.</c>: the static members of a registered type, or the

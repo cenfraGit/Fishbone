@@ -24,7 +24,7 @@ internal static partial class Program
         WS_VSCROLL = 0x00200000, WS_HSCROLL = 0x00100000, WS_BORDER = 0x00800000, SS_CENTERIMAGE = 0x200, SBARS_SIZEGRIP = 0x100;
     private const uint ES_MULTILINE = 0x4, ES_AUTOVSCROLL = 0x40, ES_AUTOHSCROLL = 0x80, ES_READONLY = 0x800;
     private const uint WM_DESTROY = 0x2, WM_SIZE = 0x5, WM_CLOSE = 0x10, WM_SETFONT = 0x30, WM_NOTIFY = 0x4E,
-        WM_KEYDOWN = 0x100, WM_SYSKEYDOWN = 0x104, WM_COMMAND = 0x111, WM_CTLCOLORSTATIC = 0x138, WM_DPICHANGED = 0x2E0, WM_APP_INVOKE = 0x8001;
+        WM_KEYDOWN = 0x100, WM_SYSKEYDOWN = 0x104, WM_COMMAND = 0x111, WM_TIMER = 0x113, WM_CTLCOLORSTATIC = 0x138, WM_DPICHANGED = 0x2E0, WM_APP_INVOKE = 0x8001;
     private const uint EM_SETSEL = 0xB1, EM_REPLACESEL = 0xC2, EM_SETLIMITTEXT = 0xC5, EM_SETCUEBANNER = 0x1501;
     private const int VK_RETURN = 0x0D, VK_SPACE = 0x20, VK_F5 = 0x74, VK_F9 = 0x78, VK_F10 = 0x79, VK_F11 = 0x7A,
         VK_SHIFT = 0x10, VK_CONTROL = 0x11, VK_N = 0x4E, VK_O = 0x4F, VK_S = 0x53;
@@ -207,6 +207,9 @@ internal static partial class Program
                 return 0;
             case WM_COMMAND:
                 RunCommand((int)(wParam & 0xFFFF));
+                return 0;
+            case WM_TIMER when wParam == AnalysisTimer:
+                AnalyzeScript();
                 return 0;
             // a read-only edit paints gray by default. the output reads better on white, like the editor
             case WM_CTLCOLORSTATIC when lParam == _output:

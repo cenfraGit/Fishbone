@@ -6,6 +6,8 @@
 // build the AST (normally starting with ProgramContext)
 // --------------------------------------------------------------------------------
 
+using Antlr4.Runtime;
+using Antlr4.Runtime.Tree;
 using Fishbone;
 using Fishbone.Ast;
 using System.Collections.Immutable;
@@ -16,6 +18,16 @@ namespace Fishbone.Parser;
 
 internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
 {
+    // records where each node ends, so tools can tell whether a position is inside it. a node
+    // that already has an end keeps it, so `(a)` and `a;` end where `a` does
+    public override AstNode Visit(IParseTree tree)
+    {
+        var node = base.Visit(tree);
+        if (node is null || node.EndLine != 0 || tree is not ParserRuleContext { Stop: { } stop })
+            return node!;
+        return node with { EndLine = stop.Line, EndColumn = stop.Column + 1 + (stop.Text?.Length ?? 0) };
+    }
+
     public override AstNode VisitProgram(FishboneParser.ProgramContext context)
     {
         var statements = new List<AstNode>();

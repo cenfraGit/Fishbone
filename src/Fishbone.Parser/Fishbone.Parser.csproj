@@ -24,6 +24,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Fishbone" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Fishbone.Core\Fishbone.Core.csproj" />
   </ItemGroup>
 

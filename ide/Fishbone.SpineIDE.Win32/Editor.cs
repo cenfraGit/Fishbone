@@ -25,8 +25,13 @@ internal static partial class Program
         SCI_MARKERDEFINE = 2040, SCI_MARKERSETFORE = 2041, SCI_MARKERSETBACK = 2042, SCI_MARKERADD = 2043,
         SCI_MARKERDELETE = 2044, SCI_MARKERDELETEALL = 2045, SCI_MARKERGET = 2046, SCI_MARKERNEXT = 2047,
         SCI_SETFOLDLEVEL = 2222, SCI_SETAUTOMATICFOLD = 2663, SCI_ENSUREVISIBLEENFORCEPOLICY = 2234,
-        SCI_AUTOCSHOW = 2100, SCI_AUTOCSETIGNORECASE = 2115, SCI_AUTOCSETORDER = 2660;
-    private const int SCN_STYLENEEDED = 2000, SCN_CHARADDED = 2001, SCN_MARGINCLICK = 2010, STYLE_DEFAULT = 32;
+        SCI_AUTOCSHOW = 2100, SCI_AUTOCSETIGNORECASE = 2115, SCI_AUTOCSETORDER = 2660, SCI_GETCHARAT = 2007,
+        SCI_POSITIONFROMLINE = 2167, SCI_INDICSETSTYLE = 2080, SCI_INDICSETFORE = 2082, SCI_SETINDICATORCURRENT = 2500,
+        SCI_INDICATORFILLRANGE = 2504, SCI_INDICATORCLEARRANGE = 2505, SCI_SETMOUSEDWELLTIME = 2264,
+        SCI_CALLTIPSHOW = 2200, SCI_CALLTIPCANCEL = 2201, SCI_GETSTYLEAT = 2010;
+    private const int SCN_STYLENEEDED = 2000, SCN_CHARADDED = 2001, SCN_MODIFIED = 2008, SCN_MARGINCLICK = 2010,
+        SCN_DWELLSTART = 2016, SCN_DWELLEND = 2017, STYLE_DEFAULT = 32;
+    private const int IndicatorDiagnostic = 8, AnalysisTimer = 1;
     private const int SC_FOLDLEVELBASE = 0x400, SC_FOLDLEVELHEADERFLAG = 0x2000;
     private const byte StyleText = 0, StyleComment = 1, StyleKeyword = 2, StyleString = 3, StyleNumber = 4;
     private const int MarkerBreakpoint = 0, MarkerCurrentArrow = 1, MarkerCurrentLine = 2;
@@ -90,6 +95,11 @@ internal static partial class Program
 
         Sci(SCI_AUTOCSETIGNORECASE, 1);
         Sci(SCI_AUTOCSETORDER, 1); // scintilla sorts the list for us
+
+        // diagnostics are red squiggles, and hovering one shows its message
+        Sci(SCI_INDICSETSTYLE, IndicatorDiagnostic, 13); // INDIC_SQUIGGLEPIXMAP
+        Sci(SCI_INDICSETFORE, IndicatorDiagnostic, 0x0000E0);
+        Sci(SCI_SETMOUSEDWELLTIME, 500);
     }
 
     private static void SetMarginWidths()
@@ -118,8 +128,19 @@ internal static partial class Program
             case SCN_CHARADDED when notification.ch == '}':
                 DedentClosingBrace();
                 break;
-            case SCN_CHARADDED when char.IsLetter((char)notification.ch) || notification.ch == '_':
+            case SCN_CHARADDED when char.IsLetter((char)notification.ch) || notification.ch is '_' or '.':
                 ShowCompletion(forced: false);
+                break;
+            // analyze once typing pauses. a new timer replaces the pending one
+            case SCN_MODIFIED when (notification.modificationType & 0x3) != 0: // SC_MOD_INSERTTEXT | SC_MOD_DELETETEXT
+                SetTimer(_window, AnalysisTimer, 400, IntPtr.Zero);
+                break;
+            case SCN_DWELLSTART when _diagnosticRanges.FirstOrDefault(range =>
+                    range.Start <= (int)notification.position && (int)notification.position < range.End) is { Message: not null } hovered:
+                Sci(SCI_CALLTIPSHOW, notification.position, Utf8(hovered.Message));
+                break;
+            case SCN_DWELLEND:
+                Sci(SCI_CALLTIPCANCEL);
                 break;
         }
     }
@@ -247,28 +268,125 @@ internal static partial class Program
         int caret = (int)Sci(SCI_GETCURRENTPOS);
         int wordStart = (int)Sci(SCI_WORDSTARTPOSITION, caret, 1);
         int typed = caret - wordStart;
+        bool afterDot = wordStart > 0 && Sci(SCI_GETCHARAT, wordStart - 1) == '.';
 
-        // open on the first letter of a word. after that scintilla narrows the list as you type
-        if (!forced && typed != 1)
+        // open on the first letter of a word, or right after a dot. after that scintilla
+        // narrows the list as you type
+        bool opens = afterDot ? typed <= 1 : typed == 1;
+        if (!forced && !opens)
+            return;
+        // a dot in a comment or a string isn't member access
+        if (afterDot && wordStart >= 2 && Sci(SCI_GETSTYLEAT, wordStart - 2) is StyleComment or StyleString)
             return;
 
         byte[] bytes = GetEditorBytes();
         string prefix = Encoding.UTF8.GetString(bytes, wordStart, typed);
+        // what comes before the caret, as text, so lines and columns count characters like the parser
+        string before = Encoding.UTF8.GetString(bytes, 0, wordStart);
+        int lineStart = before.LastIndexOf('\n') + 1;
+        int line = before.Count(c => c == '\n') + 1;
         FishboneCompletionCatalog catalog = FishboneCompletionCatalog.Shared;
+        _analysis ??= Analyze(catalog);
 
-        IEnumerable<FishboneCompletionItem> items = catalog.Keywords
-            .Concat(FishboneLocalSymbolScanner.Scan(Encoding.UTF8.GetString(bytes, 0, caret)));
-        items = items.Concat(prefix.Length > 0
-            ? catalog.GlobalsByInitial.GetValueOrDefault(char.ToLowerInvariant(prefix[0]), [])
-            : catalog.Globals);
+        IEnumerable<string> names;
+        if (afterDot)
+        {
+            // members of whatever is before the dot, when its type is known. never the globals
+            string expression = ExpressionBefore(before[..^1]);
+            if (expression.Length == 0 || char.IsDigit(expression[0]) || catalog.Description is not { } description
+                || _analysis?.TypeOf(expression, line, before.Length - expression.Length - lineStart) is not { } type)
+                return;
+            names = description.Members(type.Type, type.IsStatic).Select(member => member.Name);
+        }
+        else
+        {
+            names = catalog.Keywords
+                .Concat(prefix.Length > 0
+                    ? catalog.GlobalsByInitial.GetValueOrDefault(char.ToLowerInvariant(prefix[0]), [])
+                    : catalog.Globals)
+                .Select(item => item.Text);
+            if (_analysis is not null)
+                names = names.Concat(_analysis.VisibleAt(line, before.Length - lineStart + 1).Select(variable => variable.Name));
+        }
 
         // scintilla only moves the selection as you type, it never hides entries, so keep the list to the prefix
-        string list = string.Join(' ', items
-            .Select(item => item.Text)
+        string list = string.Join(' ', names
             .Where(name => name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && !name.Contains(' '))
             .Distinct());
         if (list.Length > 0)
             Sci(SCI_AUTOCSHOW, typed, Utf8(list));
+    }
+
+    // the expression before a dot: names, dots, and calls or indexes with balanced brackets,
+    // like a.b(1)[2]. anything goes inside the brackets
+    private static string ExpressionBefore(string text)
+    {
+        int start = text.Length, depth = 0;
+        while (start > 0)
+        {
+            char c = text[start - 1];
+            if (c is ')' or ']')
+                depth++;
+            else if (c is '(' or '[')
+            {
+                if (depth == 0)
+                    break;
+                depth--;
+            }
+            else if (depth == 0 && !char.IsLetterOrDigit(c) && c is not ('_' or '.'))
+                break;
+            start--;
+        }
+        return text[start..];
+    }
+
+    // --------------------------------------------------------------------------------
+    // analysis
+    // --------------------------------------------------------------------------------
+
+    // the last analysis that parsed. while the user types the script usually doesn't parse,
+    // so completion keeps using this one
+    private static FishboneAnalysis? _analysis;
+    private static List<(int Start, int End, string? Message)> _diagnosticRanges = [];
+
+    private static FishboneAnalysis? Analyze(FishboneCompletionCatalog catalog) =>
+        catalog.Description is { } description
+            ? FishboneAnalysis.Analyze(Encoding.UTF8.GetString(GetEditorBytes()), description)
+            : null;
+
+    // ponytail: parses the whole script on the ui thread, 400 ms after typing stops. move it
+    // to a background thread if big scripts make the editor stutter
+    private static void AnalyzeScript()
+    {
+        KillTimer(_window, AnalysisTimer);
+        Sci(SCI_SETINDICATORCURRENT, IndicatorDiagnostic);
+        Sci(SCI_INDICATORCLEARRANGE, 0, Sci(SCI_GETTEXTLENGTH));
+        _diagnosticRanges = [];
+        // a remote script runs with the host's configuration, which this one may not match
+        if (_remoteName is not null || Analyze(FishboneCompletionCatalog.Shared) is not { } analysis)
+            return;
+        if (analysis.Parsed || _analysis is null)
+            _analysis = analysis;
+
+        foreach (FishboneDiagnostic diagnostic in analysis.Diagnostics)
+        {
+            int start = PositionAt(diagnostic.Line, diagnostic.Column);
+            int end = Math.Max(start + 1, PositionAt(diagnostic.EndLine, diagnostic.EndColumn));
+            Sci(SCI_INDICATORFILLRANGE, start, end - start);
+            _diagnosticRanges.Add((start, end, diagnostic.Message));
+        }
+    }
+
+    // a 1-based line and character column as a scintilla byte position
+    private static int PositionAt(int line, int column)
+    {
+        // an error at the end of the script can be past the last line
+        int lineStart = (int)Sci(SCI_POSITIONFROMLINE, line - 1);
+        if (lineStart < 0)
+            return (int)Sci(SCI_GETTEXTLENGTH);
+        string text = GetLine(line - 1);
+        int characters = Math.Clamp(column - 1, 0, text.Length);
+        return lineStart + Encoding.UTF8.GetByteCount(text.AsSpan(0, characters));
     }
 
     private static void ToggleBreakpoint(int line)

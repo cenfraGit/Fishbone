@@ -28,8 +28,10 @@ public sealed class FishboneCompletionCatalog
         IReadOnlyList<FishboneCompletionItem> globals,
         IReadOnlyDictionary<char, IReadOnlyList<FishboneCompletionItem>> globalsByInitial,
         IReadOnlyList<FishboneCompletionItem> keywords,
-        IReadOnlyDictionary<string, IReadOnlyList<FishboneSignature>> signatures)
+        IReadOnlyDictionary<string, IReadOnlyList<FishboneSignature>> signatures,
+        FishboneDescription? description)
     {
+        Description = description;
         Globals = globals;
         GlobalsByInitial = globalsByInitial;
         Keywords = keywords;
@@ -46,6 +48,9 @@ public sealed class FishboneCompletionCatalog
     /// </summary>
     public IReadOnlyDictionary<char, IReadOnlyList<FishboneCompletionItem>> GlobalsByInitial { get; }
 
+    /// <summary>The configuration's description, for member completion and the analyzer. Null when it couldn't be built.</summary>
+    public FishboneDescription? Description { get; }
+
     /// <summary>Language keywords.</summary>
     public IReadOnlyList<FishboneCompletionItem> Keywords { get; }
 
@@ -60,10 +65,12 @@ public sealed class FishboneCompletionCatalog
 
         var globals = new List<FishboneCompletionItem>();
         var signatures = new Dictionary<string, IReadOnlyList<FishboneSignature>>(StringComparer.Ordinal);
+        FishboneDescription? description = null;
         try
         {
             var configuration = SpineConfiguration.Create(_ => { }, _ => { }, () => string.Empty);
-            foreach (var symbol in configuration.Describe().Symbols)
+            description = configuration.Describe();
+            foreach (var symbol in description.Symbols)
             {
                 var (kind, label) = symbol.Kind switch
                 {
@@ -74,10 +81,10 @@ public sealed class FishboneCompletionCatalog
                 };
                 var sigs = symbol.Signatures.Select(signature => ToDisplay(symbol.Name, signature)).ToList();
 
-                string description = sigs.Count > 0
+                string tooltip = sigs.Count > 0
                     ? $"{label}  {sigs[0].ToCompactString()}"
                     : $"{label}  {symbol.Name} : {FriendlyType(symbol.Type)}";
-                globals.Add(new FishboneCompletionItem(symbol.Name, kind, description));
+                globals.Add(new FishboneCompletionItem(symbol.Name, kind, tooltip));
 
                 if (sigs.Count > 0)
                     signatures[symbol.Name] = sigs;
@@ -92,7 +99,7 @@ public sealed class FishboneCompletionCatalog
             .GroupBy(g => char.ToLowerInvariant(g.Text[0]))
             .ToDictionary(group => group.Key, group => (IReadOnlyList<FishboneCompletionItem>)group.ToList());
 
-        return new FishboneCompletionCatalog(globals, globalsByInitial, keywords, signatures);
+        return new FishboneCompletionCatalog(globals, globalsByInitial, keywords, signatures, description);
     }
 
     private static FishboneSignature ToDisplay(string name, Fishbone.FishboneSignature signature) => new(

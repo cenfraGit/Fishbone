@@ -26,6 +26,11 @@ public abstract record AstNode
     public int Line { get; init; }
     public int Column { get; init; }
 
+    // where the node's source ends: its last line, and the column just after its last
+    // character. zero means unknown
+    public int EndLine { get; init; }
+    public int EndColumn { get; init; }
+
     public virtual bool Equals(AstNode? other)
     {
         if (other is null) return false;
