@@ -11,6 +11,7 @@ using Fishbone.Ast;
 using Fishbone.Debugging;
 using System.Collections;
 using System.Globalization;
+using System.Numerics;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 
@@ -285,14 +286,6 @@ public class FishboneInterpreter
         // equality never throws on mismatched types. numbers compare by value
         static bool AreEqual(object? left, object? right)
         {
-            bool IsNumber(object? wat)
-            {
-                if (wat is null) return false;
-                Type watType = wat.GetType();
-                var rawCode = Type.GetTypeCode(watType);
-                return !watType.IsEnum && rawCode is >= TypeCode.Char and <= TypeCode.Decimal;
-            }
-
             if (IsNumber(left) && IsNumber(right))
             {
                 // .ToDecimal and .ToDouble will throw if passed char
@@ -333,6 +326,12 @@ public class FishboneInterpreter
             throw new FishboneRuntimeException(DescribeOverflow(node.Operator, isLong, $"(a as long) {node.Operator} b"));
         }
     }
+
+    // typecodes Char..Decimal are char plus the number types. an enum reports its underlying
+    // type, so it's excluded explicitly
+    private static bool IsNumber(object? value) =>
+        value is not null and not Enum
+        && Type.GetTypeCode(value.GetType()) is >= TypeCode.Char and <= TypeCode.Decimal;
 
     // an int overflow points to long as the way out. long has no wider integer type
     private static string DescribeOverflow(string op, bool isLong, string example) => isLong
@@ -556,58 +555,65 @@ public class FishboneInterpreter
 
     internal object EvaluateFor(FishboneEnvironment env, ForNode node)
     {
-        var start = Convert.ToDouble(Evaluate(env, node.Start));
-        var end = Convert.ToDouble(Evaluate(env, node.End));
+        var start = Evaluate(env, node.Start);
+        var end = Evaluate(env, node.End);
+        var step = node.Step is null ? null : Evaluate(env, node.Step);
 
-        // 1.0 or -1.0 depending on direction
-        var step = (node.Step is null) ? Math.Sign(end - start) : Convert.ToDouble(Evaluate(env, node.Step));
+        object?[] bounds = node.Step is null ? [start, end] : [start, end, step];
+        if (!bounds.All(bound => IsNumber(bound) && bound is not char))
+            throw new FishboneRuntimeException("For: start, end and step must be numbers.");
 
-        if (start == end) return null!;
+        // the loop variable is int when every bound is an int, long when they're all
+        // integers, and double otherwise. integers count in decimal, so the value after the
+        // last one can't overflow
+        var allInts = bounds.All(bound => bound is int);
+        var values = bounds.Any(bound => bound is float or double or decimal)
+            ? Range(Convert.ToDouble(start), Convert.ToDouble(end), step is null ? null : Convert.ToDouble(step))
+                .Select(value => (object)value)
+            : Range(Convert.ToDecimal(start), Convert.ToDecimal(end), step is null ? null : Convert.ToDecimal(step))
+                .Select(value => allInts ? (object)(int)value : (long)value);
 
-        if (step == 0.0)
-            throw new FishboneRuntimeException("For: step can't be zero.");
-
-        // true if start is less than end
-        // false if start is more than end
-        bool forIncremental = (start < end);
-
-        // create new env and declare iterator name
         var loopEnv = new FishboneEnvironment(env);
+        loopEnv.Declare(node.IteratorName, null!);
         object lastValue = null!;
 
-        double i = start; // iterator value
-        loopEnv.Declare(node.IteratorName, start);
-        while (true)
+        foreach (var value in values)
         {
-            // checking phase: use forIncremental (direction) and evaluate status
-
-            // incremental: whenever i is greater than end, stop
-            if (forIncremental) { if (i >= end) break; }
-            // decremental: whenever i is less than end, stop
-            else { if (i <= end) break; }
-
+            loopEnv.Assign(node.IteratorName, value);
             try
             {
                 lastValue = Evaluate(loopEnv, node.Body);
             }
             catch (ContinueException)
             {
-                // update with current vlaue
-                i = i + step;
-                loopEnv.Assign(node.IteratorName, i);
-                continue;
             }
             catch (BreakException)
             {
                 break;
             }
-
-            // update with current vlaue
-            i = i + step;
-            loopEnv.Assign(node.IteratorName, i);
         }
 
         return lastValue;
+    }
+
+    // start, start + step, ... stopping before end. each value is start + k * step instead of
+    // a running sum, so a fractional step like 0.1 doesn't drift. the step defaults to 1 or -1
+    // toward end
+    private static IEnumerable<T> Range<T>(T start, T end, T? step) where T : struct, INumber<T>
+    {
+        var by = step ?? T.CopySign(T.One, end - start);
+        if (T.IsZero(by))
+            throw new FishboneRuntimeException("For: step can't be zero.");
+        if (start != end && T.Sign(by) != T.Sign(end - start))
+            throw new FishboneRuntimeException($"For: step {by} moves away from end {end}, so the loop would never stop.");
+
+        for (var k = T.Zero; ; k++)
+        {
+            var value = start + k * by;
+            if (T.IsPositive(by) ? value >= end : value <= end)
+                yield break;
+            yield return value;
+        }
     }
 
     internal object EvaluateReturn(FishboneEnvironment env, ReturnNode node)
