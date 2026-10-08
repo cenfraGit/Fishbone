@@ -285,8 +285,25 @@ public class FishboneInterpreter
         // equality never throws on mismatched types. numbers compare by value
         static bool AreEqual(object? left, object? right)
         {
-            if (left is int or long or double && right is int or long or double)
-                return Convert.ToDouble(left) == Convert.ToDouble(right);
+            bool IsNumber(object? wat)
+            {
+                if (wat is null) return false;
+                Type watType = wat.GetType();
+                var rawCode = Type.GetTypeCode(watType);
+                return !watType.IsEnum && rawCode is >= TypeCode.Char and <= TypeCode.Decimal;
+            }
+
+            if (IsNumber(left) && IsNumber(right))
+            {
+                // .ToDecimal and .ToDouble will throw if passed char
+                if (left is char cLeft) left = (int)cLeft;
+                if (right is char cRight) right = (int)cRight;
+
+                if (left is float or double || right is float or double)
+                    return Convert.ToDouble(left) == Convert.ToDouble(right);
+                return Convert.ToDecimal(left) == Convert.ToDecimal(right);
+            }
+
             return Equals(left, right);
         }
 
