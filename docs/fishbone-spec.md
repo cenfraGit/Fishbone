@@ -158,9 +158,11 @@ Fishbone is dynamically typed. Every value is one of these:
 | `bool`       | `true`, `false`         |                                                       |
 | `null`       | `null`                  | The absence of a value                                |
 | list         | `[1, 2, 3]`             | Ordered and mutable                                   |
-| dictionary   | `{"x": 1, "y": 2}`      | Key-value pairs. Keys and values can be any type      |
+| dictionary   | `{"x": 1, "y": 2}`, `{:}` | Key-value pairs. Keys and values can be any type. `{:}` is the empty dictionary |
 | function     | `func f(x) { ... }`     | First-class closure                                   |
 | .NET object  | any CLR type            | See [Talking to .NET](#talking-to-net)                |
+
+The empty dictionary is `{:}`, not `{}`. As an expression, `{}` is a parse error that points you to `{:}`. It's reserved so it can get a meaning later. An empty block, like `if (x) {}`, is still fine.
 
 ### Truthiness
 
@@ -207,7 +209,7 @@ The expression forms:
 | Not            | `not expr`                                                   | Boolean negation. Binds looser than equality       |
 | Boolean        | `expr and expr`, `expr or expr`, `expr xor expr`             | `and` and `or` short-circuit, `xor` can't          |
 | List           | `[ expr , expr , ... ]`                                      | Builds a list                                      |
-| Dictionary     | `{ key : value , ... }`                                      | Builds a dictionary                                |
+| Dictionary     | `{ key : value , ... }`, `{:}`                               | Builds a dictionary                                |
 | Call           | `expr ( expr , ... )`                                        | Calls a function, method, or registered type       |
 | Member access  | `expr . identifier`                                          | Reads a .NET property, field, or method group      |
 | Indexing       | `expr [ expr ]`                                              | List index, dictionary key, or .NET indexer        |
@@ -293,6 +295,17 @@ Checked is deliberate. C#'s default unchecked casts wrap around silently, so `(b
 Anything C# doesn't allow as a cast gives `null`, so `"42" as int`, `42 as string`, `true as int` and `"A" as char` are all `null`. Parsing text is a method call, not a cast: `int.Parse("42")`.
 
 Enum casts only go from an integer to an enum for now (`1 as DayOfWeek`). C# also allows `2.0` to an enum and an enum to `int`, but Fishbone doesn't support those yet.
+
+Add `[]` after the type name to cast to an array type. A list becomes a real .NET array:
+
+```csharp
+let ints = [1, 2, 3] as int[];
+let days = [1, 2] as DayOfWeek[];
+let grid = [[1, 2], [3]] as int[][];
+let bad = [1, 2.5] as int[];   // null
+```
+
+The elements follow the [argument rules](#type-conversions), not the cast rules, so `2.5` doesn't truncate into an `int[]`. The whole cast gives `null` instead. Only single-dimension arrays are supported, and there's no generic syntax, so `as List<int>` isn't possible.
 
 ---
 
@@ -600,6 +613,9 @@ When you call a .NET method, Fishbone converts an argument only when no informat
 - An integer goes to an enum parameter, so `1` is `DayOfWeek.Monday`. Names like `"Monday"` and non-whole numbers don't
 - `null` goes to reference types and to nullable value types like `int?`. A plain `int` parameter rejects it
 - Nothing converts to or from `string`, `bool` or `char`. `"42"` is not an `int`, and `5` is not a `string`
+- A list goes to a typed collection parameter: `T[]`, `List<T>`, `IList<T>`, `ICollection<T>`, `IEnumerable<T>` or `IReadOnlyList<T>`. Each element converts to `T` with these same rules, so `[1, 2.0]` goes to an `int[]`, but `[1, 2.5]` doesn't. The error names the first element that doesn't fit
+
+A list passed this way is a **copy**. If the .NET method changes the collection, the script's list doesn't see it. A parameter the list already fits as is, like `object`, `IList` or `List<object>`, gets the list itself, with no copy.
 
 The same rules apply to constructors, indexers and host callables built by hand. Use `as` when you want a conversion that may lose information, like truncating `2.7` to `2`.
 
