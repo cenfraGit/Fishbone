@@ -75,8 +75,10 @@ public sealed class FishboneDebugServerSession : IAsyncDisposable
             adapter.Stop();
         if (!_clientAccepted)
         {
-            _listener.Stop();
+            // cancel before stopping the listener. stopping it makes the pending accept throw,
+            // and RunAsync only reports a cancelled run if cancellation was already requested
             await _lifetime.CancelAsync().ConfigureAwait(false);
+            _listener.Stop();
         }
         await Completion.ConfigureAwait(false);
     }

@@ -600,6 +600,26 @@ canny(src, dst, 100, 200);          // aperture and l2 take their defaults
 canny(src, dst, 100, 200, 5);       // aperture = 5, l2 takes its default
 ```
 
+There are no named arguments, so you can't skip one in the middle. To set `l2`, you have to write out `aperture` too.
+
+### Calling delegates
+
+A .NET delegate can be called like a function. That includes host builtins, which are usually delegates (`AddBuiltIn("sum", new Func<int[], int>(...))`), and delegates that .NET hands back:
+
+```csharp
+// host: config.AddBuiltIn("makeAdder", new Func<int, Func<int, int>>(a => b => a + b));
+let addTwo = makeAdder(2);
+let five = addTwo(3);
+```
+
+The call goes through the delegate itself, so it behaves the same as calling it from C#:
+- A multicast delegate runs every handler, in order.
+- A delegate over an extension method (`new Func<int>(list.Sum)`) or a compiled expression takes the arguments its type declares.
+- Defaults declared on the delegate type apply, so with `delegate int Add(int a, int b = 10)`, `add(1)` is `11`.
+- Arguments convert, and `out` and `ref` work, the same as in a method call.
+
+Error messages use the parameter names the host wrote, like `count` in `count => count * 2`, not the delegate type's generic `arg`.
+
 ### Indexing
 
 `[ ]` works with .NET indexers, `IList`, and `IDictionary`.
@@ -648,6 +668,8 @@ let sum = p.X + p.Y;   // instances are ordinary .NET objects
 ```
 
 Constructor overloads resolve with the same best-match rules as method calls. Calling a registered type with no matching constructor is an error. That includes types with no public constructor at all, like an enum or a static class. You can still register those to reach their static members.
+
+A struct called with no arguments gives its default value, like `new Point()` in C#. Every field is zero, `false` or `null`. This works even when the struct only declares constructors with parameters, since C# structs always have an empty one. It's how a script writes `default(Point)`. For a class, the default is `null`.
 
 ### Out and ref arguments
 
