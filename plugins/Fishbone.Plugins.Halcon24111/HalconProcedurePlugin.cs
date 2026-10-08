@@ -39,6 +39,7 @@ public sealed class HalconProcedurePlugin : IFishbonePlugin
             typeof(HTuple),
             toNet: value => HalconConverters.ToHTuple(value),
             fromNet: value => HalconConverters.FromHTuple((HTuple)value));
+        HalconVisualizer.Register(config);
 
         // no directory configured is not a failure: a host that only wants the operators gets here
         if (string.IsNullOrWhiteSpace(_proceduresDirectory))

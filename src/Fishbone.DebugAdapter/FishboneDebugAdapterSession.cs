@@ -28,7 +28,7 @@ public sealed class FishboneDebugAdapterSession :
     private readonly SortedSet<int>? _statementLines;
     private readonly Func<CancellationToken, Task> _execute;
     private readonly CancellationTokenSource _executionCancellation = new();
-    private readonly DebugSnapshotHandles _handles = new();
+    private readonly DebugSnapshotHandles _handles;
     private readonly Channel<IRequest> _events = Channel.CreateUnbounded<IRequest>(new UnboundedChannelOptions { SingleReader = true });
     private readonly TaskCompletionSource<int> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private IDebugAdapterServer? _server;
@@ -53,9 +53,11 @@ public sealed class FishboneDebugAdapterSession :
         string sourceName,
         string sourceCode,
         int lineCount,
-        Func<CancellationToken, Task> execute)
+        Func<CancellationToken, Task> execute,
+        FishboneConfiguration? configuration = null)
     {
         _coordinator = coordinator;
+        _handles = new DebugSnapshotHandles(configuration);
         _sourceIdentity = sourceIdentity;
         _sourceCode = sourceCode;
         _source = new Source
@@ -157,6 +159,9 @@ public sealed class FishboneDebugAdapterSession :
             return null;
         }
     }
+
+    public Task<FishboneImageResponse> Handle(FishboneImageArguments request, CancellationToken cancellationToken) =>
+        Task.FromResult(new FishboneImageResponse { Png = Convert.ToBase64String(_handles.GetImagePng(request.VariablesReference)) });
 
     public Task<ContinueResponse> Handle(ContinueArguments request, CancellationToken cancellationToken)
     {

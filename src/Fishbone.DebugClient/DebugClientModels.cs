@@ -33,7 +33,8 @@ public sealed record FishboneDebugVariable(
     string? Type,
     FishboneVariableHandle? ChildrenHandle,
     long? NamedVariables,
-    long? IndexedVariables);
+    long? IndexedVariables,
+    FishboneVariableHandle? ImageHandle = null);
 
 public sealed record FishboneDebugScope(
     string Name,

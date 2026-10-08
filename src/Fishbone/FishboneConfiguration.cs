@@ -4,6 +4,7 @@
 // a configuration object used to set up a fishbone execution environment.
 // --------------------------------------------------------------------------------
 
+using Fishbone.Debugging;
 using Fishbone.Interpreter;
 
 namespace Fishbone;
@@ -37,6 +38,12 @@ public class FishboneConfiguration
     /// </summary>
     public Dictionary<Type, FishboneTypeConverter> TypeConverters { get; } = [];
 
+    /// <summary>
+    /// Host-registered ways to show a .NET value as an image in the debugger, keyed by the type
+    /// they were registered for.
+    /// </summary>
+    public Dictionary<Type, FishboneVisualizer> Visualizers { get; } = [];
+
     // --------------------------------------------------------------------------------
     // constructors
     // --------------------------------------------------------------------------------
@@ -48,6 +55,34 @@ public class FishboneConfiguration
     // --------------------------------------------------------------------------------
     // setup methods
     // --------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Lets the debugger show values of <typeparamref name="T"/> (and types derived from it) as
+    /// images. <paramref name="toImage"/> runs in the host while the script is paused, and returns
+    /// null when there's nothing to show. <paramref name="canShow"/> is a cheap check for whether a
+    /// value is an image at all; without it, every <typeparamref name="T"/> counts as one.
+    /// </summary>
+    public FishboneConfiguration AddVisualizer<T>(Func<T, FishboneImage?> toImage, Func<T, bool>? canShow = null)
+    {
+        Visualizers[typeof(T)] = new FishboneVisualizer(
+            value => toImage((T)value),
+            canShow is null ? null : value => canShow((T)value));
+        return this;
+    }
+
+    /// <summary>Whether the debugger can show this value as an image.</summary>
+    public bool CanVisualize(object? value) =>
+        value is not null && FindVisualizer(value) is { } visualizer && (visualizer.CanShow?.Invoke(value) ?? true);
+
+    /// <summary>The value as an image, or null when no visualizer applies or it has nothing to show.</summary>
+    public FishboneImage? Visualize(object? value) =>
+        CanVisualize(value) ? FindVisualizer(value!)!.ToImage(value!) : null;
+
+    // the visualizer for the value's own type, or else the first one registered for a base type
+    private FishboneVisualizer? FindVisualizer(object value) =>
+        Visualizers.TryGetValue(value.GetType(), out var exact)
+            ? exact
+            : Visualizers.FirstOrDefault(entry => entry.Key.IsInstanceOfType(value)).Value;
 
     /// <summary>
     /// Describes every name this configuration puts into scripts, and the members scripts can reach
@@ -140,6 +175,8 @@ public class FishboneConfiguration
             clone.Values[val.Key] = val.Value;
         foreach (var converter in TypeConverters)
             clone.TypeConverters[converter.Key] = converter.Value;
+        foreach (var visualizer in Visualizers)
+            clone.Visualizers[visualizer.Key] = visualizer.Value;
         return clone;
     }
 }

@@ -140,6 +140,7 @@ public class DebuggerModelTests
             VariableRequests++;
             return Task.FromResult(VariablesToReturn);
         }
+        public Task<byte[]> GetImageAsync(FishboneVariableHandle handle, CancellationToken cancellationToken = default) => Task.FromResult(Array.Empty<byte>());
         public Task ContinueAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task PauseAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task StepIntoAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;

@@ -187,6 +187,23 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
         }
     }
 
+    public async Task<byte[]> GetImageAsync(FishboneVariableHandle handle, CancellationToken cancellationToken = default)
+    {
+        if (State != FishboneDebugSessionState.Paused || handle.Generation != Volatile.Read(ref _generation))
+            throw new InvalidOperationException("The image belongs to an inactive pause.");
+        var response = await RequireClient()
+            .SendRequest(ImageCommand, new { variablesReference = handle.Reference })
+            .Returning<ImageResponse>(cancellationToken)
+            .ConfigureAwait(false);
+        return Convert.FromBase64String(response.Png);
+    }
+
+    // the custom request the Fishbone debug adapter serves, see FishboneImageArguments there
+    private const string ImageCommand = "fishbone/image";
+    private const string ImageKind = "fishbone.image";
+
+    private sealed record ImageResponse(string Png);
+
     public async Task<IReadOnlyList<FishboneDebugVariable>> GetVariablesAsync(FishboneVariableHandle handle, CancellationToken cancellationToken = default)
     {
         if (State != FishboneDebugSessionState.Paused || handle.Generation != Volatile.Read(ref _generation))
@@ -380,10 +397,17 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
             frames.ToImmutable(), exception)));
     }
 
-    private static FishboneDebugVariable MapVariable(Variable variable, int generation) => new(
-        variable.Name, variable.Value, variable.Type,
-        variable.VariablesReference == 0 ? null : new FishboneVariableHandle(generation, variable.VariablesReference),
-        variable.NamedVariables, variable.IndexedVariables);
+    // an image's reference is for fetching the image, not for expanding it
+    private static FishboneDebugVariable MapVariable(Variable variable, int generation)
+    {
+        var handle = variable.VariablesReference == 0 ? null : new FishboneVariableHandle(generation, variable.VariablesReference);
+        bool isImage = handle is not null && variable.PresentationHint?.Kind?.ToString() == ImageKind;
+        return new FishboneDebugVariable(
+            variable.Name, variable.Value, variable.Type,
+            isImage ? null : handle,
+            variable.NamedVariables, variable.IndexedVariables,
+            isImage ? handle : null);
+    }
 
     private void Enqueue(ProtocolEvent item) => _events.Writer.TryWrite(item);
     private void Publish(FishboneDebugEvent item) => EventReceived?.Invoke(this, item);
