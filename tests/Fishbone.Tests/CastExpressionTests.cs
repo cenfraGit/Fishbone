@@ -21,6 +21,64 @@ let widened = 2 as double;
     }
 
     [Fact]
+    public void Run_CastListToArray_ReturnsTypedArray()
+    {
+        var config = new FishboneConfiguration().AddType<DayOfWeek>();
+
+        var env = FishboneProgram.Run("""
+let ints = [1, 2, 3] as int[];
+let doubles = [1, 2.5] as double[];
+let days = [1, 2] as DayOfWeek[];
+let empty = [] as string[];
+let nested = [[1, 2], [3]] as int[][];
+let second = ([1, 2] as int[])[1];
+""", config);
+
+        Assert.Equal(new[] { 1, 2, 3 }, Assert.IsType<int[]>(env.GetValue("ints")));
+        Assert.Equal(new[] { 1.0, 2.5 }, Assert.IsType<double[]>(env.GetValue("doubles")));
+        Assert.Equal(new[] { DayOfWeek.Monday, DayOfWeek.Tuesday }, Assert.IsType<DayOfWeek[]>(env.GetValue("days")));
+        Assert.Empty(Assert.IsType<string[]>(env.GetValue("empty")));
+        var nested = Assert.IsType<int[][]>(env.GetValue("nested"));
+        Assert.Equal(new[] { 1, 2 }, nested[0]);
+        Assert.Equal(new[] { 3 }, nested[1]);
+        Assert.Equal(2, env.GetValue("second"));
+    }
+
+    [Theory]
+    [InlineData("let r = [1, 2.5] as int[];")]
+    [InlineData("""let r = [1, "2"] as int[];""")]
+    [InlineData("let r = 5 as int[];")]
+    [InlineData("""let r = "abc" as char[];""")]
+    public void Run_CastToArrayThatDoesNotFit_ReturnsNull(string code)
+    {
+        // like other casts, a failed cast is null. elements follow the argument rules, so
+        // 2.5 doesn't truncate into an int[]
+        var env = FishboneProgram.Run(code, new FishboneConfiguration());
+
+        Assert.Null(env.GetValue("r"));
+    }
+
+    [Fact]
+    public void Run_CastArrayToSameArrayType_ReturnsSameInstance()
+    {
+        var values = new[] { 1, 2 };
+        var config = new FishboneConfiguration().AddValue("values", values);
+
+        var env = FishboneProgram.Run("let r = values as int[];", config);
+
+        Assert.Same(values, env.GetValue("r"));
+    }
+
+    [Fact]
+    public void Run_CastToArrayOfUnknownType_RaisesError()
+    {
+        var exception = Assert.Throws<FishboneRuntimeException>(() =>
+            FishboneProgram.Run("let r = [1] as Missing[];", new FishboneConfiguration()));
+
+        Assert.Contains("Missing[]", exception.Message);
+    }
+
+    [Fact]
     public void Run_CastIntToEnum_ReturnsEnumValue()
     {
         var config = new FishboneConfiguration().AddType<DayOfWeek>();
