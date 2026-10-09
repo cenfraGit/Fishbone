@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<hdevelop file_version="1.2" halcon_version="24.11.2.0">
+<procedure name="myTestProcedure">
+<interface>
+<io>
+<par name="inputImage" base_type="iconic" dimension="0"/>
+</io>
+<oo>
+<par name="outputRegion" base_type="iconic" dimension="0"/>
+</oo>
+<ic>
+<par name="thresholdValue" base_type="ctrl" dimension="0"/>
+</ic>
+</interface>
+<body>
+<l>threshold (inputImage, outputRegion, thresholdValue, 255)</l>
+<l>return ()</l>
+</body>
+<docu id="myTestProcedure">
+<parameters>
+<parameter id="inputImage"/>
+<parameter id="outputRegion"/>
+<parameter id="thresholdValue"/>
+</parameters>
+</docu>
+</procedure>
+</hdevelop>

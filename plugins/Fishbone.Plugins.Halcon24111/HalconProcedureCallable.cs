@@ -23,6 +23,31 @@ internal sealed class HalconProcedureCallable : IManualCallable
         return new HalconProcedureCallable(procedure, parameters);
     }
 
+    /// <summary>Stands in for a procedure HALCON couldn't load, and fails with the reason when called.</summary>
+    public static IManualCallable Failed(string hdvpPath, string reason)
+    {
+        IReadOnlyList<CallableParameter> parameters;
+        try
+        {
+            parameters = ReadInterface(hdvpPath);
+        }
+        catch
+        {
+            // ponytail: an unreadable interface means zero parameters, so a call with arguments
+            // reports the argument count instead of the reason
+            parameters = [];
+        }
+        return new FailedProcedure(parameters,
+            $"Procedure '{Path.GetFileNameWithoutExtension(hdvpPath)}' could not be loaded from '{hdvpPath}': {reason}");
+    }
+
+    private sealed class FailedProcedure(IReadOnlyList<CallableParameter> parameters, string message) : IManualCallable
+    {
+        public IReadOnlyList<CallableParameter> Parameters => parameters;
+
+        public object? Invoke(object?[] arguments) => throw new InvalidOperationException(message);
+    }
+
     public object? Invoke(object?[] arguments)
     {
         // a fresh call instance per invocation so concurrent or repeated calls never share the

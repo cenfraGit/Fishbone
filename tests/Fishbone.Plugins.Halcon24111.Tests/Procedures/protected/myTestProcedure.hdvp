@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<hdevelop file_version="1.2" halcon_version="24.11.2.0">
+<procedure name="myTestProcedure">
+<interface>
+<io>
+<par name="inputImage" base_type="iconic" dimension="0"/>
+</io>
+<oo>
+<par name="outputRegion" base_type="iconic" dimension="0"/>
+</oo>
+<ic>
+<par name="thresholdValue" base_type="ctrl" dimension="0"/>
+</ic>
+</interface>
+<xb>Ezoqxzut83RRxwgbHknREmIjSxlboimX72Ng6p1Z1SEOCcFXo9i7Ol9fan7pwWoTldJNYODc0DMBZn9TwQARlHsvp2fGPrlpCmwh+VsZWuakBiLlvJoYzlucV4Znr44po//j9qn9Qk8YrJXuIhN6Ko3efUBP/MmmF0gpIJX0mmFQgDcy22Pa8cN1QcHdJqlr7enGbcP+0QosqB6u6aDEb6N0+A0KQytkk11RMdlaNQDDQpvb7LmK58c1YxbLYkJw7nlsggss0whANLjRupY755UP7UznJw1yQ/twy/tU+q3GblMXP6qTzV1MT1/WrSjYGbFnuxj1bxe+zpYAoncLoH1wbWb4HQ1DIlUDI0JQbgcNwVH2f9ANSuahACICkpwrAo5UhahteQ8DW2YCRzOinPhO+TKym5T348LBm3jhEvpn4hnfCMwIGlaY2QsSLevKgZO7918p7LeCj9l2a13X2KdHYjrXmQ+QzSwBe1jo8LE6ZAXUTLbr8GxUS/bslNqx6s5kuzlejlPISpWMwjfEaXTwF8UDJSF0yCwfpnv65casIm1Xg88PmpL4SS3GcTfY7XNAu9TN96Ok4Bj20/pO+k/XSVWe4tazpm3VSbFZ56nKcIt9q8VJ7dPy7hrA5D1/FCJhEjA/z4YT5mQWTranEvobLqlRp+3QBHKR0rtvGoyC8Oihewx/VYtN47j1U3t/9GU8igPIkS76SrGLp5gSRqhl7dFusvvQqjlsg0x7N1ar0ssD2tC1oZ4y2oF818kWUDybSVCKgJJ8lm7p1FMvAjM2fbsWuBKdbwo0Z+PgqMrhwsCh24UNu4fqVOtCuCoUtemB188YnqTsJCRbatpLjQ49XVVaMwsf7qabl3jGzcsor2v3JwTofpHlM/x+SRZUSGZhlOw/BcAPsexT8VyqDIBq0RyzUbxUaCmoCkKs+xNBm17nmAcw3/V04B3SFjODHYBjfVUJsyRUO5IQl6IGn/ZM8LX50SFHlX7D7JYEvsHofK37EMxOpOMojhR1Z7FOj6+SqlqBVSaYzoTc4i6/zZPNsZSppEvgYr2wOyp5+Wzf8Duh6eX6tEiCzB81J10D1c+sk1rX/O2IQ9Kw+4aDNYG1OMO9jO1eW4OUu/Q6GD4He97/cj4Peh7m9WqUHQi7F6X+T8xn24Q</xb>
+<docu id="myTestProcedure">
+<parameters>
+<parameter id="inputImage"/>
+<parameter id="outputRegion"/>
+<parameter id="thresholdValue"/>
+</parameters>
+</docu>
+</procedure>
+</hdevelop>
