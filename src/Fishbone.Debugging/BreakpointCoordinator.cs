@@ -10,6 +10,26 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
     private sealed record Frame(string Name, FishboneEnvironment Environment)
     {
         public DebugSourceLocation? Location { get; set; }
+
+        // the block the frame is in right now. a function's body is a block of its own, so its
+        // lets live below Environment
+        public FishboneEnvironment? Current { get; set; }
+
+        public ImmutableArray<DebugVariableSnapshot> Locals()
+        {
+            var locals = new Dictionary<string, object?>();
+            for (var scope = Current ?? Environment; scope is not null; scope = scope.Parent)
+            {
+                foreach (var pair in scope.Values)
+                    locals.TryAdd(pair.Key, pair.Value);
+                if (scope == Environment)
+                    break;
+            }
+            return locals
+                .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                .Select(pair => new DebugVariableSnapshot(pair.Key, pair.Value))
+                .ToImmutableArray();
+        }
     }
 
     private readonly object _sync = new();
@@ -143,6 +163,7 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
 
             var location = (node.Line, _frames.Count - 1);
             _frames[^1].Location = new DebugSourceLocation(SourceId, node.Line, node.Column);
+            _frames[^1].Current = environment;
             var isNewLocation = _lastExecutableLocation != location;
             _lastExecutableLocation = location;
             // a pause request doesn't wait for a new line, or a loop that never leaves its line
@@ -186,7 +207,10 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
                 return;
 
             if (_frames.Count > 0 && node.Line > 0)
+            {
                 _frames[^1].Location = new DebugSourceLocation(SourceId, node.Line, node.Column);
+                _frames[^1].Current = environment;
+            }
             _stepMode = StepMode.None;
             _exceptionPause = true;
             _resumeLocation = node.Line > 0 ? (node.Line, _frames.Count - 1) : null;
@@ -329,10 +353,7 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
             .Select(frame => new DebugCallFrameSnapshot(
                 frame.Name,
                 frame.Location ?? location,
-                frame.Environment.Values
-                    .OrderBy(pair => pair.Key, StringComparer.Ordinal)
-                    .Select(pair => new DebugVariableSnapshot(pair.Key, pair.Value))
-                    .ToImmutableArray()))
+                frame.Locals()))
             .ToImmutableArray();
 
         return new DebugPauseSnapshot(
