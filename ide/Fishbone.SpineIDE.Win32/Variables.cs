@@ -57,6 +57,7 @@ internal static partial class Program
         _finalConfiguration = null;
         _finalEnvironment = null;
         _keptImages.Clear();
+        _watchLine = int.MaxValue;
         _watchRoot = 0;
         _watchNodes.Clear();
         _treeVersion++;
@@ -66,6 +67,7 @@ internal static partial class Program
     {
         ClearVariables();
         _pausedSession = session;
+        _watchLine = frame?.Line ?? int.MaxValue;
         if (frame is null)
         {
             ClearPreview();

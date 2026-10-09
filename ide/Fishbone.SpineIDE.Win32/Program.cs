@@ -299,7 +299,7 @@ internal static partial class Program
             return true;
         }
         // scintilla still gets the key and closes its popup. Escape on the completion list leaves the tip
-        if (key == VK_ESCAPE && Sci(SCI_AUTOCACTIVE) == 0)
+        if (key == VK_ESCAPE && SendMessageW(GetFocus() == _watchInput ? _watchInput : _editor, SCI_AUTOCACTIVE, 0, 0) == 0)
             _tipDismissed = true;
         return false;
     }

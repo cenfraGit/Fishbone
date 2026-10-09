@@ -25,6 +25,8 @@ internal static partial class Program
     private static FishboneEnvironment? _finalEnvironment;
     // bumped on every refresh, so a slow one that finishes late doesn't replace a newer one
     private static int _watchVersion;
+    // the line a watch is read at for its parameter tip: where the script is paused, or after it
+    private static int _watchLine = int.MaxValue;
 
     private static IntPtr WatchSci(uint msg, nint wParam = 0, nint lParam = 0) => SendMessageW(_watchInput, msg, wParam, lParam);
 
@@ -189,8 +191,18 @@ internal static partial class Program
 
     private static void OnWatchInputNotification(SCNotification notification)
     {
-        if (notification.code == SCN_CHARADDED && (char.IsLetter((char)notification.ch) || notification.ch is '_' or '.'))
-            ShowWatchCompletion(forced: false);
+        switch (notification.code)
+        {
+            case SCN_CHARADDED when char.IsLetter((char)notification.ch) || notification.ch is '_' or '.':
+                ShowWatchCompletion(forced: false);
+                break;
+            case SCN_UPDATEUI when (notification.updated & 0x3) != 0: // SC_UPDATE_CONTENT | SC_UPDATE_SELECTION
+                UpdateWatchSignatureHelp();
+                break;
+            case SCN_CALLTIPCLICK:
+                CycleOverload((int)notification.position);
+                break;
+        }
     }
 
     // like the editor's list. paused, the debugger offers what's in scope where the script
@@ -237,11 +249,15 @@ internal static partial class Program
 
         Post(() =>
         {
-            // typing moved on while the list was worked out
-            if (WatchText() != text || (int)WatchSci(SCI_GETCURRENTPOS) != caretBytes)
+            // the debugger can answer after more was typed. while that's the same word, the list
+            // still fits, narrowed to what's typed now
+            string now = WatchText();
+            int caretNow = Encoding.UTF8.GetCharCount(Encoding.UTF8.GetBytes(now), 0, (int)WatchSci(SCI_GETCURRENTPOS));
+            if (!now.StartsWith(text[..start], StringComparison.Ordinal) || caretNow < start
+                || !now[start..caretNow].All(c => char.IsLetterOrDigit(c) || c == '_'))
                 return;
             string list = string.Join(' ', items.Where(name => !name.Contains(' ')));
-            WatchSci(SCI_AUTOCSHOW, caretBytes - Encoding.UTF8.GetByteCount(text.AsSpan(0, start)), Utf8(list));
+            WatchSci(SCI_AUTOCSHOW, Encoding.UTF8.GetByteCount(now.AsSpan(start, caretNow - start)), Utf8(list));
         });
     }
 
