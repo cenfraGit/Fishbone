@@ -25,6 +25,7 @@
   <!-- the same threshold procedure saved plain and password-protected (password "miguel") in HDevelop -->
   <ItemGroup>
     <None Include="Procedures\**\*.hdvp" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\halcon_images.fb" Link="halcon_images.fb" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
