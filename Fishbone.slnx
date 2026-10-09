@@ -1,6 +1,5 @@
 <Solution>
   <Folder Name="/Tests/">
-    <Project Path="tests/DebugSteppingTest/DebugSteppingTest.csproj" />
     <Project Path="tests/Fishbone.Core.Tests/Fishbone.Core.Tests.csproj" />
     <Project Path="tests/Fishbone.DebugAdapter.Tests/Fishbone.DebugAdapter.Tests.csproj" />
     <Project Path="tests/Fishbone.DebugClient.Tests/Fishbone.DebugClient.Tests.csproj" />
