@@ -95,7 +95,7 @@ internal static partial class Program
     }
 
     // checkable: one of the script's own variables, which the preview finds by name. the ones
-    // inside lists and objects have no checkbox, and open in their own window with a double-click
+    // inside lists and objects have no checkbox
     private static void InsertDebugVariable(IntPtr parent, FishboneDebugVariable variable, bool checkable = false)
     {
         bool isImage = variable.ImageHandle is not null;
@@ -124,12 +124,18 @@ internal static partial class Program
 
     private static void SetChecked(string name, bool isChecked)
     {
-        if (!_checkItems.TryGetValue(name, out IntPtr item))
-            return;
-        var change = new TVITEMW { mask = TVIF_STATE, hItem = item, state = isChecked ? Checked : Unchecked, stateMask = TVIS_STATEIMAGEMASK };
+        if (_checkItems.TryGetValue(name, out IntPtr item))
+            SetCheckState(item, isChecked ? Checked : Unchecked);
+    }
+
+    // 0 takes the checkbox off
+    private static void SetCheckState(IntPtr item, uint state)
+    {
+        var change = new TVITEMW { mask = TVIF_STATE, hItem = item, state = state, stateMask = TVIS_STATEIMAGEMASK };
+        bool setting = _settingChecks;
         _settingChecks = true;
         SendMessageW(_variables, TVM_SETITEMW, 0, ref change);
-        _settingChecks = false;
+        _settingChecks = setting;
     }
 
     // the type is left out when the value already says it, like an object shown by its type name
@@ -167,7 +173,11 @@ internal static partial class Program
                 }
             };
             _settingChecks = true;
-            return SendMessageW(_variables, TVM_INSERTITEMW, 0, ref insert);
+            IntPtr item = SendMessageW(_variables, TVM_INSERTITEMW, 0, ref insert);
+            // the tree gives every new item a checkbox, so one without has its taken off
+            if (check is null)
+                SetCheckState(item, 0);
+            return item;
         }
         finally
         {
@@ -176,23 +186,28 @@ internal static partial class Program
         }
     }
 
-    // checking an image adds it to the preview, double-clicking one opens it in its own window,
-    // and children load the first time an item opens
+    // checking an image adds it to the preview, double-clicking one fits the preview again, and
+    // children load the first time an item opens
     private static void OnVariablesNotification(IntPtr lParam)
     {
         int code = Marshal.PtrToStructure<NMHDR>(lParam).code;
         if (code == NM_DBLCLK)
         {
-            if (_selectedNode is { IsImage: true } selected)
-                OpenImage(selected);
+            if (_selectedNode is { IsImage: true })
+                FitImage(_preview);
             return;
         }
         if (code == TVN_ITEMCHANGEDW)
         {
-            // a click on the checkbox, or the space key
+            // a click on the checkbox, or the space key. space on an item without one gives it one,
+            // which is taken off again
             var change = Marshal.PtrToStructure<NMTVITEMCHANGE>(lParam);
             uint before = change.uStateOld & TVIS_STATEIMAGEMASK, after = change.uStateNew & TVIS_STATEIMAGEMASK;
-            if (!_settingChecks && before != after && after != 0 && _nodes.GetValueOrDefault(change.lParam) is { IsImage: true } checkedNode)
+            if (_settingChecks || before == after)
+                return;
+            if (!_checkItems.ContainsValue(change.hItem))
+                SetCheckState(change.hItem, 0);
+            else if (_nodes.GetValueOrDefault(change.lParam) is { } checkedNode)
                 CheckPreview(checkedNode, after == Checked);
             return;
         }
