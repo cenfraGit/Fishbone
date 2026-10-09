@@ -48,3 +48,26 @@ jobs:
       - name: Test
         # a hung test fails the run after two minutes instead of holding the job for hours
         run: dotnet test Fishbone.slnx --configuration Release --no-build --verbosity minimal --blame-hang-timeout 2m
+  # builds every package and uses them from a fresh host project, like a user would. the
+  # build job above never touches the packed output
+  packages:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ windows-latest, ubuntu-latest ]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Pack and consume
+        shell: bash
+        run: bash tests/packaging/check.sh
