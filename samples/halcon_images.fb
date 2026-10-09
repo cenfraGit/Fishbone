@@ -1,7 +1,7 @@
 // title: HALCON Images
 // note: requires the Fishbone.Plugins.Halcon24111 plugin installed in ~/.fishbone/plugins
 // the images come from HALCON's own examples folder, which read_image finds by name
-// select an image variable in the tree to preview it, or double-click it for its own window
+// check an image variable in the tree to preview it
 
 println("HALCON images\n");
 

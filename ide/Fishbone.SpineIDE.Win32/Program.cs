@@ -2,8 +2,8 @@
 // Program.cs
 //
 // SpineIDE for Windows: a raw win32 front end with a scintilla editor and the output
-// on the left, and an image preview over the variables on the right. running and
-// debugging go through the shared ScriptSession.
+// on the left, and an image preview over the variables on the right. the gaps between
+// them can be dragged. running and debugging go through the shared ScriptSession.
 // --------------------------------------------------------------------------------
 
 using SpineIDE.Services;
@@ -18,24 +18,26 @@ internal static partial class Program
     private const uint WS_OVERLAPPEDWINDOW = 0x00CF0000, WS_CHILD = 0x40000000, WS_VISIBLE = 0x10000000,
         WS_VSCROLL = 0x00200000, WS_HSCROLL = 0x00100000, WS_BORDER = 0x00800000, SS_CENTERIMAGE = 0x200, SBARS_SIZEGRIP = 0x100;
     private const uint ES_MULTILINE = 0x4, ES_AUTOVSCROLL = 0x40, ES_AUTOHSCROLL = 0x80, ES_READONLY = 0x800;
-    private const uint WM_DESTROY = 0x2, WM_SIZE = 0x5, WM_CLOSE = 0x10, WM_SETFONT = 0x30, WM_NOTIFY = 0x4E,
+    private const uint WM_DESTROY = 0x2, WM_SIZE = 0x5, WM_CLOSE = 0x10, WM_SETCURSOR = 0x20, WM_SETFONT = 0x30, WM_NOTIFY = 0x4E, WM_CAPTURECHANGED = 0x215,
         WM_KEYDOWN = 0x100, WM_SYSKEYDOWN = 0x104, WM_COMMAND = 0x111, WM_TIMER = 0x113, WM_CTLCOLORSTATIC = 0x138, WM_DPICHANGED = 0x2E0, WM_APP_INVOKE = 0x8001;
     private const uint EM_SETSEL = 0xB1, EM_REPLACESEL = 0xC2, EM_SETLIMITTEXT = 0xC5, EM_SETCUEBANNER = 0x1501;
     private const int VK_RETURN = 0x0D, VK_ESCAPE = 0x1B, VK_SPACE = 0x20, VK_F5 = 0x74, VK_F9 = 0x78, VK_F10 = 0x79, VK_F11 = 0x7A,
         VK_SHIFT = 0x10, VK_CONTROL = 0x11, VK_N = 0x4E, VK_O = 0x4F, VK_S = 0x53;
-    private const int RunButtonId = 1, DebugButtonId = 2, TopBarHeight = 32, InputHeight = 24, HeaderHeight = 22, Gap = 4;
+    private const int RunButtonId = 1, DebugButtonId = 2, TopBarHeight = 32, InputHeight = 24, HeaderHeight = 22, Gap = 6;
 
     // the delegate has to stay referenced or the gc collects it while windows still calls it
     private static readonly WndProcDelegate _wndProc = WndProc;
 
     private static IntPtr _window, _editor, _output, _input, _variables, _status;
-    private static IntPtr _outputHeader, _variablesHeader;
+    private static IntPtr _outputHeader, _variablesHeader, _uncheckAllButton, _fullScreenButton;
     private static readonly List<IntPtr> _toolbar = [];
 
+    // run on the left. the debugger's buttons on the right, where debug turns into continue
+    // while a debug session is on
     private static readonly (int Id, string Label)[] ToolbarCommands =
     [
-        (RunButtonId, "Run"), (DebugButtonId, "Debug"),
-        (CommandContinue, "Continue"), (CommandPause, "Pause"), (CommandStop, "Stop"),
+        (RunButtonId, "Run"),
+        (DebugButtonId, "Debug"), (CommandPause, "Pause"), (CommandStop, "Stop"),
         (CommandStepOver, "Step Over"), (CommandStepInto, "Step Into"), (CommandStepOut, "Step Out"),
     ];
 
@@ -45,11 +47,13 @@ internal static partial class Program
         for (int i = 0; i < _toolbar.Count; i++)
             EnableWindow(_toolbar[i], ToolbarCommands[i].Id switch
             {
-                RunButtonId or DebugButtonId => !_running,
+                RunButtonId => !_running,
+                DebugButtonId => !_running || _paused,
                 CommandPause => _running && !_paused,
                 CommandStop => _running,
                 _ => _paused,
             });
+        SetDebugButton();
     }
 
     // lets background threads (the debug client) run code on the ui thread
@@ -120,6 +124,8 @@ internal static partial class Program
         // the explorer look: arrows instead of plus boxes, and a full-row hover highlight
         SetWindowTheme(_variables, "Explorer", null);
         SendMessageW(_variables, TVM_SETEXTENDEDSTYLE, (nint)TVS_EX_DOUBLEBUFFER, (nint)TVS_EX_DOUBLEBUFFER);
+        // checkboxes have to be turned on after the tree is made, before it has items
+        SetWindowLongPtrW(_variables, -16, GetWindowLongPtrW(_variables, -16) | (nint)TVS_CHECKBOXES); // GWL_STYLE
 
         RegisterImageClass();
         _preview = CreateWindowExW(0, "SpineIDE.Image", "", WS_CHILD | WS_VISIBLE | WS_BORDER,
@@ -132,6 +138,8 @@ internal static partial class Program
         _outputHeader = CreateChild("STATIC", "Output", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE, 0);
         _previewHeader = CreateChild("STATIC", "Image", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE, 0);
         _variablesHeader = CreateChild("STATIC", "Variables", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE, 0);
+        _fullScreenButton = CreateChild("BUTTON", "Full screen", WS_CHILD | WS_VISIBLE, CommandFullScreen);
+        _uncheckAllButton = CreateChild("BUTTON", "Uncheck all", WS_CHILD | WS_VISIBLE, CommandUncheckAll);
 
         // multiline edits cap at 32k chars by default, 0 lifts that
         SendMessageW(_output, EM_SETLIMITTEXT, 0, 0);
@@ -186,6 +194,22 @@ internal static partial class Program
         {
             case WM_SIZE:
                 Layout((int)(lParam & 0xFFFF), (int)((lParam >> 16) & 0xFFFF));
+                return 0;
+            // the gaps between the panes are the window's own, so the mouse reaches it there
+            case WM_SETCURSOR when wParam == hwnd && (lParam & 0xFFFF) == 1 && SplitterUnderCursor() is var splitter and not Splitter.None: // HTCLIENT
+                SetCursor(LoadCursorW(IntPtr.Zero, splitter == Splitter.Columns ? 32644 : 32645)); // IDC_SIZEWE : IDC_SIZENS
+                return 1;
+            case WM_LBUTTONDOWN:
+                StartDrag((short)(lParam & 0xFFFF), (short)((lParam >> 16) & 0xFFFF));
+                return 0;
+            case WM_MOUSEMOVE when _dragging != Splitter.None:
+                Drag((short)(lParam & 0xFFFF), (short)((lParam >> 16) & 0xFFFF));
+                return 0;
+            case WM_LBUTTONUP when _dragging != Splitter.None:
+                ReleaseCapture();
+                return 0;
+            case WM_CAPTURECHANGED:
+                _dragging = Splitter.None;
                 return 0;
             case WM_DPICHANGED:
                 // moved to a monitor with another scale. windows suggests the new window rect
@@ -291,29 +315,94 @@ internal static partial class Program
         _treeFont = CreateFontW(-Scale(14), 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 0, 0, "Segoe UI");
         foreach (IntPtr control in new[] { _output, _input })
             SendMessageW(control, WM_SETFONT, _monoFont, 1);
-        foreach (IntPtr control in _toolbar.Append(_status))
+        foreach (IntPtr control in _toolbar.Append(_status).Append(_fullScreenButton).Append(_uncheckAllButton))
             SendMessageW(control, WM_SETFONT, _guiFont, 1);
         foreach (IntPtr control in new[] { _outputHeader, _previewHeader, _variablesHeader })
             SendMessageW(control, WM_SETFONT, _headerFont, 1);
         SendMessageW(_variables, WM_SETFONT, _treeFont, 1);
         SendMessageW(_variables, TVM_SETITEMHEIGHT, Scale(24), 0);
+        SetToolbarIcons();
         SetMarginWidths();
 
         GetClientRect(_window, out RECT client);
         Layout(client.right, client.bottom);
     }
 
-    // fixed panes: the editor over the output on the left, the image over the variables on the right
+    // the editor over the output on the left, the image over the variables on the right. the
+    // splits are kept as parts of the space they divide, so resizing the window keeps them
+    private static double _rightSplit = 0.35, _editorSplit = 0.62, _imageSplit = 0.5;
+
+    private enum Splitter { None, Columns, Editor, Image }
+
+    // each gap, with the header under it, which drags too. the sizes are what dragging changes,
+    // out of the room each one has
+    private static RECT _columnsGap, _editorGap, _imageGap;
+    private static int _rightWidth, _editorHeight, _imageHeight, _columnsRoom, _editorRoom, _imageRoom;
+    private static Splitter _dragging;
+    private static int _dragFrom, _dragSize;
+
+    private static Splitter SplitterAt(int x, int y)
+    {
+        static bool Inside(RECT rect, int x, int y) => x >= rect.left && x < rect.right && y >= rect.top && y < rect.bottom;
+        return Inside(_columnsGap, x, y) ? Splitter.Columns
+            : Inside(_editorGap, x, y) ? Splitter.Editor
+            : Inside(_imageGap, x, y) ? Splitter.Image
+            : Splitter.None;
+    }
+
+    private static Splitter SplitterUnderCursor()
+    {
+        GetCursorPos(out POINT cursor);
+        ScreenToClient(_window, ref cursor);
+        return SplitterAt(cursor.x, cursor.y);
+    }
+
+    private static void StartDrag(int x, int y)
+    {
+        _dragging = SplitterAt(x, y);
+        if (_dragging == Splitter.None)
+            return;
+        (_dragFrom, _dragSize) = _dragging switch
+        {
+            Splitter.Columns => (x, _rightWidth),
+            Splitter.Editor => (y, _editorHeight),
+            _ => (y, _imageHeight),
+        };
+        SetCapture(_window);
+    }
+
+    // the right column grows leftward, the editor and the image downward
+    private static void Drag(int x, int y)
+    {
+        switch (_dragging)
+        {
+            case Splitter.Columns: _rightSplit = (double)(_dragSize - (x - _dragFrom)) / _columnsRoom; break;
+            case Splitter.Editor: _editorSplit = (double)(_dragSize + y - _dragFrom) / _editorRoom; break;
+            case Splitter.Image: _imageSplit = (double)(_dragSize + y - _dragFrom) / _imageRoom; break;
+        }
+        GetClientRect(_window, out RECT client);
+        Layout(client.right, client.bottom);
+    }
+
+    // value, kept between low and high. when there's no room for both, low wins
+    private static int Between(int value, int low, int high) => Math.Max(low, Math.Min(value, high));
+
     private static void Layout(int width, int height)
     {
         int top = Scale(TopBarHeight), input = Scale(InputHeight), header = Scale(HeaderHeight), gap = Scale(Gap);
         int indent = Scale(6);
-        int x = Scale(8);
-        for (int i = 0; i < _toolbar.Count; i++)
+        // run on the left, and the debugger's buttons laid out from the right end. the window
+        // sizes itself before the buttons exist
+        int buttonWidth = Scale(88);
+        if (_toolbar.Count > 0)
+            MoveWindow(_toolbar[0], Scale(8), Scale(4), buttonWidth, Scale(24), true);
+        int x = width - Scale(8);
+        for (int i = _toolbar.Count - 1; i >= 1; i--)
         {
-            MoveWindow(_toolbar[i], x, Scale(4), Scale(80), Scale(24), true);
-            // a wider gap between the run, the session and the stepping groups
-            x += Scale(i is 1 or 4 ? 96 : 84);
+            x -= buttonWidth;
+            MoveWindow(_toolbar[i], x, Scale(4), buttonWidth, Scale(24), true);
+            // a wider gap between the session and the stepping buttons
+            x -= Scale(i == 4 ? 16 : 4);
         }
 
         // the status bar sizes itself on WM_SIZE, the panes take the rest
@@ -321,9 +410,13 @@ internal static partial class Program
         GetWindowRect(_status, out RECT statusRect);
         height -= statusRect.bottom - statusRect.top;
 
-        int rightWidth = width * 35 / 100;
+        // every pane keeps some room, so a splitter can't hide one
+        int least = Scale(80);
+        _columnsRoom = width - gap;
+        int rightWidth = _rightWidth = Between((int)(_columnsRoom * _rightSplit), least, _columnsRoom - least);
         int leftWidth = width - rightWidth - gap;
-        int editorHeight = (height - top) * 62 / 100;
+        _editorRoom = height - top - gap - header - input;
+        int editorHeight = _editorHeight = Between((int)(_editorRoom * _editorSplit), least, _editorRoom - least);
         MoveWindow(_editor, 0, top, leftWidth, editorHeight, true);
         int outputTop = top + editorHeight + gap;
         MoveWindow(_outputHeader, indent, outputTop, leftWidth - indent, header, true);
@@ -331,12 +424,20 @@ internal static partial class Program
         MoveWindow(_input, 0, height - input, leftWidth, input, true);
 
         int rightX = leftWidth + gap;
-        int imageHeight = (height - top - 2 * header - gap) / 2;
-        MoveWindow(_previewHeader, rightX + indent, top, rightWidth - indent, header, true);
+        int button = Scale(80);
+        _imageRoom = height - top - 2 * header - gap;
+        int imageHeight = _imageHeight = Between((int)(_imageRoom * _imageSplit), least, _imageRoom - least);
+        MoveWindow(_previewHeader, rightX + indent, top, rightWidth - indent - button, header, true);
+        MoveWindow(_fullScreenButton, width - button, top + Scale(1), button, header - Scale(2), true);
         MoveWindow(_preview, rightX, top + header, rightWidth, imageHeight, true);
         int variablesTop = top + header + imageHeight + gap;
-        MoveWindow(_variablesHeader, rightX + indent, variablesTop, rightWidth - indent, header, true);
+        MoveWindow(_variablesHeader, rightX + indent, variablesTop, rightWidth - indent - button, header, true);
+        MoveWindow(_uncheckAllButton, width - button, variablesTop + Scale(1), button, header - Scale(2), true);
         MoveWindow(_variables, rightX, variablesTop + header, rightWidth, height - variablesTop - header, true);
+
+        _columnsGap = new RECT { left = leftWidth, top = top, right = rightX, bottom = height };
+        _editorGap = new RECT { left = 0, top = top + editorHeight, right = leftWidth, bottom = outputTop + header };
+        _imageGap = new RECT { left = rightX, top = top + header + imageHeight, right = width - button, bottom = variablesTop + header };
     }
 
 }

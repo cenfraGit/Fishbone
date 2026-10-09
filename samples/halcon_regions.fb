@@ -1,0 +1,27 @@
+// title: HALCON Regions
+// note: requires the Fishbone.Plugins.Halcon24111 plugin installed in ~/.fishbone/plugins
+// check fabrik in the tree, then blobs, edges or outlines: each one stacks over the image in
+// its own color, the last checked on top. one image shows at a time. regions and contours
+// checked without an image show on a black canvas
+
+println("HALCON regions and contours\n");
+
+read_image(out fabrik, "fabrik");
+
+// the bright parts, split into one region each, keeping the big ones
+threshold(fabrik, out bright, 200, 255);
+connection(bright, out pieces);
+select_shape(pieces, out blobs, "area", "and", 500, 99999999);
+count_obj(blobs, out blob_count);
+println(blob_count + " bright blobs");
+
+// subpixel edges, keeping the long ones
+edges_sub_pix(fabrik, out all_edges, "canny", 2, 20, 40);
+select_contours_xld(all_edges, out edges, "contour_length", 50, 99999, -0.5, 0.5);
+count_obj(edges, out edge_count);
+println(edge_count + " long edges");
+
+// the same edges as polygons, which HALCON keeps as their own kind of contour
+gen_polygons_xld(edges, out outlines, "ramer", 2);
+
+println("done");

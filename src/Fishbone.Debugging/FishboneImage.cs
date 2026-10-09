@@ -7,6 +7,11 @@ namespace Fishbone.Debugging;
 /// An image a debugger can show: 8-bit pixels, row by row with no padding. One channel is gray,
 /// three are RGB and four are RGBA. Plugins turn their own image types into this, and the
 /// debugger encodes it the same way for all of them.
+/// <para>
+/// It can also carry regions and contours to draw over the pixels, or be only shapes, with no
+/// pixels at all. A debugger draws shapes alone on an empty canvas, or over the image it's
+/// already showing.
+/// </para>
 /// </summary>
 public sealed class FishboneImage
 {
@@ -19,10 +24,53 @@ public sealed class FishboneImage
         Pixels = pixels;
     }
 
+    // only shapes, sized to hold them
+    private FishboneImage(int width, int height)
+    {
+        Width = width;
+        Height = height;
+        Pixels = [];
+    }
+
     public int Width { get; }
     public int Height { get; }
+    /// <summary>1, 3 or 4, or 0 for an image that's only shapes.</summary>
     public int Channels { get; }
     public byte[] Pixels { get; }
+
+    /// <summary>False for an image that's only shapes.</summary>
+    public bool HasPixels => Channels > 0;
+
+    /// <summary>Regions to draw over the image, in its pixel coordinates.</summary>
+    public IReadOnlyList<FishboneRegion> Regions { get; init; } = [];
+
+    /// <summary>Contours to draw over the image, in its pixel coordinates.</summary>
+    public IReadOnlyList<FishboneContour> Contours { get; init; } = [];
+
+    /// <summary>
+    /// An image that's only shapes. Its size reaches from row and column 0 to the shapes' farthest
+    /// pixel, so they keep their place when drawn over a real image.
+    /// </summary>
+    public static FishboneImage FromShapes(IReadOnlyList<FishboneRegion> regions, IReadOnlyList<FishboneContour> contours)
+    {
+        int width = 1, height = 1;
+        foreach (var region in regions)
+        {
+            if (region.Rows.Length > 0)
+                height = Math.Max(height, region.Rows.Max() + 1);
+            if (region.ColumnEnds.Length > 0)
+                width = Math.Max(width, region.ColumnEnds.Max() + 1);
+        }
+        // a point belongs to the pixel whose center is nearest
+        foreach (var contour in contours)
+        {
+            if (contour.Rows.Length > 0)
+                height = Math.Max(height, (int)Math.Floor(contour.Rows.Max() + 0.5) + 1);
+            if (contour.Columns.Length > 0)
+                width = Math.Max(width, (int)Math.Floor(contour.Columns.Max() + 0.5) + 1);
+        }
+        return new FishboneImage(width, height) { Regions = regions, Contours = contours };
+    }
 
     /// <summary>
     /// Builds an image from values of any range, like a float or 16-bit image. The lowest value
@@ -49,6 +97,8 @@ public sealed class FishboneImage
     /// </summary>
     public byte[] ToPng(int maxSide = 2048)
     {
+        if (!HasPixels)
+            throw new InvalidOperationException("The image is only shapes, it has no pixels to encode.");
         double scale = Math.Min(1, (double)maxSide / Math.Max(Width, Height));
         int width = Math.Max(1, (int)Math.Round(Width * scale));
         int height = Math.Max(1, (int)Math.Round(Height * scale));

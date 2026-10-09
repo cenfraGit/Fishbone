@@ -26,6 +26,7 @@
   <ItemGroup>
     <None Include="Procedures\**\*.hdvp" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\halcon_images.fb" Link="halcon_images.fb" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\halcon_regions.fb" Link="halcon_regions.fb" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

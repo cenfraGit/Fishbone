@@ -20,10 +20,9 @@ public sealed class DebugSnapshotHandles
     }
 
     /// <summary>
-    /// The image behind a variable reference, as PNG. Only valid while paused, like any other
-    /// reference.
+    /// The image behind a variable reference. Only valid while paused, like any other reference.
     /// </summary>
-    public byte[] GetImagePng(long reference)
+    public FishboneImage GetImage(long reference)
     {
         lock (_sync)
         {
@@ -42,7 +41,7 @@ public sealed class DebugSnapshotHandles
             {
                 throw new InvalidOperationException($"The image couldn't be read: {exception.Message}", exception);
             }
-            return image?.ToPng() ?? throw new InvalidOperationException("The variable has no image to show.");
+            return image ?? throw new InvalidOperationException("The variable has no image to show.");
         }
     }
 

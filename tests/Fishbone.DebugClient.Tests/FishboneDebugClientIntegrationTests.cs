@@ -129,7 +129,7 @@ foreach (i in c)
     }
 
     [Fact]
-    public async Task ImageVariableIsFetchedAsPngWhilePaused()
+    public async Task ImageVariableIsFetchedWithItsShapesWhilePaused()
     {
         const string sourceCode = """
 let x = 1;
@@ -137,7 +137,11 @@ x = 2;
 """;
         var configuration = new FishboneConfiguration()
             .AddValue("picture", new Picture(200))
-            .AddVisualizer<Picture>(picture => new FishboneImage(2, 1, 1, [picture.Level, 0]));
+            .AddVisualizer<Picture>(picture => new FishboneImage(2, 1, 1, [picture.Level, 0])
+            {
+                Regions = [new FishboneRegion([0], [0], [1])],
+                Contours = [new FishboneContour([0.5, 0.25], [0, 1.5])],
+            });
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await using FishboneDebugServerSession server = await FishboneDebugServer.StartAsync(new FishboneDebugServerOptions
         {
@@ -164,8 +168,16 @@ x = 2;
 
         Assert.Null(x.ImageHandle);
         Assert.NotNull(picture.ImageHandle);
-        byte[] png = await client.GetImageAsync(picture.ImageHandle, timeout.Token);
-        Assert.Equal(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }, png[..8]);
+        FishboneDebugImage image = await client.GetImageAsync(picture.ImageHandle, timeout.Token);
+        Assert.Equal(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }, image.Png[..8]);
+        Assert.Equal((2, 1), (image.Width, image.Height));
+        FishboneDebugRegion region = Assert.Single(image.Regions);
+        Assert.Equal([0], region.Rows);
+        Assert.Equal([0], region.ColumnStarts);
+        Assert.Equal([1], region.ColumnEnds);
+        FishboneDebugContour contour = Assert.Single(image.Contours);
+        Assert.Equal([0.5, 0.25], contour.Rows);
+        Assert.Equal([0, 1.5], contour.Columns);
 
         // the handle belongs to this pause
         await client.ContinueAsync(timeout.Token);
