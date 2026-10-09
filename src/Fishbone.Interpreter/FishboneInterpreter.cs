@@ -535,6 +535,7 @@ public class FishboneInterpreter
         var iterable = Evaluate(env, node.Iterable);
         IEnumerable values = iterable switch
         {
+            null => throw new FishboneRuntimeException("Cannot iterate over null."),
             IDictionary dictionary => dictionary.Keys,
             IEnumerable enumerable when enumerable is not string => enumerable,
             _ => throw new FishboneRuntimeException($"Object of type '{iterable.GetType().Name}' is not iterable.")
