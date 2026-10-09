@@ -744,6 +744,36 @@ So what a script can actually call depends entirely on who is running it. Under 
 
 The three plugins in this repo are [Math](https://github.com/cenfraGit/Fishbone/tree/main/plugins/Fishbone.Plugins.Math), [OpenCV](https://github.com/cenfraGit/Fishbone/tree/main/plugins/Fishbone.Plugins.OpenCV) and [Halcon24111](https://github.com/cenfraGit/Fishbone/tree/main/plugins/Fishbone.Plugins.Halcon24111). See the [quickstart](quickstart.md#5-plugins) for how to wire one up, and the [README](../README.md#plugins) for how to write one.
 
+### Describing what a script can see
+
+Tools like an editor need the same picture of the configuration that the interpreter has. `config.Describe()` gives it without running anything:
+
+- `Symbols` lists every name the configuration injects, with its kind (value, function, type or constant) and its .NET type. Functions and types also get their signatures: each parameter's name, type, direction (`in`, `out` or `ref`) and default
+- `Members(type, isStatic)` lists what `.` reaches on a type. That's the static members of a registered type, or the instance members of a value. It uses the same lookup as member access, so it lists exactly what a script can reach
+
+A value added with `AddValue` hides a built-in with the same name, so `Symbols` only lists the value.
+
+### Static analysis
+
+`FishboneAnalysis.Analyze(code, config.Describe())` reads a script without running it and works out the types it's sure of. It gives:
+
+- `Diagnostics`: the syntax errors, or, when the script parses, members that can't exist, like `p.Nope` on a registered `Point`. Each one has a start and end line and column
+- `TypeOf(expression, line, column)` and `VisibleAt(line, column)`: the type of an expression at a place, and the script variables in scope there
+- `CompletionsAt(text, caret)` and `CallAt(text, caret)`: what to suggest at a caret, and which call and argument the caret is in. They take the current text, which usually doesn't parse while someone is typing, so they read its tokens and take the scopes from the analysis
+
+The analyzer only reports what it's certain of. An unknown type is always silent, never an error. A type is known for:
+
+- literals, lists (`List<object?>`) and dictionaries (`Dictionary<object, object?>`)
+- operators, with the same number rules as at runtime. `/` always gives a `double`, and an `int` with a `long` gives a `long`
+- calling a registered type, which constructs exactly that type, and a type keyword like `int`, which names its static members
+- properties, fields, and calls whose overloads all return the same type. A return type that a [converter](#custom-type-converters) changes on the way back is unknown
+- a variable declared once with `let` and never assigned again or passed as `out` or `ref`
+- a `for` variable, which follows the rules in [For](#for), and a `catch` variable, which is an `Exception`
+
+Function parameters, `foreach` variables and what a script function returns are unknown.
+
+A missing member is only reported when the value can't be of a derived type that has it. Its type has to be sealed, a struct, or known exactly, like a literal or a value a registered type constructed.
+
 ---
 
 ## Security
