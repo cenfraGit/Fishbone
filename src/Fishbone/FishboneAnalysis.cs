@@ -33,7 +33,7 @@ public sealed record FishboneExpressionType(Type Type, bool IsStatic);
 /// assigned again. Script functions, their parameters and anything that depends on control flow
 /// are unknown. The rules for numbers, members and calls match the interpreter's.
 /// </remarks>
-public sealed class FishboneAnalysis
+public sealed partial class FishboneAnalysis
 {
     // Exact means the value's runtime type is Type itself, not a type derived from it
     private readonly record struct Fact(Type Type, bool IsStatic, bool Exact);

@@ -23,122 +23,44 @@ internal static partial class Program
     // the diagnostic hover uses scintilla's one call tip too
     private static bool _tipIsDiagnostic;
 
-    // ponytail: copies the whole script on every caret move inside a call. read only the text
-    // before the caret if big scripts make the caret lag
+    // ponytail: copies and lexes the script on every caret move. read only the text before
+    // the caret if big scripts make the caret lag
     private static void UpdateSignatureHelp()
     {
         int caret = (int)Sci(SCI_GETCURRENTPOS);
-        string before = Encoding.UTF8.GetString(GetEditorBytes(), 0, caret);
-        if (FindCall(before) is not var (open, argument))
+        byte[] bytes = GetEditorBytes();
+        string text = Encoding.UTF8.GetString(bytes);
+        _analysis ??= Analyze(FishboneCompletionCatalog.Shared);
+        if (_analysis?.CallAt(text, Encoding.UTF8.GetCharCount(bytes, 0, caret)) is not { } call)
         {
             HideSignatureHelp();
             return;
         }
 
-        int openByte = Encoding.UTF8.GetByteCount(before.AsSpan(0, open));
+        int openByte = Encoding.UTF8.GetByteCount(text.AsSpan(0, call.OpenParen));
         if (openByte == _tipCall)
         {
             // the same call. scintilla shows only one of the tip and the completion list, so the
             // tip waits while the list is open, and comes back after unless Escape closed it
-            if (argument != _tipArgument)
+            if (call.Argument != _tipArgument)
                 _tipDismissed = false;
             if (Sci(SCI_AUTOCACTIVE) != 0)
                 return;
-            if (argument != _tipArgument || (!_tipDismissed && Sci(SCI_CALLTIPACTIVE) == 0))
+            if (call.Argument != _tipArgument || (!_tipDismissed && Sci(SCI_CALLTIPACTIVE) == 0))
             {
-                _tipArgument = argument;
+                _tipArgument = call.Argument;
                 ShowSignature();
             }
             return;
         }
 
-        if (SignaturesFor(before[..open]) is not { Count: > 0 } signatures)
-        {
-            HideSignatureHelp();
-            return;
-        }
         _tipCall = openByte;
         _tipDismissed = false;
-        _tipSignatures = signatures;
-        _tipArgument = argument;
+        _tipSignatures = call.Signatures.Select(signature => FishboneCompletionCatalog.ToDisplay(call.Name, signature)).ToList();
+        _tipArgument = call.Argument;
         // start on the first overload that has room for the argument the caret is on
-        _tipOverload = Math.Max(0, signatures.ToList().FindIndex(signature => signature.Parameters.Count > argument));
+        _tipOverload = Math.Max(0, _tipSignatures.ToList().FindIndex(signature => signature.Parameters.Count > call.Argument));
         ShowSignature();
-    }
-
-    // the '(' of the call the caret is inside, and how many arguments come before the caret.
-    // a call can't hold a ';', so the search stops at one
-    private static (int Open, int Argument)? FindCall(string text)
-    {
-        int depth = 0, open = -1;
-        for (int i = text.Length - 1; i >= 0 && open < 0; i--)
-        {
-            char c = text[i];
-            if (c is ')' or ']' or '}')
-                depth++;
-            else if (c is '(' or '[' or '{')
-            {
-                // an open list, dictionary or block means the caret isn't on a call's argument
-                if (depth > 0)
-                    depth--;
-                else if (c == '(')
-                    open = i;
-                else
-                    return null;
-            }
-            else if (depth == 0 && c == ';')
-                return null;
-        }
-        if (open < 0)
-            return null;
-
-        int nesting = 0, argument = 0;
-        foreach (char c in text.AsSpan(open + 1))
-        {
-            if (c is '(' or '[' or '{')
-                nesting++;
-            else if (c is ')' or ']' or '}')
-                nesting--;
-            else if (c == ',' && nesting == 0)
-                argument++;
-        }
-        return (open, argument);
-    }
-
-    // the overloads of whatever is called: a method on a known type, a script function, or a
-    // function or type from the configuration. a script name hides the configuration's
-    private static IReadOnlyList<FishboneSignature>? SignaturesFor(string text)
-    {
-        string trimmed = text.TrimEnd();
-        string callee = ExpressionBefore(trimmed);
-        if (callee.Length == 0 || char.IsDigit(callee[0]))
-            return null;
-
-        int start = trimmed.Length - callee.Length;
-        int line = trimmed.AsSpan(0, start).Count('\n') + 1;
-        int column = start - (trimmed.LastIndexOf('\n', Math.Max(0, start - 1)) + 1) + 1;
-        FishboneCompletionCatalog catalog = FishboneCompletionCatalog.Shared;
-        _analysis ??= Analyze(catalog);
-
-        int dot = callee.LastIndexOf('.');
-        if (dot >= 0)
-        {
-            string name = callee[(dot + 1)..];
-            if (catalog.Description is not { } description || _analysis?.TypeOf(callee[..dot], line, column) is not { } type)
-                return null;
-            return description.Members(type.Type, type.IsStatic)
-                .FirstOrDefault(member => member.Name == name && member.Kind == FishboneMemberKind.Method)?
-                .Signatures.Select(signature => FishboneCompletionCatalog.ToDisplay(name, signature))
-                .ToList();
-        }
-
-        if (_analysis?.VisibleAt(line, column).FirstOrDefault(variable => variable.Name == callee) is { } script)
-            return script.Parameters is null ? null :
-            [
-                new FishboneSignature(callee, script.Parameters
-                    .Select(parameter => new FishboneParameter(parameter, "", FishboneParamDirection.In)).ToList(), null)
-            ];
-        return catalog.Signatures.GetValueOrDefault(callee);
     }
 
     private static void ShowSignature()

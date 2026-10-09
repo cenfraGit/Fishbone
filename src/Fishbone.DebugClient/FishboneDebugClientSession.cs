@@ -321,6 +321,9 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
     {
         if (State != FishboneDebugSessionState.Paused) return;
         await request(RequireClient()).ConfigureAwait(false);
+        // the pause is over once the adapter accepts, before its continued event arrives, so
+        // this pause's handles stop working now
+        Interlocked.Increment(ref _generation);
     }
 
     private async Task PumpEventsAsync(CancellationToken cancellationToken)

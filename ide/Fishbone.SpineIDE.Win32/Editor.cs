@@ -28,7 +28,7 @@ internal static partial class Program
         SCI_AUTOCSHOW = 2100, SCI_AUTOCSETIGNORECASE = 2115, SCI_AUTOCSETORDER = 2660, SCI_GETCHARAT = 2007,
         SCI_POSITIONFROMLINE = 2167, SCI_INDICSETSTYLE = 2080, SCI_INDICSETFORE = 2082, SCI_SETINDICATORCURRENT = 2500,
         SCI_INDICATORFILLRANGE = 2504, SCI_INDICATORCLEARRANGE = 2505, SCI_SETMOUSEDWELLTIME = 2264,
-        SCI_CALLTIPSHOW = 2200, SCI_CALLTIPCANCEL = 2201, SCI_GETSTYLEAT = 2010;
+        SCI_CALLTIPSHOW = 2200, SCI_CALLTIPCANCEL = 2201;
     private const int SCN_STYLENEEDED = 2000, SCN_CHARADDED = 2001, SCN_MODIFIED = 2008, SCN_MARGINCLICK = 2010,
         SCN_DWELLSTART = 2016, SCN_DWELLEND = 2017, STYLE_DEFAULT = 32;
     private const int IndicatorDiagnostic = 8, AnalysisTimer = 1;
@@ -284,69 +284,18 @@ internal static partial class Program
         bool opens = afterDot ? typed <= 1 : typed == 1;
         if (!forced && !opens)
             return;
-        // a dot in a comment or a string isn't member access
-        if (afterDot && wordStart >= 2 && Sci(SCI_GETSTYLEAT, wordStart - 2) is StyleComment or StyleString)
+
+        // the analysis takes character offsets, scintilla byte positions
+        byte[] bytes = GetEditorBytes();
+        string text = Encoding.UTF8.GetString(bytes);
+        _analysis ??= Analyze(FishboneCompletionCatalog.Shared);
+        if (_analysis?.CompletionsAt(text, Encoding.UTF8.GetCharCount(bytes, 0, caret)) is not { } completions)
             return;
 
-        byte[] bytes = GetEditorBytes();
-        string prefix = Encoding.UTF8.GetString(bytes, wordStart, typed);
-        // what comes before the caret, as text, so lines and columns count characters like the parser
-        string before = Encoding.UTF8.GetString(bytes, 0, wordStart);
-        int lineStart = before.LastIndexOf('\n') + 1;
-        int line = before.Count(c => c == '\n') + 1;
-        FishboneCompletionCatalog catalog = FishboneCompletionCatalog.Shared;
-        _analysis ??= Analyze(catalog);
-
-        IEnumerable<string> names;
-        if (afterDot)
-        {
-            // members of whatever is before the dot, when its type is known. never the globals
-            string expression = ExpressionBefore(before[..^1]);
-            if (expression.Length == 0 || char.IsDigit(expression[0]) || catalog.Description is not { } description
-                || _analysis?.TypeOf(expression, line, before.Length - expression.Length - lineStart) is not { } type)
-                return;
-            names = description.Members(type.Type, type.IsStatic).Select(member => member.Name);
-        }
-        else
-        {
-            names = catalog.Keywords
-                .Concat(prefix.Length > 0
-                    ? catalog.GlobalsByInitial.GetValueOrDefault(char.ToLowerInvariant(prefix[0]), [])
-                    : catalog.Globals)
-                .Select(item => item.Text);
-            if (_analysis is not null)
-                names = names.Concat(_analysis.VisibleAt(line, before.Length - lineStart + 1).Select(variable => variable.Name));
-        }
-
-        // scintilla only moves the selection as you type, it never hides entries, so keep the list to the prefix
-        string list = string.Join(' ', names
-            .Where(name => name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && !name.Contains(' '))
-            .Distinct());
-        if (list.Length > 0)
-            Sci(SCI_AUTOCSHOW, typed, Utf8(list));
-    }
-
-    // the expression before a dot: names, dots, and calls or indexes with balanced brackets,
-    // like a.b(1)[2]. anything goes inside the brackets
-    private static string ExpressionBefore(string text)
-    {
-        int start = text.Length, depth = 0;
-        while (start > 0)
-        {
-            char c = text[start - 1];
-            if (c is ')' or ']')
-                depth++;
-            else if (c is '(' or '[')
-            {
-                if (depth == 0)
-                    break;
-                depth--;
-            }
-            else if (depth == 0 && !char.IsLetterOrDigit(c) && c is not ('_' or '.'))
-                break;
-            start--;
-        }
-        return text[start..];
+        // the list only holds the matches, since scintilla moves the selection as you type but never hides entries
+        string list = string.Join(' ', completions.Items.Select(item => item.Text).Where(name => !name.Contains(' ')));
+        int typedBytes = caret - Encoding.UTF8.GetByteCount(text.AsSpan(0, completions.Start));
+        Sci(SCI_AUTOCSHOW, typedBytes, Utf8(list));
     }
 
     // --------------------------------------------------------------------------------
