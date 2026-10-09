@@ -467,7 +467,7 @@ break;
 continue;
 ```
 
-`break` leaves the innermost loop, `continue` skips to its next iteration.
+`break` leaves the innermost loop, `continue` skips to its next iteration. Either one outside a loop is a parse error. A function body counts as outside, so a `break` in a function can't leave a loop around the call.
 
 ### Return
 
@@ -476,7 +476,7 @@ return;
 return expr;
 ```
 
-Exits the current Fishbone function. A bare `return;` yields `null`.
+Exits the current Fishbone function. A bare `return;` yields `null`. A `return` outside a function is a parse error.
 
 Returning more than one value isn't supported, so `return a, b;` is a syntax error. Return a list if you need to hand back several things.
 

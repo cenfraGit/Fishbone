@@ -22,6 +22,7 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
     private readonly SemaphoreSlim _requestGate = new(1, 1);
     private Process? _process;
     private TcpClient? _tcpClient;
+    private Task _transportClosed = Task.Delay(Timeout.Infinite);
     private DebugAdapterClient? _client;
     private Source? _dapSource;
     private Task? _eventPump;
@@ -97,6 +98,7 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
                 options.OnExited(value => _exitCode = checked((int)value.ExitCode));
             });
             _eventPump = PumpEventsAsync(_lifetime.Token);
+            _transportClosed = stream.Disconnected;
             _transportMonitor = WatchTransportAsync(stream.Disconnected, _lifetime.Token);
             await _client.Initialize(linked.Token).ConfigureAwait(false);
             var attach = new AttachRequestArguments();
@@ -259,8 +261,13 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
         PublishState(FishboneDebugSessionState.Stopping);
         try
         {
+            // a detached host whose script was on its last line finishes and closes the
+            // connection before its answer goes out, and the dap client waits for that answer
+            // forever. the connection closing after the request means the disconnect is done
             if (_client is not null)
-                await _client.RequestDisconnect(new DisconnectArguments { TerminateDebuggee = false }, cancellationToken).ConfigureAwait(false);
+                await Task.WhenAny(
+                    _client.RequestDisconnect(new DisconnectArguments { TerminateDebuggee = false }, cancellationToken),
+                    _transportClosed).WaitAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -320,10 +327,12 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
     private async Task ResumeAsync(Func<DebugAdapterClient, Task> request)
     {
         if (State != FishboneDebugSessionState.Paused) return;
+        int pause = Volatile.Read(ref _generation);
         await request(RequireClient()).ConfigureAwait(false);
         // the pause is over once the adapter accepts, before its continued event arrives, so
-        // this pause's handles stop working now
-        Interlocked.Increment(ref _generation);
+        // this pause's handles stop working now. the next pause can be announced before the
+        // answer arrives, and its handles are already newer, so they're left alone
+        Interlocked.CompareExchange(ref _generation, pause + 1, pause);
     }
 
     private async Task PumpEventsAsync(CancellationToken cancellationToken)

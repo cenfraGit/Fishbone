@@ -14,9 +14,16 @@ public static class FishbonePluginLoader
     private static readonly List<string> _registeredPluginDirs = [];
     private static bool _resolverRegistered;
 
+    /// <summary>The variable that, when set, replaces <see cref="DefaultPluginsDirectory"/>.</summary>
+    public const string PluginsDirectoryVariable = "FISHBONE_PLUGINS_DIR";
+
+    /// <summary>
+    /// <c>~/.fishbone/plugins</c>, or the folder in <see cref="PluginsDirectoryVariable"/> when it's set.
+    /// </summary>
     public static string DefaultPluginsDirectory =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                     ".fishbone", "plugins");
+        Environment.GetEnvironmentVariable(PluginsDirectoryVariable) is { Length: > 0 } directory
+            ? directory
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".fishbone", "plugins");
 
     public static IReadOnlyList<string> LoadPlugins(string pluginsPath, FishboneConfiguration config)
     {

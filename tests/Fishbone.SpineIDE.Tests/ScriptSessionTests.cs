@@ -110,8 +110,11 @@ public class ScriptSessionTests
     {
         var (session, _, output) = Create();
 
+        // stop only cancels a run that has started, so wait for it instead of guessing a delay
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        session.Started += () => started.TrySetResult();
         var run = session.RunAsync("while (true) { }", null, NoInput);
-        await Task.Delay(100);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await session.StopAsync();
         var outcome = await run.WaitAsync(TimeSpan.FromSeconds(5));
 

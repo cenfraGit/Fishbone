@@ -1,4 +1,3 @@
-﻿using Fishbone;
 using Fishbone;
 using System.CommandLine;
 
@@ -49,7 +48,7 @@ internal class Program
             bool showBuiltins = parseResult.GetValue(optionShowBuiltins);
             bool showPlugins = parseResult.GetValue(optionShowPlugins);
 
-            ExecuteScript(scriptFile, showValues, showBuiltins, showPlugins);
+            return ExecuteScript(scriptFile, showValues, showBuiltins, showPlugins);
         });
 
         ParseResult parseResult = rootCommand.Parse(args);
@@ -57,7 +56,8 @@ internal class Program
         return parseResult.Invoke();
     }
 
-    static void ExecuteScript(FileInfo script, bool showValues, bool showBuiltins, bool showPlugins)
+    // 1 when the script fails, so a shell or a build step can tell
+    static int ExecuteScript(FileInfo script, bool showValues, bool showBuiltins, bool showPlugins)
     {
         if (!File.Exists(script.FullName))
             throw new FileNotFoundException(script.FullName);
@@ -87,7 +87,7 @@ internal class Program
                 else
                     Console.Error.WriteLine($"Error: {error.Message}");
             }
-            return;
+            return 1;
         }
         catch (FishboneRuntimeException ex)
         {
@@ -95,12 +95,12 @@ internal class Program
                 Console.Error.WriteLine($"Error at line {ex.Line}, column {ex.Column}: {ex.Message}");
             else
                 Console.Error.WriteLine($"Error: {ex.Message}");
-            return;
+            return 1;
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Error: {ex.Message}");
-            return;
+            return 1;
         }
 
         if (showValues)
@@ -126,5 +126,7 @@ internal class Program
                 foreach (var plugin in _loadedPlugins)
                     Console.WriteLine(plugin);
         }
+
+        return 0;
     }
 }

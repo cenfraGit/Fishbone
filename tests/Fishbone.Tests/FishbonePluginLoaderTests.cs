@@ -53,12 +53,12 @@ public class FishbonePluginLoaderTests
     }
 
     [Fact]
-    public void DefaultPluginsDirectory_UsesUserProfile()
+    public void DefaultPluginsDirectory_FollowsTheVariable()
     {
-        string expected = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".fishbone", "plugins");
+        // every test assembly sets it, see tests/IsolatedPlugins.cs
+        string? isolated = Environment.GetEnvironmentVariable(FishbonePluginLoader.PluginsDirectoryVariable);
 
-        Assert.Equal(expected, FishbonePluginLoader.DefaultPluginsDirectory);
+        Assert.False(string.IsNullOrEmpty(isolated));
+        Assert.Equal(isolated, FishbonePluginLoader.DefaultPluginsDirectory);
     }
 }

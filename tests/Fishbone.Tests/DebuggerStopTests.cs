@@ -181,4 +181,30 @@ let done = true;
         else
             Assert.Empty(pauses);
     }
+
+    [Theory]
+    [InlineData("ready();\nwhile (true) { }")]
+    [InlineData("ready();\nlet n = 0;\nwhile (true) n = n + 1;")]
+    [InlineData("ready();\nlet n = 0;\nwhile (true) {\n    n = n + 1;\n}")]
+    public async Task Pause_StopsALoopThatNeverLeavesItsLine(string source)
+    {
+        // an endless loop is exactly when someone presses pause. a loop that stays on one line used
+        // to never reach a new location, so the pause never happened
+        using var coordinator = new BreakpointCoordinator("test.fb");
+        using var ready = new ManualResetEventSlim();
+        var paused = new TaskCompletionSource<DebugPauseReason>(TaskCreationOptions.RunContinuationsAsynchronously);
+        coordinator.Paused += (_, args) =>
+        {
+            paused.TrySetResult(args.Snapshot.Reason);
+            coordinator.Stop();
+        };
+        var config = new FishboneConfiguration().AddBuiltIn("ready", new Action(ready.Set));
+
+        var run = Task.Run(() => FishboneProgram.Run(source, config, coordinator));
+        Assert.True(ready.Wait(TimeSpan.FromSeconds(10)));
+        coordinator.Pause();
+
+        Assert.Equal(DebugPauseReason.ManualPause, await paused.Task.WaitAsync(TimeSpan.FromSeconds(10)));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run.WaitAsync(TimeSpan.FromSeconds(10)));
+    }
 }

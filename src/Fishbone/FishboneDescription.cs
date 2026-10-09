@@ -73,9 +73,10 @@ public sealed class FishboneDescription
 {
     internal FishboneDescription(FishboneConfiguration configuration)
     {
-        // a value shadows a built-in with the same name, so it's the one a script sees
+        // a value shadows a built-in with the same name, so it's the one a script sees. a null
+        // has no type of its own, so it's described as an object
         Symbols = configuration.Values
-            .Select(entry => new FishboneSymbol(entry.Key, FishboneSymbolKind.Value, entry.Value.GetType(), []))
+            .Select(entry => new FishboneSymbol(entry.Key, FishboneSymbolKind.Value, entry.Value?.GetType() ?? typeof(object), []))
             .Concat(configuration.BuiltIns
                 .Where(entry => !configuration.Values.ContainsKey(entry.Key))
                 .Select(entry => DescribeBuiltIn(entry.Key, entry.Value)))
@@ -101,14 +102,14 @@ public sealed class FishboneDescription
             .Select(member => DescribeMember(member.Name, member.Lookup))
             .ToArray();
 
-    private static FishboneSymbol DescribeBuiltIn(string name, object value) => value switch
+    private static FishboneSymbol DescribeBuiltIn(string name, object? value) => value switch
     {
         Delegate function => new(name, FishboneSymbolKind.Function, value.GetType(), [DescribeDelegate(function)]),
         BoundMethod methods => new(name, FishboneSymbolKind.Function, value.GetType(),
             methods.Methods.Select(method => DescribeMethod(method, method.ReturnType)).ToArray()),
         IManualCallable callable => new(name, FishboneSymbolKind.Function, value.GetType(), [DescribeManual(callable)]),
         RegisteredType registered => new(name, FishboneSymbolKind.Type, registered.Type, DescribeConstructors(registered.Type)),
-        _ => new(name, FishboneSymbolKind.Constant, value.GetType(), [])
+        _ => new(name, FishboneSymbolKind.Constant, value?.GetType() ?? typeof(object), [])
     };
 
     // a delegate is called through its Invoke, which carries the delegate type's defaults. the

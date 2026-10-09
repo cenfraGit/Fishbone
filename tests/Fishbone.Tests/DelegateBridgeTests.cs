@@ -6,8 +6,9 @@ public class DelegateBridgeTests
     public void Run_CSharpDelegateBridge_InvokesAndMarshalsTypesCorrectly()
     {
         var config = new FishboneConfiguration()
+            // invariant, so the expected text doesn't depend on the machine's culture
             .AddBuiltIn("formatValue", new Func<double, int, string>((val, precision) =>
-                val.ToString($"F{precision}")));
+                val.ToString($"F{precision}", System.Globalization.CultureInfo.InvariantCulture)));
 
         var env = FishboneProgram.Run("""
 let scriptResult = formatValue(42, 3);

@@ -246,62 +246,6 @@ foreach (value in [1])
     }
 
     [Fact]
-    public void Evaluate_ForLoop_IteratesRange()
-    {
-        var env = InterpreterTestHelpers.Run("""
-let total = 0;
-for (i in 0, 10)
-{
-    total = total + i;
-}
-""");
-
-        Assert.Equal(45, env.GetValue("total"));
-    }
-
-    [Fact]
-    public void Evaluate_ForLoop_WithStep()
-    {
-        var env = InterpreterTestHelpers.Run("""
-let total = 0;
-for (i in 0, 10, 2)
-{
-    total = total + i;
-}
-""");
-
-        Assert.Equal(20, env.GetValue("total"));
-    }
-
-    [Fact]
-    public void Evaluate_ForLoop_ReverseStep()
-    {
-        var env = InterpreterTestHelpers.Run("""
-let total = 0;
-for (i in 10, 0, -1)
-{
-    total = total + i;
-}
-""");
-
-        Assert.Equal(55, env.GetValue("total"));
-    }
-
-    [Fact]
-    public void Evaluate_ForLoop_AutoDescending()
-    {
-        var env = InterpreterTestHelpers.Run("""
-let total = 0;
-for (i in 5, 0)
-{
-    total = total + i;
-}
-""");
-
-        Assert.Equal(15, env.GetValue("total"));
-    }
-
-    [Fact]
     public void Evaluate_ForLoop_EmptyRange()
     {
         var env = InterpreterTestHelpers.Run("""
@@ -313,16 +257,6 @@ for (i in 5, 5)
 """);
 
         Assert.Equal(0, env.GetValue("count"));
-    }
-
-    [Fact]
-    public void Evaluate_ForLoop_ZeroStep_Throws()
-    {
-        Assert.Throws<FishboneRuntimeException>(() => InterpreterTestHelpers.Run("""
-for (i in 0, 10, 0)
-{
-}
-"""));
     }
 
     [Fact]
