@@ -21,8 +21,9 @@ public sealed class ManualFactAttribute : FactAttribute
 /// <summary>
 /// Opens the SpineIDE built from this repo, attached to a host the way <c>RunDebuggableAsync</c>
 /// does for an app. The IDE stops on the first line. Step around, check images into the preview,
-/// try watches, then continue to the end, and the test checks the script ran. The host loads the
-/// plugins installed in ~/.fishbone/plugins, like SpineIDE's own debug host does.
+/// try watches, then continue to the end, where it stops once more on the final values, and
+/// continue again to finish. The host loads the plugins installed in ~/.fishbone/plugins, like
+/// SpineIDE's own debug host does. A SpineIDE an earlier test opened is reused while it's idle.
 /// </summary>
 [Collection("DebugServer")]
 public class SpineIdeAttachTests
@@ -56,31 +57,65 @@ public class SpineIdeAttachTests
         Assert.Equal(10, result.Environment!.GetValue("total"));
     }
 
+    // the same window debugs both runs: the second attaches to the SpineIDE the first opened
+    [ManualFact]
+    public async Task RunDebuggableAsync_Twice_ReusesTheSpineIde()
+    {
+        for (int run = 1; run <= 2; run++)
+        {
+            var result = await RunAttachedAsync($"let run = {run};\nlet image = picture;\nprintln(run);", $"run-{run}.fb", new FishboneConfiguration()
+                .AddBuiltIn("picture", new Picture())
+                .AddVisualizer<Picture>(_ => Gradient()));
+            Assert.Equal(run, result.Environment!.GetValue("run"));
+        }
+    }
+
     // the regions sample, for HALCON regions and contours in the preview, and watches like
     // count_obj(blobs, out n). it needs the HALCON plugin installed
     [ManualFact]
     public async Task RunDebuggableAsync_OpensSpineIdeOnTheHalconRegionsSample()
     {
         string sample = Path.Combine(RepositoryRoot().FullName, "samples", "halcon_regions.fb");
+        var config = new FishboneConfiguration();
+        string loaded = LoadInstalledPlugins(config);
+        Assert.True(config.BuiltIns.ContainsKey("read_image"), $"the HALCON plugin didn't load. {loaded}");
 
-        var result = await RunAttachedAsync(File.ReadAllText(sample), Path.GetFileName(sample), new FishboneConfiguration());
+        var result = await RunAttachedAsync(File.ReadAllText(sample), Path.GetFileName(sample), config, pluginsLoaded: true);
 
         Assert.True(result.Environment!.IsDefined("blobs"));
     }
 
-    private static async Task<FishboneRunResult> RunAttachedAsync(string script, string name, FishboneConfiguration config)
+    // what loaded and what failed, which the loader only writes to stderr
+    private static string LoadInstalledPlugins(FishboneConfiguration config)
+    {
+        var errors = new StringWriter();
+        TextWriter stderr = Console.Error;
+        Console.SetError(errors);
+        try
+        {
+            var loaded = FishbonePluginLoader.LoadPlugins(FishbonePluginLoader.DefaultPluginsDirectory, config);
+            return $"from {FishbonePluginLoader.DefaultPluginsDirectory}, loaded: [{string.Join(", ", loaded)}], errors: [{errors.ToString().Trim()}]";
+        }
+        finally
+        {
+            Console.SetError(stderr);
+        }
+    }
+
+    private static async Task<FishboneRunResult> RunAttachedAsync(string script, string name, FishboneConfiguration config, bool pluginsLoaded = false)
     {
         string ide = FindSpineIde();
         // attached, println goes to the IDE's output instead
         config.AddBuiltIn("println", new Action<object?>(Console.WriteLine));
-        FishbonePluginLoader.LoadPlugins(FishbonePluginLoader.DefaultPluginsDirectory, config);
+        if (!pluginsLoaded)
+            LoadInstalledPlugins(config);
 
         var result = await FishboneProgram.FromSourceCode(script).RunDebuggableAsync(config, new FishboneDebugOptions
         {
             OpenIde = true,
             AttachTimeout = TimeSpan.FromSeconds(30),
             SourceName = name,
-            IdeLauncher = endpoint => Process.Start(ide, $"--attach {endpoint.Port}"),
+            IdeLauncher = endpoint => SpineIdeLauncher.Launch(endpoint, ide),
         });
 
         Assert.True(result.DebuggerAttached, "SpineIDE didn't attach within 30 seconds");
