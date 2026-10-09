@@ -952,7 +952,7 @@ public class FishboneInterpreter
         foreach (var method in methods)
         {
             var parameters = ReflectionCache.GetParameters(method);
-            if (!TryBindOverload(parameters, parameterNames, argumentNodes, rawArgs, out var args, out var writeBacks, out var score, out var defaultsUsed, out var diagnostic))
+            if (!TryBindOverload(parameters, parameterNames, argumentNodes, rawArgs, methodName, out var args, out var writeBacks, out var score, out var defaultsUsed, out var diagnostic))
             {
                 deferredDiagnostic ??= diagnostic;
                 continue;
@@ -1009,6 +1009,7 @@ public class FishboneInterpreter
         string?[]? parameterNames,
         IReadOnlyList<ArgumentNode> argumentNodes,
         object?[] rawArgs,
+        string methodName,
         out object?[] args,
         out List<(string Name, int Index, bool IsOut)> writeBacks,
         out int score,
@@ -1091,7 +1092,7 @@ public class FishboneInterpreter
                 var refMatch = ConvertArgument(rawArgs[i], targetType, out var refConverted);
                 if (refMatch == ArgumentMatch.None)
                 {
-                    diagnostic ??= DescribeConversionFailure(i, rawArgs[i], name!, targetType);
+                    diagnostic ??= DescribeConversionFailure(i, rawArgs[i], name!, targetType, methodName);
                     return false;
                 }
 
@@ -1110,7 +1111,7 @@ public class FishboneInterpreter
             var match = ConvertArgument(rawArgs[i], targetType, out var convertedArg);
             if (match == ArgumentMatch.None)
             {
-                diagnostic ??= DescribeConversionFailure(i, rawArgs[i], name!, targetType);
+                diagnostic ??= DescribeConversionFailure(i, rawArgs[i], name!, targetType, methodName);
                 return false;
             }
 
@@ -1121,19 +1122,20 @@ public class FishboneInterpreter
         return true;
     }
 
-    // builds the diagnostic shown when an argument cannot be converted to its parameter type
-    private string DescribeConversionFailure(int index, object? rawArg, string parameterName, Type targetType)
+    // builds the diagnostic shown when an argument cannot be converted to its parameter type, like
+    // "'count_obj' argument 1 ('objects') takes 'HObject', not 'Picture'." a callable built by
+    // the host has no name to give
+    private string DescribeConversionFailure(int index, object? rawArg, string parameterName, Type targetType, string? methodName = null)
     {
-        var message = $"Argument {index + 1} of type '{FormatTypeName(rawArg?.GetType())}' is not compatible with " +
-            $"parameter '{parameterName}' of type '{FormatTypeName(targetType)}'";
+        var message = (methodName is null ? "Argument" : $"'{methodName}' argument") +
+            $" {index + 1} ('{parameterName}') takes '{FormatTypeName(targetType)}', not '{FormatTypeName(rawArg?.GetType())}'";
 
         // a list going to a collection names the first element that doesn't fit
         if (rawArg is List<object?> list && GetCollectionElementType(targetType) is { } elementType)
         {
             var bad = list.FindIndex(element => !TryConvertArgument(element, elementType, out _));
             if (bad >= 0)
-                message += $": element {bad + 1} of type '{FormatTypeName(list[bad]?.GetType())}' " +
-                    $"is not compatible with '{FormatTypeName(elementType)}'";
+                message += $": element {bad + 1} is '{FormatTypeName(list[bad]?.GetType())}', not '{FormatTypeName(elementType)}'";
         }
 
         return message + ".";

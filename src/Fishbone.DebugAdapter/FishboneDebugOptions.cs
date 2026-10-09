@@ -33,8 +33,9 @@ public sealed class FishboneDebugOptions
     /// <summary>
     /// Launches an IDE/debug client pointed at the given endpoint, returning the launched process
     /// (or null if it could not be launched, in which case the run falls back to headless). When
-    /// null, a default launcher locates SpineIDE via the <c>SPINEIDE_PATH</c> environment variable,
-    /// a path next to the host application, or <c>PATH</c>.
+    /// null, <see cref="SpineIdeLauncher.Launch"/> attaches a SpineIDE an earlier run opened, when
+    /// one is idle, or starts SpineIDE, found via the <c>SPINEIDE_PATH</c> environment variable, a
+    /// path next to the host application, or <c>PATH</c>.
     /// </summary>
     public Func<IPEndPoint, Process?>? IdeLauncher { get; init; }
 }

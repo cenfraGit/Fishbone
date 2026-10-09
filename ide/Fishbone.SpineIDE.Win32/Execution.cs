@@ -13,6 +13,10 @@ internal static partial class Program
     // only touched on the ui thread
     private static bool _running;
     private static bool _paused;
+    // the pause after the last statement. resuming it ends the session
+    private static bool _atProgramExit;
+    // the error the script stopped on, already in the output, so it isn't written again at the end
+    private static string? _shownError;
     // a run under the debugger, started here or attached to a host
     private static bool _debugging;
 
@@ -23,10 +27,16 @@ internal static partial class Program
         _session.Started += () => Post(() =>
         {
             SetWindowTextW(_output, "");
+            _shownError = null;
             ClearVariables();
             ClearPreview();
+            RefreshWatches();
         });
-        _session.Output += text => Post(() => AppendOutput(text));
+        _session.Output += text => Post(() =>
+        {
+            if (_shownError is null || text.Trim() != _shownError)
+                AppendOutput(text);
+        });
         _session.Paused += (snapshot, session, isProgramExit) => Post(() => OnPaused(snapshot, session, isProgramExit));
         _session.Continued += () => Post(() =>
         {
@@ -52,7 +62,7 @@ internal static partial class Program
     {
         if (_paused)
         {
-            _ = _session.ContinueAsync();
+            Resume(_session.ContinueAsync);
             return;
         }
         // the debug host runs the script from its file, so it's saved first
@@ -65,6 +75,31 @@ internal static partial class Program
     }
 
     private const uint SCI_SETREADONLY = 2171;
+
+    // continuing and stepping. at the pause after the last statement that ends the session, so
+    // the images first are kept for the preview
+    private static async void Resume(Func<Task> resume)
+    {
+        if (!_paused)
+            return;
+        if (_atProgramExit)
+            await KeepFinalImagesAsync();
+        try
+        {
+            await resume();
+        }
+        catch (Exception exception)
+        {
+            Post(() => SetWindowTextW(_status, $"couldn't continue: {exception.Message}"));
+        }
+    }
+
+    private static async void StopSession()
+    {
+        if (_paused && _atProgramExit)
+            await KeepFinalImagesAsync();
+        await _session.StopAsync();
+    }
 
     private static async void Attach(int port)
     {
@@ -114,7 +149,7 @@ internal static partial class Program
         if (outcome is null)
             return;
 
-        foreach (ScriptExecutionError error in outcome.Errors)
+        foreach (ScriptExecutionError error in outcome.Errors.Where(error => _shownError is null || !error.ExMessage.Contains(_shownError)))
             AppendOutput(error.HasLocation
                 ? $"error at {error.LocationDisplay.ToLowerInvariant()}: {error.ExMessage}{Environment.NewLine}"
                 : $"error: {error.ExMessage}{Environment.NewLine}");
@@ -131,7 +166,19 @@ internal static partial class Program
         FishboneDebugFrame? frame = snapshot.Frames.FirstOrDefault();
         ShowDebugVariables(frame, session);
         _paused = true;
+        _atProgramExit = isProgramExit;
         UpdateToolbar();
+
+        // the error shows right away. the script can't go on from it, so continuing or stepping ends it
+        if (snapshot.Exception is { } error)
+        {
+            _shownError = error.Description ?? error.Id;
+            AppendOutput($"error at line {frame?.Line}: {_shownError}{Environment.NewLine}");
+            if (frame is not null)
+                ShowCurrentLine(frame.Line - 1);
+            SetWindowTextW(_status, $"stopped on an error at line {frame?.Line}. continue or step to end the script");
+            return;
+        }
 
         // the pause after the last statement only shows the final values. it stays until the
         // user continues, so they can still be looked at

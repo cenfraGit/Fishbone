@@ -41,6 +41,7 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
         _hostLocator = hostLocator;
         _host = string.Empty;
         Ownership = FishboneDebugSessionOwnership.Launched;
+        PauseAtEnd = true;
     }
 
     private FishboneDebugClientSession(string host, int port)
@@ -57,6 +58,10 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
     public event EventHandler<FishboneDebugEvent>? EventReceived;
     public FishboneDebugSessionState State { get; private set; } = FishboneDebugSessionState.Starting;
     public FishboneDebugSessionOwnership Ownership { get; }
+
+    // a host this session started has no one else waiting on it, so it can stay paused at the end
+    // to show the final values. someone else's host is only held up when the client asks
+    public bool PauseAtEnd { get; set; }
     public FishboneDebugSource? Source { get; private set; }
 
     public async Task<FishboneDebugSource> ConnectAsync(bool stopOnEntry = false, CancellationToken cancellationToken = default)
@@ -103,9 +108,7 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
             await _client.Initialize(linked.Token).ConfigureAwait(false);
             var attach = new AttachRequestArguments();
             attach.ExtensionData["stopOnEntry"] = stopOnEntry;
-            // a host this session started has no one else waiting on it, so it can stay paused at
-            // the end to show the final values. someone else's host shouldn't be held up like that
-            attach.ExtensionData["pauseAtEnd"] = Ownership == FishboneDebugSessionOwnership.Launched;
+            attach.ExtensionData["pauseAtEnd"] = PauseAtEnd;
             await _client.Attach(attach, linked.Token).ConfigureAwait(false);
             var loaded = await _client.RequestLoadedSources(new LoadedSourcesArguments(), linked.Token).ConfigureAwait(false);
             _dapSource = loaded.Sources?.FirstOrDefault()
@@ -207,6 +210,7 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
     // the custom request the Fishbone debug adapter serves, see FishboneImageArguments there
     private const string ImageCommand = "fishbone/image";
     private const string ImageKind = "fishbone.image";
+    private const string FailedEvaluation = "failedEvaluation";
 
     private sealed record ImageResponse(string Png, int Width, int Height, FishboneDebugRegion[]? Regions, FishboneDebugContour[]? Contours);
 
@@ -216,6 +220,42 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
             throw new InvalidOperationException("The variable reference belongs to an inactive pause.");
         var response = await RequireClient().RequestVariables(new VariablesArguments { VariablesReference = handle.Reference }, cancellationToken).ConfigureAwait(false);
         return (response.Variables ?? []).Select(variable => MapVariable(variable, handle.Generation)).ToArray();
+    }
+
+    public async Task<FishboneDebugVariable> EvaluateAsync(string expression, CancellationToken cancellationToken = default)
+    {
+        int generation = Volatile.Read(ref _generation);
+        if (State != FishboneDebugSessionState.Paused)
+            throw new InvalidOperationException("Watches are evaluated while the script is paused.");
+        var response = await RequireClient().RequestEvaluate(new EvaluateArguments { Expression = expression, Context = "watch" }, cancellationToken)
+            .ConfigureAwait(false);
+        // the adapter answers a watch that failed with the reason
+        if (response.PresentationHint?.Attributes?.Any(attribute => attribute.ToString() == FailedEvaluation) == true)
+            throw new InvalidOperationException(response.Result);
+        return MapVariable(new Variable
+        {
+            Name = expression,
+            Value = response.Result,
+            Type = response.Type,
+            VariablesReference = response.VariablesReference,
+            PresentationHint = response.PresentationHint,
+            NamedVariables = response.NamedVariables,
+            IndexedVariables = response.IndexedVariables
+        }, generation);
+    }
+
+    public async Task<FishboneDebugCompletions?> GetCompletionsAsync(string expression, int caret, CancellationToken cancellationToken = default)
+    {
+        if (State != FishboneDebugSessionState.Paused)
+            return null;
+        // columns start at 1
+        var response = await RequireClient().RequestCompletions(new CompletionsArguments { Text = expression, Column = caret + 1 }, cancellationToken)
+            .ConfigureAwait(false);
+        var targets = response.Targets?.ToArray() ?? [];
+        if (targets.Length == 0)
+            return null;
+        int start = (int)(targets[0].Start ?? caret + 1) - 1;
+        return new FishboneDebugCompletions(start, targets.Select(target => target.Label).ToArray());
     }
 
     public Task ContinueAsync(CancellationToken cancellationToken = default) => ResumeAsync(

@@ -3,7 +3,8 @@
 //
 // what an editor asks while the user types: what to suggest at the caret, and
 // which call the caret is in. it works on the current text, which usually doesn't
-// parse, so it reads tokens and takes scopes from the last analysis that did.
+// parse, so it reads tokens and takes scopes from the last analysis that did. a
+// debugger's watch asks the same, as if the watch were typed into the script.
 // --------------------------------------------------------------------------------
 
 using Antlr4.Runtime;
@@ -77,12 +78,7 @@ public sealed partial class FishboneAnalysis
         {
             if (TypeBefore(text, tokens, last) is not { } type)
                 return null;
-            items = _description.Members(type.Type, type.IsStatic).Select(member => new FishboneSuggestion(member.Name, member.Kind switch
-            {
-                FishboneMemberKind.Property => FishboneSuggestionKind.Property,
-                FishboneMemberKind.Field => FishboneSuggestionKind.Field,
-                _ => FishboneSuggestionKind.Method
-            }));
+            items = MemberSuggestions(type.Type, type.IsStatic);
         }
         else
         {
@@ -99,7 +95,92 @@ public sealed partial class FishboneAnalysis
                 })));
         }
 
-        // the first entry for a name wins, so a script variable hides a configuration name
+        return Completions(start, prefix, items);
+    }
+
+    /// <summary>
+    /// The completion list for a debugger's watch: <paramref name="expression"/> as if it were typed
+    /// at the start of <paramref name="line"/> in <paramref name="source"/>, the script this analysis
+    /// was made from, so the names in scope there are offered. A line past the end means after the
+    /// script. <paramref name="caret"/>, and the result's <see cref="FishboneCompletions.Start"/>, are
+    /// indexes into the expression.
+    /// </summary>
+    /// <param name="evaluate">
+    /// The value of an expression, such as a paused script's. When the type before a dot isn't known
+    /// and the text before it is a name or a chain of names, like <c>result.Items</c>, its value's
+    /// members are listed. Nothing with a call or an index is evaluated, since that would run code.
+    /// </param>
+    public FishboneCompletions? WatchCompletionsAt(string source, int line, string expression, int caret,
+        Func<string, object?>? evaluate = null)
+    {
+        string before = LinesBefore(source, line);
+        if (CompletionsAt(before + expression, before.Length + caret) is { } completions)
+            return completions with { Start = completions.Start - before.Length };
+        return evaluate is null ? null : ValueMembersAt(expression, caret, evaluate);
+    }
+
+    /// <summary>
+    /// The call the caret is inside in a debugger's watch, typed as <see cref="WatchCompletionsAt"/>
+    /// says. The result's <see cref="FishboneCallInfo.OpenParen"/> is an index into the expression.
+    /// </summary>
+    public FishboneCallInfo? WatchCallAt(string source, int line, string expression, int caret)
+    {
+        string before = LinesBefore(source, line);
+        return CallAt(before + expression, before.Length + caret) is { } call && call.OpenParen >= before.Length
+            ? call with { OpenParen = call.OpenParen - before.Length }
+            : null;
+    }
+
+    // the script up to the start of a line, or all of it and a line break past its end
+    private static string LinesBefore(string source, int line)
+    {
+        int offset = 0;
+        for (int i = 1; i < line && offset >= 0; i++)
+            offset = source.IndexOf('\n', offset) is var next and >= 0 ? next + 1 : -1;
+        return offset >= 0 ? source[..offset] : source + "\n";
+    }
+
+    // the members of the value before the dot at the caret, when it's a chain of names
+    private FishboneCompletions? ValueMembersAt(string expression, int caret, Func<string, object?> evaluate)
+    {
+        if (CodeTokens(expression, caret) is not { } tokens)
+            return null;
+        int start = caret, last = tokens.Count - 1;
+        if (last >= 0 && tokens[last].Type == FishboneLexer.ID && tokens[last].StopIndex + 1 == caret)
+            start = tokens[last--].StartIndex;
+        if (last < 1 || tokens[last].Text != ".")
+            return null;
+
+        // back over name, dot, name. it has to start the expression or follow an operator, not a ')'
+        int first = last - 1;
+        while (first >= 2 && tokens[first].Type == FishboneLexer.ID && tokens[first - 1].Text == "." && tokens[first - 2].Type == FishboneLexer.ID)
+            first -= 2;
+        if (tokens[first].Type != FishboneLexer.ID || (first > 0 && tokens[first - 1].Text is "." or ")" or "]"))
+            return null;
+
+        object? value;
+        try
+        {
+            value = evaluate(expression[tokens[first].StartIndex..tokens[last].StartIndex]);
+        }
+        catch
+        {
+            return null;
+        }
+        return value is null ? null : Completions(start, expression[start..caret], MemberSuggestions(value.GetType(), false));
+    }
+
+    private IEnumerable<FishboneSuggestion> MemberSuggestions(Type type, bool isStatic) =>
+        _description.Members(type, isStatic).Select(member => new FishboneSuggestion(member.Name, member.Kind switch
+        {
+            FishboneMemberKind.Property => FishboneSuggestionKind.Property,
+            FishboneMemberKind.Field => FishboneSuggestionKind.Field,
+            _ => FishboneSuggestionKind.Method
+        }));
+
+    // the first entry for a name wins, so a script variable hides a configuration name
+    private static FishboneCompletions? Completions(int start, string prefix, IEnumerable<FishboneSuggestion> items)
+    {
         var list = items
             .Where(item => item.Text.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             .DistinctBy(item => item.Text)

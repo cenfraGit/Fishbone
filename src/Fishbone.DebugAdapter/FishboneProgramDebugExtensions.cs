@@ -40,7 +40,7 @@ public static class FishboneProgramDebugExtensions
 
         if (options.OpenIde)
         {
-            var launcher = options.IdeLauncher ?? DefaultIdeLauncher;
+            var launcher = options.IdeLauncher ?? (endpoint => SpineIdeLauncher.Launch(endpoint));
             // a missing or failed IDE is not fatal: we still wait for the attach timeout (an external
             // client may attach) and otherwise fall back to a headless run.
             try { launcher(session.Endpoint); }
@@ -67,21 +67,10 @@ public static class FishboneProgramDebugExtensions
         return new FishboneRunResult(result.Environment, result.Error, debuggerAttached: true, result.WasCancelled);
     }
 
-    private static Process? DefaultIdeLauncher(IPEndPoint endpoint)
-    {
-        var executable = ResolveSpineIde();
-        return Process.Start(new ProcessStartInfo
-        {
-            FileName = executable,
-            Arguments = $"--attach {endpoint.Port}",
-            UseShellExecute = false,
-        });
-    }
-
     /// <summary>Subfolder of the host's output that the SpineIDE package populates.</summary>
     internal const string SpineIdeFolderName = "spineide";
 
-    private static string ResolveSpineIde()
+    internal static string ResolveSpineIde()
     {
         var fromEnvironment = Environment.GetEnvironmentVariable("SPINEIDE_PATH");
         if (!string.IsNullOrWhiteSpace(fromEnvironment) && File.Exists(fromEnvironment))

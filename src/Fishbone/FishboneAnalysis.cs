@@ -425,7 +425,7 @@ public sealed partial class FishboneAnalysis
             Check(child);
     }
 
-    private static IEnumerable<AstNode> Children(AstNode node) => node switch
+    internal static IEnumerable<AstNode> Children(AstNode node) => node switch
     {
         ProgramNode program => program.Statements,
         BlockNode block => block.Statements,

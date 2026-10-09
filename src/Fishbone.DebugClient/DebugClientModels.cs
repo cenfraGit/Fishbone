@@ -36,6 +36,9 @@ public sealed record FishboneDebugVariable(
     long? IndexedVariables,
     FishboneVariableHandle? ImageHandle = null);
 
+/// <summary>Suggestions for a watch. <see cref="Start"/> is where the word being typed begins in it.</summary>
+public sealed record FishboneDebugCompletions(int Start, IReadOnlyList<string> Items);
+
 public sealed record FishboneDebugScope(
     string Name,
     FishboneVariableHandle VariablesHandle,

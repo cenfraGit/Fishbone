@@ -43,6 +43,9 @@ internal static partial class Program
 
     private static IntPtr _gdiplusToken;
 
+    // screen pixels per image pixel, at most
+    private const double MaxZoom = 90;
+
     // the docked preview shows the checked variables: the image, with the shapes stacked over it
     // in the order they were checked. it follows them by name, so stepping keeps showing the same
     // ones. the full screen window, while it's open, shows the same
@@ -51,6 +54,9 @@ internal static partial class Program
     // the checked variables' images, for the current pause or run
     private static readonly Dictionary<string, FishboneDebugImage> _previewImages = [];
     private static List<StackEntry> _previewStack = [];
+    // the images from the pause after the last statement, by name, so the preview still has them
+    // once the debug session ends
+    private static readonly Dictionary<string, FishboneDebugImage> _keptImages = [];
     // bumped when the variables change, so an image that finishes loading late is dropped
     private static int _previewVersion;
 
@@ -73,6 +79,8 @@ internal static partial class Program
     // a paused image comes from the debug host. a final value is rendered here, with the run's visualizers
     private static async Task<FishboneDebugImage?> LoadImage(VariableNode node)
     {
+        if (node.Debug is not null && _keptImages.TryGetValue(node.Name, out FishboneDebugImage? kept))
+            return kept;
         if (node.Debug is not null)
             return node.Debug.ImageHandle is { } handle && _pausedSession is { } session
                 ? await session.GetImageAsync(handle)
@@ -126,6 +134,30 @@ internal static partial class Program
         {
             Post(() => SetWindowTextW(_status, $"{name} couldn't be shown: {exception.Message}"));
         }
+    }
+
+    // every variable and watch with a checkbox, fetched while the debugger still answers
+    private static async Task KeepFinalImagesAsync()
+    {
+        SetWindowTextW(_status, "keeping the final images...");
+        var kept = new Dictionary<string, FishboneDebugImage>(_previewImages);
+        foreach (VariableNode node in _checkNodes.Values.Where(node => !kept.ContainsKey(node.Name)).ToList())
+        {
+            try
+            {
+                if (await LoadImage(node) is { } image)
+                    kept[node.Name] = image;
+            }
+            catch
+            {
+                // one that can't be read just isn't kept
+            }
+        }
+        Post(() =>
+        {
+            foreach (var (name, image) in kept)
+                _keptImages[name] = image;
+        });
     }
 
     // after a pause or a run, loads the checked variables again. one that's gone stays checked,
@@ -334,7 +366,7 @@ internal static partial class Program
                 var point = new POINT { x = mouseX, y = mouseY };
                 ScreenToClient(hwnd, ref point);
                 double factor = (short)((wParam >> 16) & 0xFFFF) > 0 ? 1.25 : 0.8;
-                double scale = Math.Clamp(view.Scale * factor, 0.01, 64);
+                double scale = Math.Clamp(view.Scale * factor, 0.01, MaxZoom);
                 // keep the pixel under the cursor where it is
                 view.X = point.x - (point.x - view.X) * scale / view.Scale;
                 view.Y = point.y - (point.y - view.Y) * scale / view.Scale;
@@ -419,27 +451,19 @@ internal static partial class Program
         // COLOR_APPWORKSPACE, like the class background. full screen, a dark gray that's easier on the eyes
         FillRect(buffer, ref client, hwnd == _fullScreen ? GetStockObject(3) : GetSysColorBrush(12)); // DKGRAY_BRUSH
 
-        var target = new RECT
-        {
-            left = (int)Math.Round(view.X), top = (int)Math.Round(view.Y),
-            right = (int)Math.Round(view.X + view.Width * view.Scale), bottom = (int)Math.Round(view.Y + view.Height * view.Scale),
-        };
         if (view.Bitmap == 0)
         {
-            FillRect(buffer, ref target, GetStockObject(4)); // BLACK_BRUSH
+            // the canvas, only where it's on screen
+            var canvas = new RECT
+            {
+                left = (int)Math.Max(0, Math.Round(view.X)), top = (int)Math.Max(0, Math.Round(view.Y)),
+                right = (int)Math.Min(client.right, Math.Round(view.X + view.Width * view.Scale)),
+                bottom = (int)Math.Min(client.bottom, Math.Round(view.Y + view.Height * view.Scale)),
+            };
+            FillRect(buffer, ref canvas, GetStockObject(4)); // BLACK_BRUSH
         }
         else
-        {
-            IntPtr source = CreateCompatibleDC(dc);
-            IntPtr previous = SelectObject(source, view.Bitmap);
-            // smooth when shrinking, sharp pixels when enlarging
-            SetStretchBltMode(buffer, target.right - target.left < view.BitmapWidth ? 4 : 3); // HALFTONE : COLORONCOLOR
-            SetBrushOrgEx(buffer, 0, 0, IntPtr.Zero);
-            StretchBlt(buffer, target.left, target.top, target.right - target.left, target.bottom - target.top,
-                source, 0, 0, view.BitmapWidth, view.BitmapHeight, 0x00CC0020); // SRCCOPY
-            SelectObject(source, previous);
-            DeleteDC(source);
-        }
+            PaintBitmap(dc, buffer, view, client);
         if (view.Layers.Count > 0)
             PaintShapes(buffer, view, client);
 
@@ -448,6 +472,31 @@ internal static partial class Program
         DeleteObject(bufferBitmap);
         DeleteDC(buffer);
         EndPaint(hwnd, ref paint);
+    }
+
+    // only the bitmap pixels that are on screen are stretched. zoomed far in, the whole image
+    // stretched would be hundreds of thousands of pixels across, which gdi doesn't draw
+    private static void PaintBitmap(IntPtr dc, IntPtr buffer, ImageView view, RECT client)
+    {
+        // screen pixels per bitmap pixel. a big image's bitmap is smaller than the image
+        double scaleX = view.Scale * view.Width / view.BitmapWidth, scaleY = view.Scale * view.Height / view.BitmapHeight;
+        int left = (int)Math.Clamp(Math.Floor(-view.X / scaleX), 0, view.BitmapWidth);
+        int top = (int)Math.Clamp(Math.Floor(-view.Y / scaleY), 0, view.BitmapHeight);
+        int right = (int)Math.Clamp(Math.Ceiling((client.right - view.X) / scaleX), 0, view.BitmapWidth);
+        int bottom = (int)Math.Clamp(Math.Ceiling((client.bottom - view.Y) / scaleY), 0, view.BitmapHeight);
+        if (right <= left || bottom <= top)
+            return;
+
+        int x = (int)Math.Round(view.X + left * scaleX), y = (int)Math.Round(view.Y + top * scaleY);
+        int width = (int)Math.Round(view.X + right * scaleX) - x, height = (int)Math.Round(view.Y + bottom * scaleY) - y;
+        IntPtr source = CreateCompatibleDC(dc);
+        IntPtr previous = SelectObject(source, view.Bitmap);
+        // smooth when shrinking, sharp pixels when enlarging
+        SetStretchBltMode(buffer, scaleX < 1 ? 4 : 3); // HALFTONE : COLORONCOLOR
+        SetBrushOrgEx(buffer, 0, 0, IntPtr.Zero);
+        StretchBlt(buffer, x, y, width, height, source, left, top, right - left, bottom - top, 0x00CC0020); // SRCCOPY
+        SelectObject(source, previous);
+        DeleteDC(source);
     }
 
     private static void StartGdiplus()

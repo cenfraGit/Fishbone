@@ -75,7 +75,12 @@ public sealed class ScriptSession
     public Task<ScriptRunOutcome?> AttachAsync(string host, int port, Func<FishboneDebugSource, Task<IReadOnlyList<int>>> openSource) =>
         ExecuteAsync(null, (_, token) =>
             DebugScriptAsync(_debugSessionFactory.CreateAttached(host, port), async (session, connectToken) =>
-                await openSource(await session.ConnectAsync(stopOnEntry: true, connectToken)), token));
+            {
+                // the script stays at its end until the user continues, so the final values can
+                // still be looked at, like when debugging here
+                session.PauseAtEnd = true;
+                return await openSource(await session.ConnectAsync(stopOnEntry: true, connectToken));
+            }, token));
 
     private async Task<ScriptRunOutcome?> ExecuteAsync(
         string? directory,

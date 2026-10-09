@@ -65,7 +65,7 @@ let intToFloat = takeFloat(2);
         var exception = Assert.Throws<FishboneRuntimeException>(() =>
             FishboneProgram.Run($"let result = {call};", Config()));
 
-        Assert.Contains($"not compatible with parameter 'value' of type '{parameterType}'", exception.Message);
+        Assert.Contains($"('value') takes '{parameterType}'", exception.Message);
     }
 
     [Fact]

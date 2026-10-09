@@ -124,6 +124,31 @@ public sealed class DebugSnapshotHandles
         lock (_sync) return _snapshot?.Exception;
     }
 
+    /// <summary>A frame of the current pause, or the top one when <paramref name="frameId"/> is null.</summary>
+    public DebugCallFrameSnapshot GetFrame(long? frameId)
+    {
+        lock (_sync)
+        {
+            if (_snapshot is null || _frames.Count == 0)
+                throw new InvalidOperationException("The script isn't paused.");
+            if (frameId is null)
+                return _frames.First().Value;
+            return _frames.TryGetValue(frameId.Value, out var frame) ? frame
+                : throw new InvalidOperationException("The stack frame is no longer available.");
+        }
+    }
+
+    /// <summary>A value worked out while paused, like a watch's, shown like a variable of the pause.</summary>
+    public Variable AddValue(string name, object? value)
+    {
+        lock (_sync)
+        {
+            if (_snapshot is null)
+                throw new InvalidOperationException("The script continued.");
+            return CreateVariable(new DebugVariableSnapshot(name, value));
+        }
+    }
+
     // Two scopes are treated as the same when they expose the same set of variable names — enough to
     // recognize that "Visible Variables" adds nothing over "Locals" at global scope.
     private static bool SameVariableSet(IReadOnlyList<DebugVariableSnapshot> a, IReadOnlyList<DebugVariableSnapshot> b)

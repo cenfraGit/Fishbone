@@ -55,7 +55,10 @@ public static class DebugValueFormatter
         if (value is IFormattable formattable)
             return Truncate(formattable.ToString(null, CultureInfo.InvariantCulture) ?? string.Empty);
 
-        return Truncate(value.ToString() ?? string.Empty);
+        // an object that doesn't say what it is shows its type's full name, which is long, and its
+        // short name says the same
+        string shown = value.ToString() ?? string.Empty;
+        return shown == value.GetType().ToString() ? FormatType(value) : Truncate(shown);
     }
 
     private static string FormatList(IList list, int depth)

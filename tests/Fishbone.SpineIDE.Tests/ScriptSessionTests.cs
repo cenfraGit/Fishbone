@@ -322,6 +322,11 @@ public class ScriptSessionTests
             Task.FromResult<IReadOnlyList<FishboneDebugVariable>>([]);
         public Task<FishboneDebugImage> GetImageAsync(FishboneVariableHandle handle, CancellationToken cancellationToken = default) =>
             Task.FromResult(new FishboneDebugImage([], 0, 0, [], []));
+        public bool PauseAtEnd { get; set; }
+        public Task<FishboneDebugVariable> EvaluateAsync(string expression, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new FishboneDebugVariable(expression, "", null, null, null, null));
+        public Task<FishboneDebugCompletions?> GetCompletionsAsync(string expression, int caret, CancellationToken cancellationToken = default) =>
+            Task.FromResult<FishboneDebugCompletions?>(null);
         public Task ContinueAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task PauseAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task StepIntoAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;

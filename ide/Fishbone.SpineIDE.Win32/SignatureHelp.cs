@@ -6,13 +6,15 @@ using FishboneSignature = SpineIDE.Views.Editor.FishboneSignature;
 
 namespace SpineIDE.Win32;
 
-// the parameter tip shown while the caret is inside a call.
+// the parameter tip shown while the caret is inside a call, in the editor or the watch line.
 // it marks the argument the caret is on, and whether that one needs out or ref
 internal static partial class Program
 {
-    private const uint SCI_AUTOCACTIVE = 2102, SCI_CALLTIPACTIVE = 2202, SCI_CALLTIPSETHLT = 2204, SCI_CALLTIPSETFOREHLT = 2207;
+    private const uint SCI_AUTOCACTIVE = 2102, SCI_AUTOCCANCEL = 2101, SCI_CALLTIPACTIVE = 2202, SCI_CALLTIPSETHLT = 2204, SCI_CALLTIPSETFOREHLT = 2207;
     private const int SCN_UPDATEUI = 2007, SCN_CALLTIPCLICK = 2021;
 
+    // the control the tip is in, the editor or the watch line
+    private static IntPtr _tipControl;
     // the call the tip shows: the byte position of its '(' (-1 for none), its overloads, which
     // one is shown, and the argument the caret is on
     private static int _tipCall = -1;
@@ -31,7 +33,27 @@ internal static partial class Program
         byte[] bytes = GetEditorBytes();
         string text = Encoding.UTF8.GetString(bytes);
         _analysis ??= Analyze();
-        if (_analysis?.CallAt(text, Encoding.UTF8.GetCharCount(bytes, 0, caret)) is not { } call)
+        UpdateTip(_editor, text, _analysis?.CallAt(text, Encoding.UTF8.GetCharCount(bytes, 0, caret)));
+    }
+
+    // a watch is read as if it were typed at the line the script is paused on, or after the
+    // script, with the editor's analysis
+    private static void UpdateWatchSignatureHelp()
+    {
+        string text = WatchText();
+        int caret = Encoding.UTF8.GetCharCount(Encoding.UTF8.GetBytes(text), 0, (int)WatchSci(SCI_GETCURRENTPOS));
+        _analysis ??= Analyze();
+        UpdateTip(_watchInput, text, _analysis?.WatchCallAt(Encoding.UTF8.GetString(GetEditorBytes()), _watchLine, text, caret));
+    }
+
+    private static void UpdateTip(IntPtr control, string text, FishboneCallInfo? call)
+    {
+        if (control != _tipControl)
+        {
+            HideSignatureHelp();
+            _tipControl = control;
+        }
+        if (call is null)
         {
             HideSignatureHelp();
             return;
@@ -44,9 +66,9 @@ internal static partial class Program
             // tip waits while the list is open, and comes back after unless Escape closed it
             if (call.Argument != _tipArgument)
                 _tipDismissed = false;
-            if (Sci(SCI_AUTOCACTIVE) != 0)
+            if (TipSci(SCI_AUTOCACTIVE) != 0)
                 return;
-            if (call.Argument != _tipArgument || (!_tipDismissed && Sci(SCI_CALLTIPACTIVE) == 0))
+            if (call.Argument != _tipArgument || (!_tipDismissed && TipSci(SCI_CALLTIPACTIVE) == 0))
             {
                 _tipArgument = call.Argument;
                 ShowSignature();
@@ -54,6 +76,10 @@ internal static partial class Program
             return;
         }
 
+        // a new call: the '(' ended the word a completion list was open for, and scintilla shows
+        // one of the list and the tip, so the list goes
+        if (TipSci(SCI_AUTOCACTIVE) != 0)
+            TipSci(SCI_AUTOCCANCEL);
         _tipCall = openByte;
         _tipDismissed = false;
         _tipSignatures = call.Signatures.Select(signature => FishboneSignature.From(call.Name, signature)).ToList();
@@ -96,9 +122,9 @@ internal static partial class Program
         bool byReference = _tipArgument < signature.Parameters.Count
             && signature.Parameters[_tipArgument].Direction != ParameterDirection.In;
         _tipIsDiagnostic = false;
-        Sci(SCI_CALLTIPSETFOREHLT, byReference ? 0x0060E0 : 0xC05000); // 0x00bbggrr
-        Sci(SCI_CALLTIPSHOW, _tipCall, Utf8(text.ToString()));
-        Sci(SCI_CALLTIPSETHLT, highlightStart, highlightEnd);
+        TipSci(SCI_CALLTIPSETFOREHLT, byReference ? 0x0060E0 : 0xC05000); // 0x00bbggrr
+        SendMessageW(_tipControl, SCI_CALLTIPSHOW, _tipCall, Utf8(text.ToString()));
+        TipSci(SCI_CALLTIPSETHLT, highlightStart, highlightEnd);
     }
 
     // position 1 is the up arrow, 2 the down arrow
@@ -116,6 +142,8 @@ internal static partial class Program
             return;
         _tipCall = -1;
         if (!_tipIsDiagnostic)
-            Sci(SCI_CALLTIPCANCEL);
+            TipSci(SCI_CALLTIPCANCEL);
     }
+
+    private static IntPtr TipSci(uint msg, nint wParam = 0, nint lParam = 0) => SendMessageW(_tipControl, msg, wParam, lParam);
 }

@@ -199,6 +199,9 @@ internal static partial class Program
     [DllImport("user32.dll")]
     private static extern IntPtr SetFocus(IntPtr hwnd);
 
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetFocus();
+
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern int GetWindowTextW(IntPtr hwnd, System.Text.StringBuilder text, int maxCount);
 

@@ -189,6 +189,8 @@ var options = new FishboneDebugOptions
 };
 ```
 
+A host that debugs several runs keeps one window: the SpineIDE an earlier run opened stays open, and when it's idle the next run attaches to it instead of starting another. One that's still debugging, or holds unsaved edits, is left alone. A custom `IdeLauncher` gets the same with `SpineIdeLauncher.Launch(endpoint, pathToSpineIde)`.
+
 If `OpenIde` is true but no IDE can be found or launched, that isn't fatal. The run still waits out `AttachTimeout` in case something else attaches, then falls back to headless with `DebuggerAttached = false`.
 
 ---
