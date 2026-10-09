@@ -25,24 +25,6 @@ internal static partial class Program
         VK_SHIFT = 0x10, VK_CONTROL = 0x11, VK_N = 0x4E, VK_O = 0x4F, VK_S = 0x53;
     private const int RunButtonId = 1, DebugButtonId = 2, TopBarHeight = 32, InputHeight = 24, HeaderHeight = 22, Gap = 4;
 
-    private const string DefaultScript = """
-        // F5 debug / continue    Ctrl+F5 run    Shift+F5 stop
-        // F9 breakpoint    F10 step over    F11 step into    Shift+F11 step out
-        // Ctrl+Space completion
-        func square(x)
-        {
-            return x * x;
-        }
-
-        let i = 0;
-        while (i < 10000)
-        {
-            let squared = square(i);
-            println("line " + i.ToString() + " squared is " + squared.ToString());
-            i = i + 1;
-        }
-        """;
-
     // the delegate has to stay referenced or the gc collects it while windows still calls it
     private static readonly WndProcDelegate _wndProc = WndProc;
 
@@ -165,7 +147,7 @@ internal static partial class Program
         if (options.FilePath is not null)
             LoadDocument(File.ReadAllText(options.FilePath), Path.GetFullPath(options.FilePath));
         else
-            LoadDocument(DefaultScript, null);
+            LoadDocument("", null);
 
         GetClientRect(_window, out RECT client);
         Layout(client.right, client.bottom);
