@@ -2,26 +2,10 @@ using Fishbone;
 
 namespace SpineIDE.Services;
 
-public class ScriptExecutionError
+public sealed record ScriptExecutionError(string ExMessage, int? Line = null, int? Column = null)
 {
-    public int? Line { get; set; }
-    public int? Column { get; set; }
-    public string ExMessage { get; set; }
-    public bool HasLocation => Line is not null || Column is not null;
-    public string LocationDisplay => (Line, Column) switch
-    {
-        (int line, int col) => $"Line {line}, column {col}",
-        (int line, _) => $"Line {line}",
-        (_, int col) => $"Column {col}",
-        _ => string.Empty
-    };
-
-    public ScriptExecutionError(string message, int? line = null, int? column = null)
-    {
-        this.ExMessage = message;
-        this.Line = line;
-        this.Column = column;
-    }
+    public bool HasLocation => Line is not null;
+    public string LocationDisplay => Column is null ? $"Line {Line}" : $"Line {Line}, column {Column}";
 
     /// <summary>One error per parse error, or the exception's message with its location if it has one.</summary>
     public static IReadOnlyList<ScriptExecutionError> From(Exception exception)

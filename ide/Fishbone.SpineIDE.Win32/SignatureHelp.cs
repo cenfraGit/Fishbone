@@ -80,7 +80,7 @@ internal static partial class Program
             FishboneParameter parameter = signature.Parameters[i];
             if (i == _tipArgument)
                 highlightStart = Encoding.UTF8.GetByteCount(text.ToString());
-            if (parameter.Direction != FishboneParamDirection.In)
+            if (parameter.Direction != ParameterDirection.In)
                 text.Append(parameter.DirectionKeyword).Append(' ');
             if (parameter.Type.Length > 0)
                 text.Append(parameter.Type).Append(' ');
@@ -94,7 +94,7 @@ internal static partial class Program
 
         // the current argument is blue, or orange when it has to be passed with out or ref
         bool byReference = _tipArgument < signature.Parameters.Count
-            && signature.Parameters[_tipArgument].Direction != FishboneParamDirection.In;
+            && signature.Parameters[_tipArgument].Direction != ParameterDirection.In;
         _tipIsDiagnostic = false;
         Sci(SCI_CALLTIPSETFOREHLT, byReference ? 0x0060E0 : 0xC05000); // 0x00bbggrr
         Sci(SCI_CALLTIPSHOW, _tipCall, Utf8(text.ToString()));

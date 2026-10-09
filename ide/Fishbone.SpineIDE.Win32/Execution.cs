@@ -58,13 +58,8 @@ internal static partial class Program
             return;
         BeginExecution("starting the debugger...");
 
-        ScriptRunOutcome? outcome = await _session.DebugAsync(_filePath!, BreakpointLines(), _ => { });
-        Post(() =>
-        {
-            _paused = false;
-            ShowCurrentLine(-1);
-            EndExecution(outcome);
-        });
+        ScriptRunOutcome? outcome = await _session.DebugAsync(_filePath!, BreakpointLines());
+        Post(() => EndExecution(outcome));
     }
 
     private const uint SCI_SETREADONLY = 2171;
@@ -72,13 +67,11 @@ internal static partial class Program
     private static async void Attach(int port)
     {
         BeginExecution($"attaching to port {port}...");
-        ScriptRunOutcome? outcome = await _session.AttachAsync("127.0.0.1", port, OpenRemoteSource, _ => { });
+        ScriptRunOutcome? outcome = await _session.AttachAsync("127.0.0.1", port, OpenRemoteSource);
         Post(() =>
         {
-            _paused = false;
             _remoteName = null;
             Sci(SCI_SETREADONLY, 0);
-            ShowCurrentLine(-1);
             UpdateTitle();
             EndExecution(outcome);
         });
@@ -111,6 +104,7 @@ internal static partial class Program
     {
         _running = false;
         _paused = false;
+        ShowCurrentLine(-1);
         UpdateToolbar();
         // null means a newer run replaced this one, and that one reports itself
         if (outcome is null)

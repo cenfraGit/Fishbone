@@ -9,7 +9,6 @@ internal static partial class Program
         WM_LBUTTONDOWN = 0x201, WM_LBUTTONUP = 0x202, WM_LBUTTONDBLCLK = 0x203, WM_MOUSEWHEEL = 0x20A;
     private const int CW_USEDEFAULT = unchecked((int)0x80000000);
     private const int NM_DBLCLK = -3;
-    private const uint TVM_GETNEXTITEM = 0x110A, TVM_GETITEMW = 0x113E, TVGN_CARET = 0x9;
 
     // the delegate has to stay referenced, like the main window's
     private static readonly WndProcDelegate _imageWndProc = ImageWndProc;
@@ -117,14 +116,6 @@ internal static partial class Program
         InvalidateRect(_preview, IntPtr.Zero, true);
     }
 
-    private static VariableNode? SelectedNode()
-    {
-        IntPtr selected = SendMessageW(_variables, TVM_GETNEXTITEM, (nint)TVGN_CARET, 0);
-        var item = new TVITEMW { mask = TVIF_PARAM, hItem = selected };
-        SendMessageW(_variables, TVM_GETITEMW, 0, ref item);
-        return _nodes.GetValueOrDefault(item.lParam);
-    }
-
     // double-clicking an image variable also opens it in its own, bigger window
     private static async void OpenImage(VariableNode node)
     {
@@ -208,9 +199,6 @@ internal static partial class Program
             // the image paints its own background, so dragging doesn't flicker
             case WM_ERASEBKGND when _images.ContainsKey(hwnd):
                 return 1;
-            case WM_SIZE:
-                InvalidateRect(hwnd, IntPtr.Zero, true);
-                return 0;
             case WM_MOUSEWHEEL when _images.TryGetValue(hwnd, out var view):
             {
                 // the wheel reports screen coordinates
@@ -422,7 +410,4 @@ internal static partial class Program
     [DllImport("gdi32.dll")]
     private static extern bool StretchBlt(IntPtr destination, int x, int y, int width, int height,
         IntPtr source, int sourceX, int sourceY, int sourceWidth, int sourceHeight, uint operation);
-
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern IntPtr SendMessageW(IntPtr hwnd, uint msg, IntPtr wParam, ref TVITEMW lParam);
 }

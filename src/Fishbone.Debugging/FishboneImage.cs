@@ -49,7 +49,9 @@ public sealed class FishboneImage
     /// </summary>
     public byte[] ToPng(int maxSide = 2048)
     {
-        var (width, height) = ScaledSize(maxSide);
+        double scale = Math.Min(1, (double)maxSide / Math.Max(Width, Height));
+        int width = Math.Max(1, (int)Math.Round(Width * scale));
+        int height = Math.Max(1, (int)Math.Round(Height * scale));
 
         using var output = new MemoryStream();
         output.Write([137, 80, 78, 71, 13, 10, 26, 10]);
@@ -80,15 +82,6 @@ public sealed class FishboneImage
         WriteChunk(output, "IDAT", compressed.ToArray());
         WriteChunk(output, "IEND", []);
         return output.ToArray();
-    }
-
-    private (int Width, int Height) ScaledSize(int maxSide)
-    {
-        int longest = Math.Max(Width, Height);
-        if (longest <= maxSide)
-            return (Width, Height);
-        double scale = (double)maxSide / longest;
-        return (Math.Max(1, (int)Math.Round(Width * scale)), Math.Max(1, (int)Math.Round(Height * scale)));
     }
 
     private static void WriteChunk(Stream output, string type, byte[] data)

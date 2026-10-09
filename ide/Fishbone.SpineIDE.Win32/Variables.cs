@@ -31,6 +31,7 @@ internal static partial class Program
     // the finished run's configuration, so its final values can still be shown as images
     private static FishboneConfiguration? _finalConfiguration;
     private static int _nextNode = 1;
+    private static VariableNode? _selectedNode;
 
     // bumped whenever the tree is refilled, so children that finish loading late are dropped
     private static int _treeVersion;
@@ -39,6 +40,7 @@ internal static partial class Program
     {
         SendMessageW(_variables, TVM_DELETEITEM, 0, TVI_ROOT);
         _nodes.Clear();
+        _selectedNode = null;
         _pausedSession = null;
         _finalConfiguration = null;
         _treeVersion++;
@@ -151,14 +153,15 @@ internal static partial class Program
         int code = Marshal.PtrToStructure<NMHDR>(lParam).code;
         if (code == NM_DBLCLK)
         {
-            if (SelectedNode() is { IsImage: true } selected)
+            if (_selectedNode is { IsImage: true } selected)
                 OpenImage(selected);
             return;
         }
         var notification = Marshal.PtrToStructure<NMTREEVIEWW>(lParam);
         if (code == TVN_SELCHANGEDW)
         {
-            if (_nodes.TryGetValue(notification.itemNew.lParam, out VariableNode? chosen) && chosen.IsImage)
+            _selectedNode = _nodes.GetValueOrDefault(notification.itemNew.lParam);
+            if (_selectedNode is { IsImage: true } chosen)
                 ShowPreview(chosen);
             return;
         }

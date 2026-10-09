@@ -39,8 +39,6 @@ while (i < 10000)
 $p = Start-Process $Exe -ArgumentList "`"$script`"" -PassThru
 Start-Sleep -Seconds 2; $p.Refresh(); $w = $p.MainWindowHandle
 $ed = [W]::FindWindowExW($w, [IntPtr]::Zero, "Scintilla", $null)
-$outBox = [W]::FindWindowExW($w, [IntPtr]::Zero, "Edit", $null)
-$vars = [W]::FindWindowExW($w, $outBox, "Edit", $null)
 $st = [W]::FindWindowExW($w, [IntPtr]::Zero, "msctls_statusbar32", $null)
 function Key($vk) { [W]::PostMessageW($ed, 0x100, [IntPtr]$vk, [IntPtr]::Zero) | Out-Null; [W]::PostMessageW($ed, 0x101, [IntPtr]$vk, [IntPtr]::Zero) | Out-Null }
 function Send-Text($s) { foreach ($c in $s.ToCharArray()) { if ($c -eq "`n") { Key 0x0D } else { [W]::PostMessageW($ed, 0x102, [IntPtr][int]$c, [IntPtr]::Zero) | Out-Null }; Start-Sleep -Milliseconds 30 } }
@@ -66,7 +64,6 @@ Key 0x7A; Start-Sleep -Seconds 1                                      # F11 into
 "after F11:"; Status; Shot "2_stepped_in"
 Key 0x74; Start-Sleep -Seconds 1                                      # F5 continue, hits breakpoint again
 "after continue:"; Status
-"variables pane:"; ([W]::Text($vars) -split "`n" | Select-Object -First 12) | ForEach-Object { "  $_" }
 # shift+F5 stop: fake the shift state is not possible from here, so remove breakpoint and continue instead
 [W]::SendMessageW($ed, 2024, [IntPtr]11, [IntPtr]::Zero) | Out-Null
 Key 0x78; Start-Sleep -Milliseconds 300

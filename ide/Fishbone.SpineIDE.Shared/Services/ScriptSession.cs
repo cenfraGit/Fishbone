@@ -39,8 +39,6 @@ public sealed class ScriptSession
 
     public event Action<string>? Output;
 
-    public event Action<FishboneDebugSessionState>? StateChanged;
-
     /// <summary>
     /// The debugger paused. The flag is true for the pause after stepping off the end of the script,
     /// which only shows the final values.
@@ -61,27 +59,23 @@ public sealed class ScriptSession
     public Task<ScriptRunOutcome?> RunAsync(string code, string? directory, Func<CancellationToken, Task<string>> readInput) =>
         ExecuteAsync(directory, (version, token) => RunScriptAsync(code, readInput, version, token));
 
-    /// <summary>
-    /// Debugs a saved script in the debug host. <paramref name="breakpointsApplied"/> gets the
-    /// adapter's answer for the starting breakpoints.
-    /// </summary>
-    public Task<ScriptRunOutcome?> DebugAsync(
-        string scriptPath,
-        IReadOnlyList<int> breakpoints,
-        Action<IReadOnlyList<FishboneBreakpointResult>> breakpointsApplied) =>
+    /// <summary>Debugs a saved script in the debug host.</summary>
+    public Task<ScriptRunOutcome?> DebugAsync(string scriptPath, IReadOnlyList<int> breakpoints) =>
         ExecuteAsync(Path.GetDirectoryName(scriptPath), (_, token) =>
-            DebugScriptAsync(scriptPath, breakpoints, breakpointsApplied, token));
+            DebugScriptAsync(_debugSessionFactory.CreateLaunched(scriptPath), async (session, connectToken) =>
+            {
+                await session.ConnectAsync(stopOnEntry: false, connectToken);
+                return breakpoints;
+            }, token));
 
     /// <summary>
     /// Attaches to a running debug server. <paramref name="openSource"/> shows the remote script and
     /// returns the breakpoints to start with.
     /// </summary>
-    public Task<ScriptRunOutcome?> AttachAsync(
-        string host,
-        int port,
-        Func<FishboneDebugSource, Task<IReadOnlyList<int>>> openSource,
-        Action<IReadOnlyList<FishboneBreakpointResult>> breakpointsApplied) =>
-        ExecuteAsync(null, (_, token) => AttachScriptAsync(host, port, openSource, breakpointsApplied, token));
+    public Task<ScriptRunOutcome?> AttachAsync(string host, int port, Func<FishboneDebugSource, Task<IReadOnlyList<int>>> openSource) =>
+        ExecuteAsync(null, (_, token) =>
+            DebugScriptAsync(_debugSessionFactory.CreateAttached(host, port), async (session, connectToken) =>
+                await openSource(await session.ConnectAsync(stopOnEntry: true, connectToken)), token));
 
     private async Task<ScriptRunOutcome?> ExecuteAsync(
         string? directory,
@@ -155,24 +149,7 @@ public sealed class ScriptSession
             () => ReadInput(readInput, outputBuffer, executionVersion, cancellationToken));
 
         Task<ScriptRunOutcome> executionTask = Task.Run(
-            () =>
-            {
-                try
-                {
-                    return new ScriptRunOutcome(
-                        FishboneProgram.Run(code, configuration, cancellationToken: cancellationToken),
-                        [],
-                        configuration);
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    return new ScriptRunOutcome(null, ScriptExecutionError.From(ex));
-                }
-            },
+            () => new ScriptRunOutcome(FishboneProgram.Run(code, configuration, cancellationToken: cancellationToken), [], configuration),
             cancellationToken);
 
         try
@@ -224,14 +201,13 @@ public sealed class ScriptSession
     // debugging
     // --------------------------------------------------------------------------------
 
+    // connect returns the breakpoints to start with
     private async Task<ScriptRunOutcome> DebugScriptAsync(
-        string scriptPath,
-        IReadOnlyList<int> breakpoints,
-        Action<IReadOnlyList<FishboneBreakpointResult>> breakpointsApplied,
+        IFishboneDebugClientSession session,
+        Func<IFishboneDebugClientSession, CancellationToken, Task<IReadOnlyList<int>>> connect,
         CancellationToken cancellationToken)
     {
         var completion = new TaskCompletionSource<ScriptRunOutcome>(TaskCreationOptions.RunContinuationsAsynchronously);
-        IFishboneDebugClientSession session = _debugSessionFactory.CreateLaunched(scriptPath);
         _debugSession = session;
         session.EventReceived += OnDebugEventReceived;
 
@@ -239,11 +215,14 @@ public sealed class ScriptSession
         {
             switch (debugEvent)
             {
-                case FishboneDebugTerminated terminated:
-                    completion.TrySetResult(terminated.ExitCode is null or 0
-                        ? new ScriptRunOutcome(null, [])
-                        : new ScriptRunOutcome(null, ScriptExecutionError.From(
-                            new InvalidOperationException($"fishbone-dap exited with code {terminated.ExitCode}."))));
+                // an attached host's exit code belongs to the host, not to the script
+                case FishboneDebugTerminated terminated when terminated.ExitCode is not (null or 0)
+                    && session.Ownership == FishboneDebugSessionOwnership.Launched:
+                    completion.TrySetResult(new ScriptRunOutcome(null, ScriptExecutionError.From(
+                        new InvalidOperationException($"fishbone-dap exited with code {terminated.ExitCode}."))));
+                    break;
+                case FishboneDebugTerminated:
+                    completion.TrySetResult(new ScriptRunOutcome(null, []));
                     break;
                 case FishboneDebugFailed failed:
                     completion.TrySetResult(new ScriptRunOutcome(null, ScriptExecutionError.From(failed.Exception)));
@@ -255,68 +234,24 @@ public sealed class ScriptSession
         using CancellationTokenRegistration registration = cancellationToken.Register(() => completion.TrySetCanceled(cancellationToken));
         try
         {
-            await session.ConnectAsync(stopOnEntry: false, cancellationToken);
-            breakpointsApplied(await session.ConfigureAsync(breakpoints, cancellationToken));
+            IReadOnlyList<int> breakpoints = await connect(session, cancellationToken);
+            await session.ConfigureAsync(breakpoints, cancellationToken);
             return await completion.Task;
         }
         finally
         {
-            await EndDebugSessionAsync(session, HandleCompletion);
+            session.EventReceived -= HandleCompletion;
+            session.EventReceived -= OnDebugEventReceived;
+            await session.DisposeAsync();
+            if (ReferenceEquals(_debugSession, session))
+                _debugSession = null;
         }
-    }
-
-    private async Task<ScriptRunOutcome> AttachScriptAsync(
-        string host,
-        int port,
-        Func<FishboneDebugSource, Task<IReadOnlyList<int>>> openSource,
-        Action<IReadOnlyList<FishboneBreakpointResult>> breakpointsApplied,
-        CancellationToken cancellationToken)
-    {
-        var completion = new TaskCompletionSource<ScriptRunOutcome>(TaskCreationOptions.RunContinuationsAsynchronously);
-        IFishboneDebugClientSession session = _debugSessionFactory.CreateAttached(host, port);
-        _debugSession = session;
-        session.EventReceived += OnDebugEventReceived;
-
-        void HandleCompletion(object? sender, FishboneDebugEvent debugEvent)
-        {
-            if (debugEvent is FishboneDebugTerminated)
-                completion.TrySetResult(new ScriptRunOutcome(null, []));
-            else if (debugEvent is FishboneDebugFailed failed)
-                completion.TrySetResult(new ScriptRunOutcome(null, ScriptExecutionError.From(failed.Exception)));
-        }
-
-        session.EventReceived += HandleCompletion;
-        using CancellationTokenRegistration registration = cancellationToken.Register(() => completion.TrySetCanceled(cancellationToken));
-        try
-        {
-            FishboneDebugSource source = await session.ConnectAsync(stopOnEntry: true, cancellationToken);
-            IReadOnlyList<int> breakpoints = await openSource(source);
-            breakpointsApplied(await session.ConfigureAsync(breakpoints, cancellationToken));
-            return await completion.Task;
-        }
-        finally
-        {
-            await EndDebugSessionAsync(session, HandleCompletion);
-        }
-    }
-
-    private async Task EndDebugSessionAsync(IFishboneDebugClientSession session, EventHandler<FishboneDebugEvent> handleCompletion)
-    {
-        session.EventReceived -= handleCompletion;
-        session.EventReceived -= OnDebugEventReceived;
-        await session.DisposeAsync();
-        if (ReferenceEquals(_debugSession, session))
-            _debugSession = null;
-        StateChanged?.Invoke(FishboneDebugSessionState.Completed);
     }
 
     private void OnDebugEventReceived(object? sender, FishboneDebugEvent debugEvent)
     {
         switch (debugEvent)
         {
-            case FishboneDebugStateChanged state:
-                StateChanged?.Invoke(state.State);
-                break;
             case FishboneDebugOutput output:
                 Output?.Invoke(output.Text);
                 break;

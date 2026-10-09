@@ -28,19 +28,8 @@
   <!-- the debug client launches fishbone-dap from a daphost folder next to the exe, in a
        build and in a publish -->
   <ItemGroup>
-    <FishboneDapHostFiles Include="$(MSBuildProjectDirectory)\..\Fishbone.Dap\bin\$(Configuration)\$(TargetFramework)\**\*" />
+    <None Include="$(MSBuildProjectDirectory)\..\Fishbone.Dap\bin\$(Configuration)\$(TargetFramework)\**\*"
+          LinkBase="daphost\" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
   </ItemGroup>
-
-  <Target Name="CopyFishboneDapHost" AfterTargets="Build">
-    <Copy SourceFiles="@(FishboneDapHostFiles)"
-          DestinationFiles="@(FishboneDapHostFiles->'$(OutDir)daphost\%(RecursiveDir)%(Filename)%(Extension)')"
-          SkipUnchangedFiles="true" />
-  </Target>
-
-  <Target Name="PublishFishboneDapHost" AfterTargets="Publish">
-    <Copy SourceFiles="@(FishboneDapHostFiles)"
-          DestinationFiles="@(FishboneDapHostFiles->'$(PublishDir)daphost\%(RecursiveDir)%(Filename)%(Extension)')"
-          SkipUnchangedFiles="true" />
-  </Target>
 
 </Project>

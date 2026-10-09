@@ -47,7 +47,7 @@ public static class SampleCatalog
 
     private static string ResolveDisplayName(string fileName)
     {
-        string firstLine = ReadFirstLine(fileName);
+        string firstLine = Load(fileName).Split('\n')[0].Trim();
         if (firstLine.StartsWith(TitleMarker, StringComparison.OrdinalIgnoreCase))
         {
             string title = firstLine[TitleMarker.Length..].Trim();
@@ -61,14 +61,5 @@ public static class SampleCatalog
             .Split('_', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(word => CultureInfo.InvariantCulture.TextInfo.ToTitleCase(word));
         return string.Join(' ', words);
-    }
-
-    private static string ReadFirstLine(string fileName)
-    {
-        using Stream? stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(ResourcePrefix + fileName);
-        if (stream is null)
-            return string.Empty;
-        using var reader = new StreamReader(stream);
-        return reader.ReadLine()?.Trim() ?? string.Empty;
     }
 }

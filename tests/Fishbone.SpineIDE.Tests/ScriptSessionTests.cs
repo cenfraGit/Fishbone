@@ -123,13 +123,10 @@ public class ScriptSessionTests
     public async Task DebugAsync_ConfiguresBreakpointsAndReportsEvents()
     {
         var (session, debug, output) = Create();
-        IReadOnlyList<FishboneBreakpointResult>? applied = null;
         var pauses = new List<bool>();
-        var states = new List<FishboneDebugSessionState>();
         session.Paused += (_, _, isProgramExit) => pauses.Add(isProgramExit);
-        session.StateChanged += state => states.Add(state);
 
-        var run = session.DebugAsync(TempScript(), [3], results => applied = results);
+        var run = session.DebugAsync(TempScript(), [3]);
         await debug.Configured.Task.WaitAsync(TimeSpan.FromSeconds(5));
         debug.Raise(new FishboneDebugOutput("hello", FishboneDebugOutputCategory.Stdout));
         debug.Raise(new FishboneDebugPaused(Snapshot("breakpoint")));
@@ -138,12 +135,10 @@ public class ScriptSessionTests
         var outcome = await run.WaitAsync(TimeSpan.FromSeconds(5));
 
         Assert.Equal([3], debug.ConfiguredLines);
-        Assert.Equal(3, Assert.Single(applied!).Line);
         Assert.Equal([false, true], pauses);
         Assert.Equal("hello", Joined(output));
         Assert.Empty(outcome!.Errors);
         Assert.True(debug.Disposed);
-        Assert.Equal(FishboneDebugSessionState.Completed, states[^1]);
     }
 
     [Fact]
@@ -151,7 +146,7 @@ public class ScriptSessionTests
     {
         var (session, debug, _) = Create();
 
-        var run = session.DebugAsync(TempScript(), [], _ => { });
+        var run = session.DebugAsync(TempScript(), []);
         await debug.Configured.Task.WaitAsync(TimeSpan.FromSeconds(5));
         debug.Raise(new FishboneDebugTerminated(3));
         var outcome = await run.WaitAsync(TimeSpan.FromSeconds(5));
@@ -164,7 +159,7 @@ public class ScriptSessionTests
     {
         var (session, debug, _) = Create();
 
-        var run = session.DebugAsync(TempScript(), [], _ => { });
+        var run = session.DebugAsync(TempScript(), []);
         await debug.Configured.Task.WaitAsync(TimeSpan.FromSeconds(5));
         var results = await session.UpdateBreakpointsAsync([5, 7]);
         debug.Raise(new FishboneDebugTerminated(0));
@@ -186,7 +181,7 @@ public class ScriptSessionTests
         {
             opened = source;
             return Task.FromResult<IReadOnlyList<int>>([2]);
-        }, _ => { });
+        });
         await debug.Configured.Task.WaitAsync(TimeSpan.FromSeconds(5));
         debug.Raise(new FishboneDebugFailed(new InvalidOperationException("host went away")));
         var outcome = await run.WaitAsync(TimeSpan.FromSeconds(5));
