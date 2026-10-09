@@ -49,6 +49,19 @@ public class ConfigurationDescriptionTests
     }
 
     [Fact]
+    public void Describe_NullValueOrConstant_IsAnObject()
+    {
+        // a null runs fine, so describing it must not throw. spineide lost every completion when it did
+        var config = new FishboneConfiguration().AddValue("nothing", null!).AddBuiltIn("NONE", null!);
+        FishboneProgram.Run("let a = nothing; let b = NONE;", config);
+
+        var symbols = config.Describe().Symbols;
+
+        Assert.Equal(typeof(object), Assert.Single(symbols, symbol => symbol.Name == "nothing").Type);
+        Assert.Equal(FishboneSymbolKind.Constant, Assert.Single(symbols, symbol => symbol.Name == "NONE").Kind);
+    }
+
+    [Fact]
     public void Describe_Delegate_HasOneSignatureWithHostNames()
     {
         var signature = Assert.Single(Symbol("add").Signatures);
