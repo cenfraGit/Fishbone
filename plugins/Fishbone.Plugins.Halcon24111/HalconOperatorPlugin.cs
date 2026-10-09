@@ -24,8 +24,26 @@ public partial class HalconOperatorPlugin : IFishbonePlugin
 
         // group overloads under one script name so a call resolves across all of them, rather than
         // the last registration silently winning
-        foreach (var overloads in methods.GroupBy(method => ToSnakeCase(method.Name)))
+        var names = OperatorNames();
+        foreach (var overloads in methods.GroupBy(method => names.GetValueOrDefault(method.Name.ToLowerInvariant()) ?? ToSnakeCase(method.Name)))
             config.AddBuiltIn(overloads.Key, new BoundMethod(target: null, overloads.ToArray()));
+    }
+
+    // halcon's own operator names, keyed without their underscores. the .net names drop them, and
+    // no casing rule gets them all back: ReadObjectModel3d is read_object_model_3d, but Rgb1ToGray
+    // is rgb1_to_gray
+    private static Dictionary<string, string> OperatorNames()
+    {
+        try
+        {
+            HOperatorSet.GetOperatorName("", out HTuple names);
+            return names.SArr.ToDictionary(name => name.Replace("_", ""), name => name);
+        }
+        catch
+        {
+            // without halcon itself there's no list to ask, and the casing rule is the best guess
+            return [];
+        }
     }
 
     private static bool ShouldExclude(MethodInfo method)
