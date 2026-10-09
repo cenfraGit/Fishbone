@@ -231,6 +231,9 @@ internal static partial class Program
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr LoadCursorW(IntPtr instance, IntPtr cursorName);
 
+    [DllImport("user32.dll")]
+    private static extern IntPtr LoadIconW(IntPtr instance, IntPtr iconName);
+
     [DllImport("gdi32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr CreateFontW(int height, int width, int escapement, int orientation, int weight,
         uint italic, uint underline, uint strikeOut, uint charSet, uint outPrecision, uint clipPrecision,

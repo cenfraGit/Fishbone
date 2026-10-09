@@ -6,6 +6,7 @@
     <AssemblyName>spineide</AssemblyName>
     <RootNamespace>SpineIDE.Win32</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>fishbone.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -24,13 +25,21 @@
     <ProjectReference Include="..\Fishbone.Dap\Fishbone.Dap.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
-  <!-- same as SpineIDE: the debug client launches fishbone-dap from a daphost folder next to the exe -->
+  <!-- the debug client launches fishbone-dap from a daphost folder next to the exe, in a
+       build and in a publish -->
+  <ItemGroup>
+    <FishboneDapHostFiles Include="$(MSBuildProjectDirectory)\..\Fishbone.Dap\bin\$(Configuration)\$(TargetFramework)\**\*" />
+  </ItemGroup>
+
   <Target Name="CopyFishboneDapHost" AfterTargets="Build">
-    <ItemGroup>
-      <FishboneDapHostFiles Include="$(MSBuildProjectDirectory)\..\Fishbone.Dap\bin\$(Configuration)\$(TargetFramework)\**\*" />
-    </ItemGroup>
     <Copy SourceFiles="@(FishboneDapHostFiles)"
           DestinationFiles="@(FishboneDapHostFiles->'$(OutDir)daphost\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="PublishFishboneDapHost" AfterTargets="Publish">
+    <Copy SourceFiles="@(FishboneDapHostFiles)"
+          DestinationFiles="@(FishboneDapHostFiles->'$(PublishDir)daphost\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
   </Target>
 

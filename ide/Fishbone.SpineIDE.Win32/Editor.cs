@@ -288,7 +288,7 @@ internal static partial class Program
         // the analysis takes character offsets, scintilla byte positions
         byte[] bytes = GetEditorBytes();
         string text = Encoding.UTF8.GetString(bytes);
-        _analysis ??= Analyze(FishboneCompletionCatalog.Shared);
+        _analysis ??= Analyze();
         if (_analysis?.CompletionsAt(text, Encoding.UTF8.GetCharCount(bytes, 0, caret)) is not { } completions)
             return;
 
@@ -307,8 +307,8 @@ internal static partial class Program
     private static FishboneAnalysis? _analysis;
     private static List<(int Start, int End, string? Message)> _diagnosticRanges = [];
 
-    private static FishboneAnalysis? Analyze(FishboneCompletionCatalog catalog) =>
-        catalog.Description is { } description
+    private static FishboneAnalysis? Analyze() =>
+        SpineConfiguration.Description is { } description
             ? FishboneAnalysis.Analyze(Encoding.UTF8.GetString(GetEditorBytes()), description)
             : null;
 
@@ -321,7 +321,7 @@ internal static partial class Program
         Sci(SCI_INDICATORCLEARRANGE, 0, Sci(SCI_GETTEXTLENGTH));
         _diagnosticRanges = [];
         // a remote script runs with the host's configuration, which this one may not match
-        if (_remoteName is not null || Analyze(FishboneCompletionCatalog.Shared) is not { } analysis)
+        if (_remoteName is not null || Analyze() is not { } analysis)
             return;
         if (analysis.Parsed || _analysis is null)
             _analysis = analysis;

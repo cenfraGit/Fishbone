@@ -4,9 +4,9 @@
        Imported automatically by NuGet when a project references Fishbone.SpineIDE.<rid>.
 
        Copies the IDE into a "spineide" subfolder of the consumer's output. A subfolder
-       rather than the output root on purpose: SpineIDE brings about 130 files including
-       Microsoft.VisualStudio.Threading and System.CommandLine, which would collide with
-       a host's own copies at different versions. Kept apart, it runs as its own process
+       rather than the output root on purpose: SpineIDE brings its own copies of the
+       engine, System.CommandLine and the debug adapter, which would collide with a
+       host's own copies at different versions. Kept apart, it runs as its own process
        from its own folder using its own deps.json.
 
        Fishbone.DebugAdapter looks in exactly this folder, so RunDebuggableAsync with

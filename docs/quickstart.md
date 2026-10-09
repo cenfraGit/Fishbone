@@ -169,7 +169,7 @@ The easiest way to get SpineIDE onto a machine is the package for your platform:
 dotnet add package Fishbone.SpineIDE.win-x64 --version 0.1.0-alpha.1
 ```
 
-That drops the IDE into a `spineide` folder in your build output, which the launcher checks, so `OpenIde = true` then works with no configuration at all. There is one package per platform (`win-x64`, `linux-x64`) because Avalonia's native rendering binaries are platform specific. To leave it out of a particular build, set `FishboneIncludeSpineIde` to `false`.
+That drops the IDE into a `spineide` folder in your build output, which the launcher checks, so `OpenIde = true` then works with no configuration at all. For now there's only a Windows package (`win-x64`). SpineIDE is a native Win32 app, and a Linux version is planned. To leave it out of a particular build, set `FishboneIncludeSpineIde` to `false`.
 
 In full, the launcher looks for an executable named `spineide` in four places, in order:
 

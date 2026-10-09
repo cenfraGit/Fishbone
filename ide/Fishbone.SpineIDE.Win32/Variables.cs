@@ -72,7 +72,7 @@ internal static partial class Program
     }
 
     // after a run without the debugger, the script's own variables. functions registered by the
-    // host are left out, the same as in the Avalonia SpineIDE
+    // host are left out
     private static void ShowFinalVariables(FishboneEnvironment environment, FishboneConfiguration? configuration)
     {
         ClearVariables();

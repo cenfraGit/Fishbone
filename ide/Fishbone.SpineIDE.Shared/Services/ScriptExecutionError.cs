@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using Fishbone;
 
 namespace SpineIDE.Services;
@@ -39,28 +38,5 @@ public class ScriptExecutionError
                 runtimeException.Column > 0 ? runtimeException.Column : null)];
 
         return [new ScriptExecutionError(exception.Message)];
-    }
-}
-
-public interface IErrorService
-{
-    ObservableCollection<ScriptExecutionError> Errors { get; set; }
-
-    void AddError(ScriptExecutionError ex);
-    void ClearErrors();
-}
-
-public class ErrorService : IErrorService
-{
-    public ObservableCollection<ScriptExecutionError> Errors { get; set; } = [];
-
-    public void AddError(ScriptExecutionError ex)
-    {
-        this.Errors.Add(ex);
-    }
-
-    public void ClearErrors()
-    {
-        this.Errors.Clear();
     }
 }

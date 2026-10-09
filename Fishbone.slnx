@@ -15,7 +15,6 @@
   <Folder Name="/IDE/">
     <Project Path="ide/Fishbone.Dap/Fishbone.Dap.csproj" />
     <Project Path="ide/Fishbone.SpineCLI/Fishbone.SpineCLI.csproj" />
-    <Project Path="ide/Fishbone.SpineIDE/Fishbone.SpineIDE.csproj" />
     <Project Path="ide/Fishbone.SpineIDE.Shared/Fishbone.SpineIDE.Shared.csproj" />
     <Project Path="ide/Fishbone.SpineIDE.Win32/Fishbone.SpineIDE.Win32.csproj" />
   </Folder>

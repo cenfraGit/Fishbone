@@ -3,7 +3,7 @@
 //
 // SpineIDE for Windows: a raw win32 front end with a scintilla editor and the output
 // on the left, and an image preview over the variables on the right. running and
-// debugging go through the shared ScriptSession, like the Avalonia SpineIDE.
+// debugging go through the shared ScriptSession.
 // --------------------------------------------------------------------------------
 
 using Antlr4.Runtime;
@@ -98,6 +98,8 @@ internal static partial class Program
             style = 0x3, // CS_HREDRAW | CS_VREDRAW
             lpfnWndProc = Marshal.GetFunctionPointerForDelegate(_wndProc),
             hInstance = instance,
+            // the sdk embeds ApplicationIcon under this id
+            hIcon = LoadIconW(instance, 32512),
             hCursor = LoadCursorW(IntPtr.Zero, 32512), // IDC_ARROW
             hbrBackground = 16, // COLOR_BTNFACE + 1
             lpszClassName = "SpineIDE",
@@ -168,7 +170,7 @@ internal static partial class Program
         SetWindowTextW(_status, $"ready in {startupMs:F0} ms");
 
         // loading plugins for completion touches disk, so do it before the first keystroke needs it
-        _ = Task.Run(() => _ = FishboneCompletionCatalog.Shared);
+        _ = Task.Run(() => _ = SpineConfiguration.Description);
 
         // a host started us to debug its script, like RunDebuggableAsync does
         if (options.AttachPort is int port)

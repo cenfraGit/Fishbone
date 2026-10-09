@@ -6,7 +6,7 @@ using FishboneSignature = SpineIDE.Views.Editor.FishboneSignature;
 
 namespace SpineIDE.Win32;
 
-// the parameter tip shown while the caret is inside a call, like the Avalonia SpineIDE's.
+// the parameter tip shown while the caret is inside a call.
 // it marks the argument the caret is on, and whether that one needs out or ref
 internal static partial class Program
 {
@@ -30,7 +30,7 @@ internal static partial class Program
         int caret = (int)Sci(SCI_GETCURRENTPOS);
         byte[] bytes = GetEditorBytes();
         string text = Encoding.UTF8.GetString(bytes);
-        _analysis ??= Analyze(FishboneCompletionCatalog.Shared);
+        _analysis ??= Analyze();
         if (_analysis?.CallAt(text, Encoding.UTF8.GetCharCount(bytes, 0, caret)) is not { } call)
         {
             HideSignatureHelp();
@@ -56,7 +56,7 @@ internal static partial class Program
 
         _tipCall = openByte;
         _tipDismissed = false;
-        _tipSignatures = call.Signatures.Select(signature => FishboneCompletionCatalog.ToDisplay(call.Name, signature)).ToList();
+        _tipSignatures = call.Signatures.Select(signature => FishboneSignature.From(call.Name, signature)).ToList();
         _tipArgument = call.Argument;
         // start on the first overload that has room for the argument the caret is on
         _tipOverload = Math.Max(0, _tipSignatures.ToList().FindIndex(signature => signature.Parameters.Count > call.Argument));

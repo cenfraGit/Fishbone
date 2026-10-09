@@ -3,7 +3,7 @@
   <!-- ================================================================================
        Packs a published SpineIDE build as a content-only NuGet package, one per RID.
 
-         dotnet publish ide/Fishbone.SpineIDE -r win-x64 -o <dir>
+         dotnet publish ide/Fishbone.SpineIDE.Win32 -r win-x64 -o <dir>
          dotnet pack ide/Fishbone.SpineIDE.Package -p:SpineRid=win-x64 -p:SpinePublishDir=<dir>
 
        pack.sh does both. the package carries no assembly and no dependencies, it only
@@ -17,7 +17,7 @@
     <TargetFramework>netstandard2.0</TargetFramework>
 
     <SpineRid Condition="'$(SpineRid)' == ''">win-x64</SpineRid>
-    <SpinePublishDir Condition="'$(SpinePublishDir)' == ''">$(MSBuildThisFileDirectory)..\Fishbone.SpineIDE\bin\publish\$(SpineRid)</SpinePublishDir>
+    <SpinePublishDir Condition="'$(SpinePublishDir)' == ''">$(MSBuildThisFileDirectory)..\Fishbone.SpineIDE.Win32\bin\publish\$(SpineRid)</SpinePublishDir>
 
     <!-- versioned independently of the engine. this package declares no dependencies,
          so nothing pins it to a Fishbone version and it can move on its own cadence.
@@ -53,8 +53,7 @@
     <Error Condition="!Exists('$(SpinePublishDir)')"
            Text="SpinePublishDir does not exist: $(SpinePublishDir). Publish SpineIDE for $(SpineRid) first, or run pack.sh." />
     <ItemGroup>
-      <!-- pdbs are excluded deliberately. the SkiaSharp and HarfBuzz native symbols alone
-           are 100 MB, two thirds of the publish, and nobody consuming this needs them -->
+      <!-- pdbs are excluded deliberately. nobody consuming this needs them -->
       <None Include="$(SpinePublishDir)\**\*" Exclude="$(SpinePublishDir)\**\*.pdb"
             Pack="true" PackagePath="tools\spineide\" />
     </ItemGroup>

@@ -5,7 +5,7 @@
 # packs every Fishbone NuGet package into artifacts/ and prints what came out.
 #
 #   ./pack.sh        the libraries and plugins
-#   ./pack.sh -i     also the SpineIDE packages, one per platform (slow, publishes first)
+#   ./pack.sh -i     also the SpineIDE package (slow, publishes first)
 #   ./pack.sh -p     purge the packed versions from the NuGet cache afterwards
 #
 # versions come from Directory.Build.props, and for SpineIDE from its own packaging
@@ -26,7 +26,8 @@ PROJECTS=(
     "plugins/Fishbone.Plugins.Halcon24111/Fishbone.Plugins.Halcon24111.csproj"
 )
 
-SPINE_RIDS=("win-x64" "linux-x64")
+# the Win32 SpineIDE is windows only. a GTK version for linux comes later
+SPINE_RIDS=("win-x64")
 
 OUTPUT="artifacts"
 CONFIGURATION="Release"
@@ -73,9 +74,9 @@ done
 
 if [ "$BUILD_IDE" -eq 1 ]; then
     for rid in "${SPINE_RIDS[@]}"; do
-        publish_dir="ide/Fishbone.SpineIDE/bin/publish/$rid"
+        publish_dir="ide/Fishbone.SpineIDE.Win32/bin/publish/$rid"
         rm -rf "$publish_dir"
-        run_step "SpineIDE $rid publish" dotnet publish ide/Fishbone.SpineIDE/Fishbone.SpineIDE.csproj --configuration "$CONFIGURATION" --runtime "$rid" --self-contained false --output "$publish_dir"
+        run_step "SpineIDE $rid publish" dotnet publish ide/Fishbone.SpineIDE.Win32/Fishbone.SpineIDE.Win32.csproj --configuration "$CONFIGURATION" --runtime "$rid" --self-contained false --output "$publish_dir"
         run_step "SpineIDE $rid pack" dotnet pack ide/Fishbone.SpineIDE.Package/Fishbone.SpineIDE.Package.csproj --configuration "$CONFIGURATION" --output "$OUTPUT" -p:SpineRid="$rid" -p:SpinePublishDir="$(pwd)/$publish_dir"
     done
 fi
