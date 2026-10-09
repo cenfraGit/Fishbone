@@ -8,30 +8,54 @@ internal static partial class Program
     // ARGB
     private const uint IconGreen = 0xFF2E9E44, IconBlue = 0xFF1F6FD0, IconRed = 0xFFD13438, IconGray = 0xFFAAAAAA;
 
-    private static readonly List<IntPtr> _toolbarIcons = [];
+    // one image list per button, by command. the debug button swaps between two of them
+    private static readonly Dictionary<int, IntPtr> _toolbarIcons = [];
+    private static bool? _debugButtonContinues;
 
-    // the icons are drawn for the monitor's dpi, so this runs again when it changes. a button's
-    // image list holds one image per state: normal, hot, pressed, disabled, default and stylus hot
+    // the icons are drawn for the monitor's dpi, so this runs again when it changes
     private static void SetToolbarIcons()
     {
-        int size = Scale(16);
-        List<IntPtr> previous = [.. _toolbarIcons];
-        _toolbarIcons.Clear();
+        List<IntPtr> previous = [.. _toolbarIcons.Values];
+        foreach (int command in ToolbarCommands.Select(command => command.Id).Append(CommandContinue))
+            _toolbarIcons[command] = IconList(command, Scale(16));
         for (int i = 0; i < _toolbar.Count; i++)
-        {
-            var (draw, color) = ToolbarIcon(ToolbarCommands[i].Id);
-            IntPtr normal = DrawIcon(size, draw, color), disabled = DrawIcon(size, draw, IconGray);
-            IntPtr list = ImageList_Create(size, size, 0x20, 6, 0); // ILC_COLOR32
-            foreach (IntPtr bitmap in new[] { normal, normal, normal, disabled, normal, normal })
-                ImageList_Add(list, bitmap, IntPtr.Zero);
-            DeleteObject(normal);
-            DeleteObject(disabled);
-            var image = new BUTTON_IMAGELIST { himl = list, margin = new RECT { left = Scale(2) } };
-            SendMessageW(_toolbar[i], BCM_SETIMAGELIST, 0, ref image);
-            _toolbarIcons.Add(list);
-        }
+            if (ToolbarCommands[i].Id != DebugButtonId)
+                SetButtonIcons(_toolbar[i], _toolbarIcons[ToolbarCommands[i].Id]);
+        _debugButtonContinues = null;
+        SetDebugButton();
         foreach (IntPtr list in previous)
             ImageList_Destroy(list);
+    }
+
+    // debug starts a session, and while one is on the same button continues it
+    private static void SetDebugButton()
+    {
+        if (_debugButtonContinues == _debugging || _toolbarIcons.Count == 0)
+            return;
+        _debugButtonContinues = _debugging;
+        IntPtr button = _toolbar[Array.FindIndex(ToolbarCommands, command => command.Id == DebugButtonId)];
+        SetWindowTextW(button, _debugging ? "Continue" : "Debug");
+        SetButtonIcons(button, _toolbarIcons[_debugging ? CommandContinue : DebugButtonId]);
+    }
+
+    // one image per button state: normal, hot, pressed, disabled, default and stylus hot
+    private static IntPtr IconList(int command, int size)
+    {
+        var (draw, color) = ToolbarIcon(command);
+        IntPtr normal = DrawIcon(size, draw, color), disabled = DrawIcon(size, draw, IconGray);
+        IntPtr list = ImageList_Create(size, size, 0x20, 6, 0); // ILC_COLOR32
+        foreach (IntPtr bitmap in new[] { normal, normal, normal, disabled, normal, normal })
+            ImageList_Add(list, bitmap, IntPtr.Zero);
+        DeleteObject(normal);
+        DeleteObject(disabled);
+        return list;
+    }
+
+    private static void SetButtonIcons(IntPtr button, IntPtr list)
+    {
+        var image = new BUTTON_IMAGELIST { himl = list, margin = new RECT { left = Scale(2) } };
+        SendMessageW(button, BCM_SETIMAGELIST, 0, ref image);
+        InvalidateRect(button, IntPtr.Zero, true);
     }
 
     // drawn on a 16 by 16 grid: triangles to run, bars to pause, a square to stop, and arrows

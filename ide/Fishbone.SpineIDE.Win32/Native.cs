@@ -118,6 +118,14 @@ internal static partial class Program
     }
 
     [StructLayout(LayoutKind.Sequential)]
+    private struct TVHITTESTINFO
+    {
+        public POINT pt;
+        public uint flags;
+        public IntPtr hItem;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
     private struct INITCOMMONCONTROLSEX
     {
         public uint dwSize, dwICC;
@@ -131,6 +139,12 @@ internal static partial class Program
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr SendMessageW(IntPtr hwnd, uint msg, IntPtr wParam, ref TVITEMW lParam);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr SendMessageW(IntPtr hwnd, uint msg, IntPtr wParam, ref TVHITTESTINFO lParam);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetMessagePos();
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct OPENFILENAMEW

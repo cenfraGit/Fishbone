@@ -10,7 +10,7 @@ internal static partial class Program
 {
     private const uint TVS_HASBUTTONS = 0x1, TVS_LINESATROOT = 0x4, TVS_SHOWSELALWAYS = 0x20, TVS_CHECKBOXES = 0x100, TVS_FULLROWSELECT = 0x1000;
     private const uint TVM_DELETEITEM = 0x1101, TVM_EXPAND = 0x1102, TVM_SETITEMHEIGHT = 0x111B, TVM_SETEXTENDEDSTYLE = 0x112C,
-        TVM_INSERTITEMW = 0x1132, TVM_SETITEMW = 0x113F, TVS_EX_DOUBLEBUFFER = 0x4;
+        TVM_INSERTITEMW = 0x1132, TVM_SETITEMW = 0x113F, TVM_HITTEST = 0x1111, TVM_GETITEMSTATE = 0x1127, TVS_EX_DOUBLEBUFFER = 0x4;
     private const uint TVIF_TEXT = 0x1, TVIF_STATE = 0x8, TVIF_PARAM = 0x4, TVIF_CHILDREN = 0x40, TVIS_BOLD = 0x10, TVE_EXPAND = 0x2;
     // the checkbox is the state image: 0 is none, 1 unchecked, 2 checked
     private const uint TVIS_STATEIMAGEMASK = 0xF000, Unchecked = 1 << 12, Checked = 2 << 12;
@@ -37,6 +37,7 @@ internal static partial class Program
     // the checkbox of each variable the preview can show, by name. only the first of a name gets
     // one, the same one the preview finds again after a step
     private static readonly Dictionary<string, IntPtr> _checkItems = [];
+    private static readonly Dictionary<IntPtr, VariableNode> _checkNodes = [];
     // set while checkboxes change from code, so that isn't taken for a click
     private static bool _settingChecks;
 
@@ -48,6 +49,7 @@ internal static partial class Program
         SendMessageW(_variables, TVM_DELETEITEM, 0, TVI_ROOT);
         _nodes.Clear();
         _checkItems.Clear();
+        _checkNodes.Clear();
         _selectedNode = null;
         _pausedSession = null;
         _finalConfiguration = null;
@@ -119,7 +121,23 @@ internal static partial class Program
             InsertItem(parent, text, hasChildren, node);
             return;
         }
-        _checkItems[node.Name] = InsertItem(parent, text, hasChildren, node, check: _previewNames.Contains(node.Name));
+        IntPtr item = InsertItem(parent, text, hasChildren, node, check: _previewNames.Contains(node.Name));
+        _checkItems[node.Name] = item;
+        _checkNodes[item] = node;
+    }
+
+    // a double-click on the checkbox itself is the tree's, which toggles it on the first click
+    private static void ToggleDoubleClicked()
+    {
+        uint position = GetMessagePos();
+        var hit = new TVHITTESTINFO { pt = new POINT { x = (short)(position & 0xFFFF), y = (short)(position >> 16) } };
+        ScreenToClient(_variables, ref hit.pt);
+        SendMessageW(_variables, TVM_HITTEST, 0, ref hit);
+        if ((hit.flags & 0x40) != 0 || !_checkNodes.TryGetValue(hit.hItem, out VariableNode? node)) // TVHT_ONITEMSTATEICON
+            return;
+        bool isChecked = ((uint)SendMessageW(_variables, TVM_GETITEMSTATE, hit.hItem, (nint)TVIS_STATEIMAGEMASK) & TVIS_STATEIMAGEMASK) != Checked;
+        SetCheckState(hit.hItem, isChecked ? Checked : Unchecked);
+        CheckPreview(node, isChecked);
     }
 
     private static void SetChecked(string name, bool isChecked)
@@ -186,15 +204,14 @@ internal static partial class Program
         }
     }
 
-    // checking an image adds it to the preview, double-clicking one fits the preview again, and
-    // children load the first time an item opens
+    // checking an image adds it to the preview, and so does double-clicking its row. children
+    // load the first time an item opens
     private static void OnVariablesNotification(IntPtr lParam)
     {
         int code = Marshal.PtrToStructure<NMHDR>(lParam).code;
         if (code == NM_DBLCLK)
         {
-            if (_selectedNode is { IsImage: true })
-                FitImage(_preview);
+            ToggleDoubleClicked();
             return;
         }
         if (code == TVN_ITEMCHANGEDW)
@@ -205,10 +222,10 @@ internal static partial class Program
             uint before = change.uStateOld & TVIS_STATEIMAGEMASK, after = change.uStateNew & TVIS_STATEIMAGEMASK;
             if (_settingChecks || before == after)
                 return;
-            if (!_checkItems.ContainsValue(change.hItem))
-                SetCheckState(change.hItem, 0);
-            else if (_nodes.GetValueOrDefault(change.lParam) is { } checkedNode)
+            if (_checkNodes.TryGetValue(change.hItem, out VariableNode? checkedNode))
                 CheckPreview(checkedNode, after == Checked);
+            else
+                SetCheckState(change.hItem, 0);
             return;
         }
         var notification = Marshal.PtrToStructure<NMTREEVIEWW>(lParam);

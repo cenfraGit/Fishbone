@@ -13,6 +13,8 @@ internal static partial class Program
     // only touched on the ui thread
     private static bool _running;
     private static bool _paused;
+    // a run under the debugger, started here or attached to a host
+    private static bool _debugging;
 
     // the session raises its events on any thread, so each one is posted to the ui thread
     private static void SetupSession()
@@ -39,7 +41,7 @@ internal static partial class Program
     {
         if (_running)
             return;
-        BeginExecution("running...");
+        BeginExecution("running...", debugging: false);
 
         string? directory = _filePath is null ? null : Path.GetDirectoryName(_filePath);
         ScriptRunOutcome? outcome = await _session.RunAsync(Encoding.UTF8.GetString(GetEditorBytes()), directory, ReadInput);
@@ -56,7 +58,7 @@ internal static partial class Program
         // the debug host runs the script from its file, so it's saved first
         if (_running || !Save())
             return;
-        BeginExecution("starting the debugger...");
+        BeginExecution("starting the debugger...", debugging: true);
 
         ScriptRunOutcome? outcome = await _session.DebugAsync(_filePath!, BreakpointLines());
         Post(() => EndExecution(outcome));
@@ -66,7 +68,7 @@ internal static partial class Program
 
     private static async void Attach(int port)
     {
-        BeginExecution($"attaching to port {port}...");
+        BeginExecution($"attaching to port {port}...", debugging: true);
         ScriptRunOutcome? outcome = await _session.AttachAsync("127.0.0.1", port, OpenRemoteSource);
         Post(() =>
         {
@@ -92,9 +94,10 @@ internal static partial class Program
         return opened.Task;
     }
 
-    private static void BeginExecution(string status)
+    private static void BeginExecution(string status, bool debugging)
     {
         _running = true;
+        _debugging = debugging;
         UpdateToolbar();
         _runClock.Restart();
         SetWindowTextW(_status, status);
@@ -104,6 +107,7 @@ internal static partial class Program
     {
         _running = false;
         _paused = false;
+        _debugging = false;
         ShowCurrentLine(-1);
         UpdateToolbar();
         // null means a newer run replaced this one, and that one reports itself

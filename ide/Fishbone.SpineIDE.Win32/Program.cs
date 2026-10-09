@@ -32,10 +32,12 @@ internal static partial class Program
     private static IntPtr _outputHeader, _variablesHeader, _uncheckAllButton, _fullScreenButton;
     private static readonly List<IntPtr> _toolbar = [];
 
+    // run on the left. the debugger's buttons on the right, where debug turns into continue
+    // while a debug session is on
     private static readonly (int Id, string Label)[] ToolbarCommands =
     [
-        (RunButtonId, "Run"), (DebugButtonId, "Debug"),
-        (CommandContinue, "Continue"), (CommandPause, "Pause"), (CommandStop, "Stop"),
+        (RunButtonId, "Run"),
+        (DebugButtonId, "Debug"), (CommandPause, "Pause"), (CommandStop, "Stop"),
         (CommandStepOver, "Step Over"), (CommandStepInto, "Step Into"), (CommandStepOut, "Step Out"),
     ];
 
@@ -45,11 +47,13 @@ internal static partial class Program
         for (int i = 0; i < _toolbar.Count; i++)
             EnableWindow(_toolbar[i], ToolbarCommands[i].Id switch
             {
-                RunButtonId or DebugButtonId => !_running,
+                RunButtonId => !_running,
+                DebugButtonId => !_running || _paused,
                 CommandPause => _running && !_paused,
                 CommandStop => _running,
                 _ => _paused,
             });
+        SetDebugButton();
     }
 
     // lets background threads (the debug client) run code on the ui thread
@@ -387,14 +391,18 @@ internal static partial class Program
     {
         int top = Scale(TopBarHeight), input = Scale(InputHeight), header = Scale(HeaderHeight), gap = Scale(Gap);
         int indent = Scale(6);
-        // the toolbar sits on the right, laid out from its right end
-        int x = width - Scale(8), buttonWidth = Scale(88);
-        for (int i = _toolbar.Count - 1; i >= 0; i--)
+        // run on the left, and the debugger's buttons laid out from the right end. the window
+        // sizes itself before the buttons exist
+        int buttonWidth = Scale(88);
+        if (_toolbar.Count > 0)
+            MoveWindow(_toolbar[0], Scale(8), Scale(4), buttonWidth, Scale(24), true);
+        int x = width - Scale(8);
+        for (int i = _toolbar.Count - 1; i >= 1; i--)
         {
             x -= buttonWidth;
             MoveWindow(_toolbar[i], x, Scale(4), buttonWidth, Scale(24), true);
-            // a wider gap between the run, the session and the stepping groups
-            x -= Scale(i is 2 or 5 ? 16 : 4);
+            // a wider gap between the session and the stepping buttons
+            x -= Scale(i == 4 ? 16 : 4);
         }
 
         // the status bar sizes itself on WM_SIZE, the panes take the rest
