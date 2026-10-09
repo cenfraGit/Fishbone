@@ -25,6 +25,7 @@ internal static partial class Program
             SetWindowTextW(_output, "");
             ClearVariables();
             ClearPreview();
+            RefreshWatches();
         });
         _session.Output += text => Post(() => AppendOutput(text));
         _session.Paused += (snapshot, session, isProgramExit) => Post(() => OnPaused(snapshot, session, isProgramExit));

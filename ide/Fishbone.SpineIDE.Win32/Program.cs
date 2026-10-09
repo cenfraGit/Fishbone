@@ -107,6 +107,7 @@ internal static partial class Program
         NativeLibrary.Load(Path.Combine(AppContext.BaseDirectory, "Scintilla.dll"));
         _editor = CreateChild("Scintilla", "", WS_CHILD | WS_VISIBLE | WS_BORDER, 0);
         SetupEditor();
+        SetupWatchInput();
 
         uint editStyle = WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | WS_BORDER
             | ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY;
@@ -179,6 +180,12 @@ internal static partial class Program
                 SubmitInput();
                 continue;
             }
+            // Enter adds the watch, unless it picks from the completion list
+            if (msg.message == WM_KEYDOWN && msg.hwnd == _watchInput && (int)msg.wParam == VK_RETURN && WatchSci(SCI_AUTOCACTIVE) == 0)
+            {
+                AddWatch();
+                continue;
+            }
             // F10 arrives as a system key
             if ((msg.message == WM_KEYDOWN || msg.message == WM_SYSKEYDOWN) && HandleKey((int)msg.wParam))
                 continue;
@@ -240,6 +247,8 @@ internal static partial class Program
                 IntPtr from = Marshal.PtrToStructure<NMHDR>(lParam).hwndFrom;
                 if (from == _editor)
                     OnEditorNotification(Marshal.PtrToStructure<SCNotification>(lParam));
+                else if (from == _watchInput)
+                    OnWatchInputNotification(Marshal.PtrToStructure<SCNotification>(lParam));
                 else if (from == _variables)
                     OnVariablesNotification(lParam);
                 return 0;
@@ -280,7 +289,10 @@ internal static partial class Program
         }
         if (key == VK_SPACE && ctrl)
         {
-            ShowCompletion(forced: true);
+            if (GetFocus() == _watchInput)
+                ShowWatchCompletion(forced: true);
+            else
+                ShowCompletion(forced: true);
             return true;
         }
         // scintilla still gets the key and closes its popup. Escape on the completion list leaves the tip
@@ -322,6 +334,7 @@ internal static partial class Program
         SendMessageW(_variables, WM_SETFONT, _treeFont, 1);
         SendMessageW(_variables, TVM_SETITEMHEIGHT, Scale(24), 0);
         SetToolbarIcons();
+        SetWatchInputDpi();
         SetMarginWidths();
 
         GetClientRect(_window, out RECT client);
@@ -433,7 +446,11 @@ internal static partial class Program
         int variablesTop = top + header + imageHeight + gap;
         MoveWindow(_variablesHeader, rightX + indent, variablesTop, rightWidth - indent - button, header, true);
         MoveWindow(_uncheckAllButton, width - button, variablesTop + Scale(1), button, header - Scale(2), true);
-        MoveWindow(_variables, rightX, variablesTop + header, rightWidth, height - variablesTop - header, true);
+        // the watch line, then the tree
+        int label = Scale(48), watchTop = variablesTop + header;
+        MoveWindow(_watchLabel, rightX + indent, watchTop, label - indent, input, true);
+        MoveWindow(_watchInput, rightX + label, watchTop, rightWidth - label, input, true);
+        MoveWindow(_variables, rightX, watchTop + input + Scale(2), rightWidth, height - watchTop - input - Scale(2), true);
 
         _columnsGap = new RECT { left = leftWidth, top = top, right = rightX, bottom = height };
         _editorGap = new RECT { left = 0, top = top + editorHeight, right = leftWidth, bottom = outputTop + header };

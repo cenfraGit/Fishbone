@@ -18,11 +18,13 @@ internal static partial class Program
     private static readonly IntPtr TVI_ROOT = -0x10000, TVI_LAST = -0xFFFE;
 
     // what a tree item stands for. a pause hands out debug variables, whose children come from the
-    // debug host. a finished run hands out the real values, whose children are read directly
+    // debug host. a finished run hands out the real values, whose children are read directly. a
+    // watch is named after its expression
     private sealed class VariableNode
     {
         public required string Name { get; init; }
         public bool IsImage { get; init; }
+        public bool IsWatch { get; init; }
         public FishboneDebugVariable? Debug { get; init; }
         public object? Value { get; init; }
         public bool Loaded { get; set; }
@@ -53,6 +55,9 @@ internal static partial class Program
         _selectedNode = null;
         _pausedSession = null;
         _finalConfiguration = null;
+        _finalEnvironment = null;
+        _watchRoot = 0;
+        _watchNodes.Clear();
         _treeVersion++;
     }
 
@@ -63,6 +68,7 @@ internal static partial class Program
         if (frame is null)
         {
             ClearPreview();
+            RefreshWatches();
             return;
         }
 
@@ -74,12 +80,14 @@ internal static partial class Program
             SendMessageW(_variables, TVM_EXPAND, (nint)TVE_EXPAND, scopeItem);
         }
 
-        // the preview keeps showing the same variables from pause to pause
+        // the preview keeps showing the same variables and watches from pause to pause
         FishboneDebugVariable[] variables = frame.Scopes.SelectMany(scope => scope.Variables).ToArray();
-        FollowPreview(name => variables.FirstOrDefault(variable => variable.Name == name && variable.ImageHandle is not null) is { } followed
+        RefreshWatches(() => FollowPreview(name => variables.FirstOrDefault(variable => variable.Name == name && variable.ImageHandle is not null) is { } followed
             ? new VariableNode { Name = followed.Name, IsImage = true, Debug = followed }
-            : null);
+            : WatchToFollow(name)));
     }
+
+    private static VariableNode? WatchToFollow(string name) => _watchNodes.GetValueOrDefault(name) is { IsImage: true } watch ? watch : null;
 
     // after a run without the debugger, the script's own variables. functions registered by the
     // host are left out
@@ -87,13 +95,14 @@ internal static partial class Program
     {
         ClearVariables();
         _finalConfiguration = configuration;
+        _finalEnvironment = environment;
         foreach (var (name, value) in environment.Values)
             if (value is not Delegate)
                 InsertLocalValue(TVI_ROOT, name, value, checkable: true);
 
-        FollowPreview(name => environment.Values.TryGetValue(name, out object? shown) && configuration?.CanVisualize(shown) == true
+        RefreshWatches(() => FollowPreview(name => environment.Values.TryGetValue(name, out object? shown) && configuration?.CanVisualize(shown) == true
             ? new VariableNode { Name = name, IsImage = true, Value = shown }
-            : null);
+            : WatchToFollow(name)));
     }
 
     // checkable: one of the script's own variables, which the preview finds by name. the ones
@@ -163,8 +172,9 @@ internal static partial class Program
         return isImage ? text + "   [image]" : text;
     }
 
-    // check is null for an item without a checkbox
-    private static IntPtr InsertItem(IntPtr parent, string text, bool hasChildren, VariableNode? node, bool bold = false, bool? check = null)
+    // check is null for an item without a checkbox. after is where it goes, last by default
+    private static IntPtr InsertItem(IntPtr parent, string text, bool hasChildren, VariableNode? node, bool bold = false, bool? check = null,
+        IntPtr? after = null)
     {
         IntPtr id = 0;
         if (node is not null)
@@ -179,7 +189,7 @@ internal static partial class Program
             var insert = new TVINSERTSTRUCTW
             {
                 hParent = parent,
-                hInsertAfter = TVI_LAST,
+                hInsertAfter = after ?? TVI_LAST,
                 item = new TVITEMW
                 {
                     mask = TVIF_TEXT | TVIF_PARAM | TVIF_CHILDREN | TVIF_STATE,
@@ -226,6 +236,11 @@ internal static partial class Program
                 CheckPreview(checkedNode, after == Checked);
             else
                 SetCheckState(change.hItem, 0);
+            return;
+        }
+        if (code == TVN_KEYDOWN)
+        {
+            OnVariablesKeyDown(lParam);
             return;
         }
         var notification = Marshal.PtrToStructure<NMTREEVIEWW>(lParam);
