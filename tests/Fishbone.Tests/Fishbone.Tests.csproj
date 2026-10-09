@@ -20,6 +20,8 @@
     <ProjectReference Include="..\..\src\Fishbone.Core\Fishbone.Core.csproj" />
     <ProjectReference Include="..\..\src\Fishbone.Parser\Fishbone.Parser.csproj" />
     <ProjectReference Include="..\..\src\Fishbone.Interpreter\Fishbone.Interpreter.csproj" />
+    <!-- the cli runs as its own process in CliTests, from this output folder -->
+    <ProjectReference Include="..\..\ide\Fishbone.SpineCLI\Fishbone.SpineCLI.csproj" />
   </ItemGroup>
 
   <ItemGroup>
