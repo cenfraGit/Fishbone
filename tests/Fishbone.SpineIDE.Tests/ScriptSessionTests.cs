@@ -195,6 +195,62 @@ public class ScriptSessionTests
         Assert.Equal("host went away", Assert.Single(outcome!.Errors).ExMessage);
     }
 
+    [Fact]
+    public async Task AttachAsync_HostExitCode_IsNotAnError()
+    {
+        // the host's exit code is the host's business, not the script's
+        var (session, debug, _) = Create();
+
+        var run = session.AttachAsync("127.0.0.1", 4711, _ => Task.FromResult<IReadOnlyList<int>>([]));
+        await debug.Configured.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        debug.Raise(new FishboneDebugTerminated(3));
+        var outcome = await run.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Empty(outcome!.Errors);
+    }
+
+    [Fact]
+    public async Task StopAsync_LeavesAnAttachedHostRunning()
+    {
+        var (session, debug, output) = Create();
+
+        var run = session.AttachAsync("127.0.0.1", 4711, _ => Task.FromResult<IReadOnlyList<int>>([]));
+        await debug.Configured.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await session.StopAsync();
+        // a cancelled run would report itself as cancelled before this terminated event counts
+        debug.Raise(new FishboneDebugTerminated(0));
+        var outcome = await run.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.True(debug.Stopped);
+        Assert.Empty(outcome!.Errors);
+        Assert.DoesNotContain("cancelled", Joined(output));
+    }
+
+    [Fact]
+    public async Task DebugAsync_RunsFromTheScriptsFolder_AndGoesBack()
+    {
+        // a script reads files next to itself by relative path
+        var (session, debug, _) = Create();
+        string folder = Directory.CreateTempSubdirectory("fishbone-session-").FullName;
+        string script = Path.Combine(folder, "script.fb");
+        File.WriteAllText(script, "let x = 1;");
+        string before = Directory.GetCurrentDirectory();
+        try
+        {
+            var run = session.DebugAsync(script, []);
+            await debug.Configured.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            debug.Raise(new FishboneDebugTerminated(0));
+            await run.WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.Equal(Path.GetFullPath(folder), Path.GetFullPath(debug.ConnectedFrom!));
+            Assert.Equal(before, Directory.GetCurrentDirectory());
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
     private static string TempScript()
     {
         string path = Path.Combine(Path.GetTempPath(), $"session-{Guid.NewGuid():N}.fb");
@@ -208,14 +264,20 @@ public class ScriptSessionTests
     private sealed class FakeFactory(FakeDebugSession session) : IFishboneDebugClientSessionFactory
     {
         public IFishboneDebugClientSession CreateLaunched(string scriptPath) => session;
-        public IFishboneDebugClientSession CreateAttached(string host, int port) => session;
+        public IFishboneDebugClientSession CreateAttached(string host, int port)
+        {
+            session.Ownership = FishboneDebugSessionOwnership.Attached;
+            return session;
+        }
     }
 
     private sealed class FakeDebugSession : IFishboneDebugClientSession
     {
         public event EventHandler<FishboneDebugEvent>? EventReceived;
         public FishboneDebugSessionState State { get; private set; } = FishboneDebugSessionState.Starting;
-        public FishboneDebugSessionOwnership Ownership => FishboneDebugSessionOwnership.Launched;
+        public FishboneDebugSessionOwnership Ownership { get; set; } = FishboneDebugSessionOwnership.Launched;
+        public string? ConnectedFrom { get; private set; }
+        public bool Stopped { get; private set; }
         public FishboneDebugSource? Source { get; private set; }
         public TaskCompletionSource Configured { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public IReadOnlyList<int>? ConfiguredLines { get; private set; }
@@ -233,6 +295,7 @@ public class ScriptSessionTests
         public Task<FishboneDebugSource> ConnectAsync(bool stopOnEntry = false, CancellationToken cancellationToken = default)
         {
             ConnectedStoppingOnEntry = stopOnEntry;
+            ConnectedFrom = Directory.GetCurrentDirectory();
             Source = new FishboneDebugSource("remote.fb", "remote.fb", 1, "let x = 1;", "text/plain");
             return Task.FromResult(Source);
         }
@@ -264,7 +327,11 @@ public class ScriptSessionTests
         public Task StepOverAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task StepOutAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task DisconnectAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task StopAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task StopAsync(CancellationToken cancellationToken = default)
+        {
+            Stopped = true;
+            return Task.CompletedTask;
+        }
 
         public ValueTask DisposeAsync()
         {
