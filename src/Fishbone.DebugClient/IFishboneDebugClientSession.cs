@@ -6,6 +6,13 @@ public interface IFishboneDebugClientSession : IAsyncDisposable
     FishboneDebugSessionState State { get; }
     FishboneDebugSessionOwnership Ownership { get; }
     FishboneDebugSource? Source { get; }
+
+    /// <summary>
+    /// Whether the script pauses once more after its last statement, so the final values can be
+    /// looked at until the session continues. Set it before connecting. A launched host does by
+    /// default, and an attached one doesn't, since its host waits on the script.
+    /// </summary>
+    bool PauseAtEnd { get; set; }
     Task<FishboneDebugSource> ConnectAsync(bool stopOnEntry = false, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<FishboneBreakpointResult>> ConfigureAsync(IReadOnlyList<int> breakpoints, CancellationToken cancellationToken = default);
     Task StartAsync(IReadOnlyList<int> breakpoints, CancellationToken cancellationToken = default);

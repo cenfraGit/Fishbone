@@ -56,6 +56,7 @@ internal static partial class Program
         _pausedSession = null;
         _finalConfiguration = null;
         _finalEnvironment = null;
+        _keptImages.Clear();
         _watchRoot = 0;
         _watchNodes.Clear();
         _treeVersion++;

@@ -41,6 +41,7 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
         _hostLocator = hostLocator;
         _host = string.Empty;
         Ownership = FishboneDebugSessionOwnership.Launched;
+        PauseAtEnd = true;
     }
 
     private FishboneDebugClientSession(string host, int port)
@@ -57,6 +58,10 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
     public event EventHandler<FishboneDebugEvent>? EventReceived;
     public FishboneDebugSessionState State { get; private set; } = FishboneDebugSessionState.Starting;
     public FishboneDebugSessionOwnership Ownership { get; }
+
+    // a host this session started has no one else waiting on it, so it can stay paused at the end
+    // to show the final values. someone else's host is only held up when the client asks
+    public bool PauseAtEnd { get; set; }
     public FishboneDebugSource? Source { get; private set; }
 
     public async Task<FishboneDebugSource> ConnectAsync(bool stopOnEntry = false, CancellationToken cancellationToken = default)
@@ -103,9 +108,7 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
             await _client.Initialize(linked.Token).ConfigureAwait(false);
             var attach = new AttachRequestArguments();
             attach.ExtensionData["stopOnEntry"] = stopOnEntry;
-            // a host this session started has no one else waiting on it, so it can stay paused at
-            // the end to show the final values. someone else's host shouldn't be held up like that
-            attach.ExtensionData["pauseAtEnd"] = Ownership == FishboneDebugSessionOwnership.Launched;
+            attach.ExtensionData["pauseAtEnd"] = PauseAtEnd;
             await _client.Attach(attach, linked.Token).ConfigureAwait(false);
             var loaded = await _client.RequestLoadedSources(new LoadedSourcesArguments(), linked.Token).ConfigureAwait(false);
             _dapSource = loaded.Sources?.FirstOrDefault()

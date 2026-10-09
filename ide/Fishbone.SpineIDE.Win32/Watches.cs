@@ -92,8 +92,15 @@ internal static partial class Program
         FishboneConfiguration? configuration = _finalConfiguration;
 
         var results = new List<(string Watch, VariableNode? Node, string? Error)>();
+        // the debug session ended: the watches keep the values they had
+        bool ended = session is { State: not FishboneDebugSessionState.Paused };
         foreach (string watch in watches)
         {
+            if (ended)
+            {
+                results.Add(_watchNodes.TryGetValue(watch, out VariableNode? last) ? (watch, last, null) : (watch, null, "the debug session ended"));
+                continue;
+            }
             try
             {
                 if (session is not null)

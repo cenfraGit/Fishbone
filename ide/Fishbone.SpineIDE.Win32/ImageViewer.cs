@@ -51,6 +51,9 @@ internal static partial class Program
     // the checked variables' images, for the current pause or run
     private static readonly Dictionary<string, FishboneDebugImage> _previewImages = [];
     private static List<StackEntry> _previewStack = [];
+    // the images from the pause after the last statement, by name, so the preview still has them
+    // once the debug session ends
+    private static readonly Dictionary<string, FishboneDebugImage> _keptImages = [];
     // bumped when the variables change, so an image that finishes loading late is dropped
     private static int _previewVersion;
 
@@ -73,6 +76,8 @@ internal static partial class Program
     // a paused image comes from the debug host. a final value is rendered here, with the run's visualizers
     private static async Task<FishboneDebugImage?> LoadImage(VariableNode node)
     {
+        if (node.Debug is not null && _keptImages.TryGetValue(node.Name, out FishboneDebugImage? kept))
+            return kept;
         if (node.Debug is not null)
             return node.Debug.ImageHandle is { } handle && _pausedSession is { } session
                 ? await session.GetImageAsync(handle)
@@ -126,6 +131,30 @@ internal static partial class Program
         {
             Post(() => SetWindowTextW(_status, $"{name} couldn't be shown: {exception.Message}"));
         }
+    }
+
+    // every variable and watch with a checkbox, fetched while the debugger still answers
+    private static async Task KeepFinalImagesAsync()
+    {
+        SetWindowTextW(_status, "keeping the final images...");
+        var kept = new Dictionary<string, FishboneDebugImage>(_previewImages);
+        foreach (VariableNode node in _checkNodes.Values.Where(node => !kept.ContainsKey(node.Name)).ToList())
+        {
+            try
+            {
+                if (await LoadImage(node) is { } image)
+                    kept[node.Name] = image;
+            }
+            catch
+            {
+                // one that can't be read just isn't kept
+            }
+        }
+        Post(() =>
+        {
+            foreach (var (name, image) in kept)
+                _keptImages[name] = image;
+        });
     }
 
     // after a pause or a run, loads the checked variables again. one that's gone stays checked,

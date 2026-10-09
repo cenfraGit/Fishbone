@@ -59,12 +59,12 @@ internal static partial class Program
             case CommandExit: SendMessageW(_window, WM_CLOSE, 0, 0); break;
             case RunButtonId: Run(); break;
             case DebugButtonId: DebugOrContinue(); break;
-            case CommandContinue: if (_paused) _ = _session.ContinueAsync(); break;
+            case CommandContinue: Resume(_session.ContinueAsync); break;
             case CommandPause: if (_running && !_paused) _ = _session.PauseAsync(); break;
-            case CommandStop: _ = _session.StopAsync(); break;
-            case CommandStepOver: if (_paused) _ = _session.StepOverAsync(); break;
-            case CommandStepInto: if (_paused) _ = _session.StepIntoAsync(); break;
-            case CommandStepOut: if (_paused) _ = _session.StepOutAsync(); break;
+            case CommandStop: StopSession(); break;
+            case CommandStepOver: Resume(_session.StepOverAsync); break;
+            case CommandStepInto: Resume(_session.StepIntoAsync); break;
+            case CommandStepOut: Resume(_session.StepOutAsync); break;
             case CommandBreakpoint: ToggleBreakpoint(CaretLine()); break;
             case CommandFullScreen: ShowFullScreen(); break;
             case CommandUncheckAll: UncheckAll(); break;
