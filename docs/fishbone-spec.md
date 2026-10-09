@@ -6,15 +6,16 @@ The grammar and semantics of the language. If you want to embed Fishbone in an a
 
 1. [What Fishbone is](#what-fishbone-is)
 2. [What Fishbone is not](#what-fishbone-is-not)
-3. [Writing a script](#writing-a-script)
-4. [Values](#values)
-5. [Expressions and operators](#expressions-and-operators)
-6. [Statements](#statements)
-7. [Functions](#functions)
-8. [Errors](#errors)
-9. [Talking to .NET](#talking-to-net)
-10. [What the host gives you](#what-the-host-gives-you)
-11. [Security](#security)
+3. [Syntax stability](#syntax-stability)
+4. [Writing a script](#writing-a-script)
+5. [Values](#values)
+6. [Expressions and operators](#expressions-and-operators)
+7. [Statements](#statements)
+8. [Functions](#functions)
+9. [Errors](#errors)
+10. [Talking to .NET](#talking-to-net)
+11. [What the host gives you](#what-the-host-gives-you)
+12. [Security](#security)
 
 ---
 
@@ -35,6 +36,16 @@ Fishbone is **not** trying to be Python or Lua for .NET. Don't expect any simila
 It's also not meant to exist outside .NET. Interfacing with .NET types is the entire point, and that interfacing comes from the fact that the interpreter is written in C# and uses .NET types directly instead of wrapping them.
 
 It is not a standalone CLR language either. It does not compile to MSIL and it does not run on the DLR.
+
+## Syntax stability
+
+From 1.0 on, scripts you write keep working:
+
+- Syntax is only **added**. Existing syntax is never removed.
+- Existing syntax doesn't change meaning.
+- New syntax never makes a valid script fail to parse or behave differently.
+
+Before 1.0, syntax can still change.
 
 ---
 
