@@ -116,6 +116,44 @@ public class FishboneImageTests
         Assert.ThrowsAny<ArgumentException>(() => new FishboneImage(width, height, channels, new byte[length]));
     }
 
+    [Fact]
+    public void FromShapes_ReachesTheFarthestPixel()
+    {
+        // the run ends on column 6 of row 3, and the contour point nearest pixel row 8, column 2
+        var region = new FishboneRegion([1, 3], [2, 4], [5, 6]);
+        var contour = new FishboneContour([0, 7.6], [0, 2.4]);
+
+        var image = FishboneImage.FromShapes([region], [contour]);
+
+        Assert.False(image.HasPixels);
+        Assert.Equal((7, 9), (image.Width, image.Height));
+        Assert.Same(region, Assert.Single(image.Regions));
+        Assert.Same(contour, Assert.Single(image.Contours));
+    }
+
+    [Fact]
+    public void FromShapes_WithNoShapes_IsOnePixel()
+    {
+        var image = FishboneImage.FromShapes([], [new FishboneContour([], [])]);
+
+        Assert.Equal((1, 1), (image.Width, image.Height));
+    }
+
+    [Fact]
+    public void ToPng_OnlyShapes_Throws()
+    {
+        var image = FishboneImage.FromShapes([new FishboneRegion([0], [0], [0])], []);
+
+        Assert.Throws<InvalidOperationException>(() => image.ToPng());
+    }
+
+    [Fact]
+    public void Shapes_RejectMismatchedLengths()
+    {
+        Assert.Throws<ArgumentException>(() => new FishboneRegion([0, 1], [0], [0, 1]));
+        Assert.Throws<ArgumentException>(() => new FishboneContour([0, 1], [0]));
+    }
+
     private sealed record Png(int Width, int Height, byte BitDepth, byte ColorType, byte[] Data, List<string> ChunkTypes);
 
     // reads the chunks, checks every crc, and inflates the pixel data

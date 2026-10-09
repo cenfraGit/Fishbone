@@ -192,7 +192,7 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
         }
     }
 
-    public async Task<byte[]> GetImageAsync(FishboneVariableHandle handle, CancellationToken cancellationToken = default)
+    public async Task<FishboneDebugImage> GetImageAsync(FishboneVariableHandle handle, CancellationToken cancellationToken = default)
     {
         if (State != FishboneDebugSessionState.Paused || handle.Generation != Volatile.Read(ref _generation))
             throw new InvalidOperationException("The image belongs to an inactive pause.");
@@ -200,14 +200,15 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
             .SendRequest(ImageCommand, new { variablesReference = handle.Reference })
             .Returning<ImageResponse>(cancellationToken)
             .ConfigureAwait(false);
-        return Convert.FromBase64String(response.Png);
+        return new FishboneDebugImage(Convert.FromBase64String(response.Png), response.Width, response.Height,
+            response.Regions ?? [], response.Contours ?? []);
     }
 
     // the custom request the Fishbone debug adapter serves, see FishboneImageArguments there
     private const string ImageCommand = "fishbone/image";
     private const string ImageKind = "fishbone.image";
 
-    private sealed record ImageResponse(string Png);
+    private sealed record ImageResponse(string Png, int Width, int Height, FishboneDebugRegion[]? Regions, FishboneDebugContour[]? Contours);
 
     public async Task<IReadOnlyList<FishboneDebugVariable>> GetVariablesAsync(FishboneVariableHandle handle, CancellationToken cancellationToken = default)
     {

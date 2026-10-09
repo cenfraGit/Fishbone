@@ -320,7 +320,8 @@ public class ScriptSessionTests
         public Task StartAsync(IReadOnlyList<int> breakpoints, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<IReadOnlyList<FishboneDebugVariable>> GetVariablesAsync(FishboneVariableHandle handle, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<FishboneDebugVariable>>([]);
-        public Task<byte[]> GetImageAsync(FishboneVariableHandle handle, CancellationToken cancellationToken = default) => Task.FromResult(Array.Empty<byte>());
+        public Task<FishboneDebugImage> GetImageAsync(FishboneVariableHandle handle, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new FishboneDebugImage([], 0, 0, [], []));
         public Task ContinueAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task PauseAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task StepIntoAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;

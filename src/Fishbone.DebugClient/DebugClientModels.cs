@@ -73,3 +73,20 @@ public sealed record FishboneDebugContinued : FishboneDebugEvent;
 public sealed record FishboneDebugOutput(string Text, FishboneDebugOutputCategory Category) : FishboneDebugEvent;
 public sealed record FishboneDebugTerminated(int? ExitCode) : FishboneDebugEvent;
 public sealed record FishboneDebugFailed(Exception Exception) : FishboneDebugEvent;
+/// <summary>
+/// An image from the debug adapter. <see cref="Png"/> is empty for an image that's only shapes.
+/// The shapes are in the coordinates of <see cref="Width"/> and <see cref="Height"/>, the image's
+/// own size, which the PNG can be smaller than, since a big image is scaled down to send.
+/// </summary>
+public sealed record FishboneDebugImage(
+    byte[] Png,
+    int Width,
+    int Height,
+    IReadOnlyList<FishboneDebugRegion> Regions,
+    IReadOnlyList<FishboneDebugContour> Contours);
+
+/// <summary>Runs of pixels, each on one row from a start to an end column, both included.</summary>
+public sealed record FishboneDebugRegion(int[] Rows, int[] ColumnStarts, int[] ColumnEnds);
+
+/// <summary>A line through points, where a pixel's center sits at its whole row and column.</summary>
+public sealed record FishboneDebugContour(double[] Rows, double[] Columns);

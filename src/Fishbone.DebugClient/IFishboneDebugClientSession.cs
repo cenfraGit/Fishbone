@@ -10,8 +10,8 @@ public interface IFishboneDebugClientSession : IAsyncDisposable
     Task<IReadOnlyList<FishboneBreakpointResult>> ConfigureAsync(IReadOnlyList<int> breakpoints, CancellationToken cancellationToken = default);
     Task StartAsync(IReadOnlyList<int> breakpoints, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<FishboneBreakpointResult>> SetBreakpointsAsync(IReadOnlyList<int> lines, CancellationToken cancellationToken = default);
-    /// <summary>The image behind <see cref="FishboneDebugVariable.ImageHandle"/>, as PNG bytes.</summary>
-    Task<byte[]> GetImageAsync(FishboneVariableHandle handle, CancellationToken cancellationToken = default);
+    /// <summary>The image behind <see cref="FishboneDebugVariable.ImageHandle"/>, and the shapes to draw over it.</summary>
+    Task<FishboneDebugImage> GetImageAsync(FishboneVariableHandle handle, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<FishboneDebugVariable>> GetVariablesAsync(FishboneVariableHandle handle, CancellationToken cancellationToken = default);
     Task ContinueAsync(CancellationToken cancellationToken = default);

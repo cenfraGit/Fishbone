@@ -165,7 +165,7 @@ public sealed class FishboneDebugAdapterSession :
     }
 
     public Task<FishboneImageResponse> Handle(FishboneImageArguments request, CancellationToken cancellationToken) =>
-        Task.FromResult(new FishboneImageResponse { Png = Convert.ToBase64String(_handles.GetImagePng(request.VariablesReference)) });
+        Task.FromResult(FishboneImageResponse.From(_handles.GetImage(request.VariablesReference)));
 
     public Task<ContinueResponse> Handle(ContinueArguments request, CancellationToken cancellationToken)
     {

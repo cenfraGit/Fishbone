@@ -92,12 +92,38 @@ public class DebugSnapshotHandlesTests
         new FishboneConfiguration().AddVisualizer<Picture>(picture => new FishboneImage(1, 1, 1, [picture.Level]));
 
     [Fact]
-    public void ImageValue_HasAReferenceThatGivesItsPng()
+    public void ImageValue_HasAReferenceThatGivesItsImage()
     {
         var (handles, variable) = ShowVariable(PictureConfig(), new Picture(7));
 
         Assert.NotEqual(0, variable.VariablesReference);
-        Assert.Equal(PngSignature, handles.GetImagePng(variable.VariablesReference)[..8]);
+        Assert.Equal([7], handles.GetImage(variable.VariablesReference).Pixels);
+    }
+
+    [Fact]
+    public void ImageResponse_CarriesThePngAndTheShapes()
+    {
+        var region = new FishboneRegion([0], [0], [1]);
+        var image = new FishboneImage(2, 1, 1, [7, 7]) { Regions = [region] };
+
+        var response = FishboneImageResponse.From(image);
+
+        Assert.Equal(PngSignature, Convert.FromBase64String(response.Png)[..8]);
+        Assert.Equal((2, 1), (response.Width, response.Height));
+        Assert.Same(region, Assert.Single(response.Regions));
+        Assert.Empty(response.Contours);
+    }
+
+    [Fact]
+    public void ImageResponse_ForOnlyShapes_HasNoPng()
+    {
+        var contour = new FishboneContour([0, 4], [0, 9]);
+
+        var response = FishboneImageResponse.From(FishboneImage.FromShapes([], [contour]));
+
+        Assert.Equal("", response.Png);
+        Assert.Equal((10, 5), (response.Width, response.Height));
+        Assert.Same(contour, Assert.Single(response.Contours));
     }
 
     [Fact]
@@ -109,31 +135,31 @@ public class DebugSnapshotHandlesTests
     }
 
     [Fact]
-    public void GetImagePng_RejectsReferencesThatArentImages()
+    public void GetImage_RejectsReferencesThatArentImages()
     {
         var (handles, variable) = ShowVariable(PictureConfig(), new List<object?> { 1 });
 
-        Assert.Throws<InvalidOperationException>(() => handles.GetImagePng(variable.VariablesReference));
-        Assert.Throws<InvalidOperationException>(() => handles.GetImagePng(12345));
+        Assert.Throws<InvalidOperationException>(() => handles.GetImage(variable.VariablesReference));
+        Assert.Throws<InvalidOperationException>(() => handles.GetImage(12345));
     }
 
     [Fact]
-    public void GetImagePng_RejectsStaleReferences()
+    public void GetImage_RejectsStaleReferences()
     {
         var (handles, variable) = ShowVariable(PictureConfig(), new Picture(7));
 
         handles.Clear();
 
-        Assert.Throws<InvalidOperationException>(() => handles.GetImagePng(variable.VariablesReference));
+        Assert.Throws<InvalidOperationException>(() => handles.GetImage(variable.VariablesReference));
     }
 
     [Fact]
-    public void GetImagePng_VisualizerFailure_IsReportedWithItsMessage()
+    public void GetImage_VisualizerFailure_IsReportedWithItsMessage()
     {
         var config = new FishboneConfiguration().AddVisualizer<Picture>(_ => throw new InvalidOperationException("no pixels"));
         var (handles, variable) = ShowVariable(config, new Picture(7));
 
-        var exception = Assert.Throws<InvalidOperationException>(() => handles.GetImagePng(variable.VariablesReference));
+        var exception = Assert.Throws<InvalidOperationException>(() => handles.GetImage(variable.VariablesReference));
         Assert.Contains("no pixels", exception.Message);
     }
 
