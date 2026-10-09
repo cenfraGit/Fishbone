@@ -101,8 +101,13 @@ internal static partial class Program
         };
         RegisterClassExW(ref windowClass);
 
+        // open on the monitor under the mouse, so the window gets that monitor's dpi from the start
+        GetCursorPos(out POINT cursor);
+        var monitor = new MONITORINFO { cbSize = (uint)Marshal.SizeOf<MONITORINFO>() };
+        GetMonitorInfoW(MonitorFromPoint(cursor, 2), ref monitor); // MONITOR_DEFAULTTONEAREST
+        RECT work = monitor.rcWork;
         _window = CreateWindowExW(0, "SpineIDE", "SpineIDE", WS_OVERLAPPEDWINDOW,
-            100, 100, 1100, 800, IntPtr.Zero, IntPtr.Zero, instance, IntPtr.Zero);
+            work.left, work.top, 1100, 800, IntPtr.Zero, IntPtr.Zero, instance, IntPtr.Zero);
         SetMenu(_window, CreateMainMenu());
 
         // mica title bar on windows 11 22h2+, older versions ignore the attribute
@@ -150,6 +155,12 @@ internal static partial class Program
         SendMessageW(_output, EM_SETLIMITTEXT, 0, 0);
         _dpi = (int)GetDpiForWindow(_window);
         ApplyDpi();
+
+        // centered in the work area, which leaves out the taskbar
+        int width = Math.Min(Scale(1100), work.right - work.left);
+        int height = Math.Min(Scale(800), work.bottom - work.top);
+        SetWindowPos(_window, IntPtr.Zero, work.left + (work.right - work.left - width) / 2,
+            work.top + (work.bottom - work.top - height) / 2, width, height, 0x14); // SWP_NOZORDER | SWP_NOACTIVATE
 
         if (options.FilePath is not null)
             LoadDocument(File.ReadAllText(options.FilePath), Path.GetFullPath(options.FilePath));

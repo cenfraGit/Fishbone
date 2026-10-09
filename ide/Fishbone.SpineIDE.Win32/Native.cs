@@ -39,6 +39,23 @@ internal static partial class Program
         public int left, top, right, bottom;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MONITORINFO
+    {
+        public uint cbSize;
+        public RECT rcMonitor, rcWork;
+        public uint dwFlags;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out POINT point);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromPoint(POINT point, uint flags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern bool GetMonitorInfoW(IntPtr monitor, ref MONITORINFO info);
+
     // the leading fields of scintilla's SCNotification, up to the ones used here
     [StructLayout(LayoutKind.Sequential)]
     private struct SCNotification
