@@ -76,14 +76,13 @@ internal static partial class Program
 
     private const uint SCI_SETREADONLY = 2171;
 
-    // continuing and stepping. at the pause after the last statement that ends the session, so
-    // the images first are kept for the preview
+    // continuing and stepping. either can end the session, so the images are kept for the preview
+    // first: every one at the pause after the last statement, otherwise the ones it shows
     private static async void Resume(Func<Task> resume)
     {
         if (!_paused)
             return;
-        if (_atProgramExit)
-            await KeepFinalImagesAsync();
+        await KeepImagesAsync();
         try
         {
             await resume();
@@ -96,9 +95,18 @@ internal static partial class Program
 
     private static async void StopSession()
     {
-        if (_paused && _atProgramExit)
-            await KeepFinalImagesAsync();
+        if (_paused)
+            await KeepImagesAsync();
         await _session.StopAsync();
+    }
+
+    private static Task KeepImagesAsync()
+    {
+        if (_atProgramExit)
+            return KeepFinalImagesAsync();
+        foreach (var (name, image) in _previewImages)
+            _keptImages[name] = image;
+        return Task.CompletedTask;
     }
 
     private static async void Attach(int port)

@@ -191,6 +191,8 @@ public class ScriptSessionTests
 
         Assert.Equal("remote.fb", opened!.Name);
         Assert.True(debug.ConnectedStoppingOnEntry);
+        // a continue to the end ends the session, so the host isn't held at its end
+        Assert.False(debug.PauseAtEnd);
         Assert.Equal([2], debug.ConfiguredLines);
         Assert.Equal("host went away", Assert.Single(outcome!.Errors).ExMessage);
     }

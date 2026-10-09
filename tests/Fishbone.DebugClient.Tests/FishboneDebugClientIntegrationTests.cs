@@ -33,14 +33,78 @@ public class FishboneDebugClientIntegrationTests
         Assert.Contains(visible.Variables, variable => variable.Name == "x" && variable.Value == "1");
         await session.ContinueAsync(timeout.Token);
 
-        // a session that launched its own host pauses once more at the end, with the final values
-        FishbonePauseSnapshot end = await paused.Reader.ReadAsync(timeout.Token);
+        // continuing to the end ends the session, without a pause there
+        await terminated.Task.WaitAsync(timeout.Token);
+        Assert.False(paused.Reader.TryRead(out _));
+        Assert.Contains("1" + Environment.NewLine, output);
+    }
+
+    [Fact]
+    public async Task AttachedSession_ContinuingToTheEnd_EndsWithoutAPause()
+    {
+        await using var attached = await AttachedAtLine2Async();
+
+        await attached.Client.ContinueAsync(attached.Timeout.Token);
+
+        FishboneDebugServerResult result = await attached.Server.Completion.WaitAsync(attached.Timeout.Token);
+        await attached.Terminated.Task.WaitAsync(attached.Timeout.Token);
+        Assert.Equal(2, result.Environment!.GetValue("x"));
+        Assert.False(attached.Pauses.Reader.TryRead(out _));
+    }
+
+    [Fact]
+    public async Task AttachedSession_SteppingOffTheEnd_StopsThereWithTheFinalValues()
+    {
+        await using var attached = await AttachedAtLine2Async();
+
+        await attached.Client.StepOverAsync(attached.Timeout.Token);
+        FishbonePauseSnapshot end = await attached.Pauses.Reader.ReadAsync(attached.Timeout.Token);
+
         Assert.Equal(FishbonePauseSnapshot.ProgramExitReason, end.Reason);
         FishboneDebugScope final = end.Frames[0].Scopes.Single(scope => scope.Name == "Locals");
         Assert.Contains(final.Variables, variable => variable.Name == "x" && variable.Value == "2");
-        await session.ContinueAsync(timeout.Token);
-        await terminated.Task.WaitAsync(timeout.Token);
-        Assert.Contains("1" + Environment.NewLine, output);
+        await attached.Client.ContinueAsync(attached.Timeout.Token);
+        await attached.Server.Completion.WaitAsync(attached.Timeout.Token);
+        await attached.Terminated.Task.WaitAsync(attached.Timeout.Token);
+    }
+
+    private sealed record Attached(FishboneDebugServerSession Server, FishboneDebugClientSession Client,
+        Channel<FishbonePauseSnapshot> Pauses, TaskCompletionSource Terminated, CancellationTokenSource Timeout) : IAsyncDisposable
+    {
+        public async ValueTask DisposeAsync()
+        {
+            await Client.DisposeAsync();
+            await Server.DisposeAsync();
+            Timeout.Dispose();
+        }
+    }
+
+    // attached like SpineIDE does, and paused at the breakpoint on the last line
+    private static async Task<Attached> AttachedAtLine2Async()
+    {
+        var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        FishboneDebugServerSession server = await FishboneDebugServer.StartAsync(new FishboneDebugServerOptions
+        {
+            SourceCode = "let x = 1;\nx = x + 1;",
+            SourceName = "remote.fb",
+            SourceIdentity = "fishbone://remote/end.fb",
+            ListenEndpoint = new IPEndPoint(IPAddress.Loopback, 0)
+        }, timeout.Token);
+        FishboneDebugClientSession client = FishboneDebugClientSession.Attach("127.0.0.1", server.Endpoint.Port);
+        var pauses = Channel.CreateUnbounded<FishbonePauseSnapshot>();
+        var terminated = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.EventReceived += (_, debugEvent) =>
+        {
+            if (debugEvent is FishboneDebugPaused paused)
+                pauses.Writer.TryWrite(paused.Snapshot);
+            if (debugEvent is FishboneDebugTerminated)
+                terminated.TrySetResult();
+        };
+        await client.ConnectAsync(stopOnEntry: false, timeout.Token);
+        await client.ConfigureAsync([2], timeout.Token);
+        FishbonePauseSnapshot breakpoint = await pauses.Reader.ReadAsync(timeout.Token);
+        Assert.Equal(2, breakpoint.Frames[0].Line);
+        return new Attached(server, client, pauses, terminated, timeout);
     }
 
     [Fact]

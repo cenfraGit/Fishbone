@@ -54,8 +54,8 @@ internal static partial class Program
     // the checked variables' images, for the current pause or run
     private static readonly Dictionary<string, FishboneDebugImage> _previewImages = [];
     private static List<StackEntry> _previewStack = [];
-    // the images from the pause after the last statement, by name, so the preview still has them
-    // once the debug session ends
+    // the images kept when the debugger resumed, by name, so the preview still has them once the
+    // debug session ends. all of them after the last statement, otherwise the ones shown
     private static readonly Dictionary<string, FishboneDebugImage> _keptImages = [];
     // bumped when the variables change, so an image that finishes loading late is dropped
     private static int _previewVersion;
@@ -82,9 +82,16 @@ internal static partial class Program
         if (node.Debug is not null && _keptImages.TryGetValue(node.Name, out FishboneDebugImage? kept))
             return kept;
         if (node.Debug is not null)
-            return node.Debug.ImageHandle is { } handle && _pausedSession is { } session
-                ? await session.GetImageAsync(handle)
-                : null;
+        {
+            if (node.Debug.ImageHandle is not { } handle || _pausedSession is not { } session)
+                return null;
+            // a handle only works while the debugger is paused where it came from
+            if (session.State is not FishboneDebugSessionState.Paused)
+                throw new InvalidOperationException(session.State is FishboneDebugSessionState.Running
+                    ? "the script is running"
+                    : "the debug session ended. only the images shown at its last pause are kept");
+            return await session.GetImageAsync(handle);
+        }
         FishboneConfiguration? configuration = _finalConfiguration;
         object? value = node.Value;
         return await Task.Run(() => configuration?.Visualize(value) is { } image ? ToDebugImage(image) : null);
@@ -132,7 +139,12 @@ internal static partial class Program
         }
         catch (Exception exception)
         {
-            Post(() => SetWindowTextW(_status, $"{name} couldn't be shown: {exception.Message}"));
+            Post(() =>
+            {
+                _previewNames.Remove(name);
+                SetChecked(name, false);
+                SetWindowTextW(_status, $"{name} couldn't be shown: {exception.Message}");
+            });
         }
     }
 
