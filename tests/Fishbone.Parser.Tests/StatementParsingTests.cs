@@ -145,18 +145,28 @@ values[1] += 5;
     public void Parse_ReturnBreakAndContinue_ReturnsControlStatementNodes()
     {
         var ast = ParserTestHelpers.ParseProgram("""
-return;
-return x;
-break;
-continue;
+func f() {
+    while (true) {
+        return;
+        return x;
+        break;
+        continue;
+    }
+}
 """);
 
         var expectedAst = new ProgramNode(new List<AstNode>
         {
-            new ReturnNode(null),
-            new ReturnNode(new IdentifierNode("x")),
-            new BreakNode(),
-            new ContinueNode()
+            new FunctionDefinitionNode("f", [], new BlockNode(new List<AstNode>
+            {
+                new WhileNode(new LiteralNode(true), new BlockNode(new List<AstNode>
+                {
+                    new ReturnNode(null),
+                    new ReturnNode(new IdentifierNode("x")),
+                    new BreakNode(),
+                    new ContinueNode()
+                }))
+            }))
         });
 
         Assert.Equal(expectedAst, ast);

@@ -18,6 +18,11 @@ namespace Fishbone.Parser;
 
 internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
 {
+    // break and continue need a loop, return needs a function. a function body starts outside
+    // any loop, so a break in it can't reach a loop around the call
+    private int _loopDepth;
+    private int _functionDepth;
+
     // records where each node ends, so tools can tell whether a position is inside it. a node
     // that already has an end keeps it, so `(a)` and `a;` end where `a` does
     public override AstNode Visit(IParseTree tree)
@@ -52,7 +57,12 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
     {
         CheckReserved(context.ID(0).GetText(), context.Start.Line, context.Start.Column + 1);
         var funcName = context.ID(0).GetText();
+        int outerLoops = _loopDepth;
+        _loopDepth = 0;
+        _functionDepth++;
         var block = Visit(context.blockStat());
+        _functionDepth--;
+        _loopDepth = outerLoops;
 
         // get parameters
         var funcParams = new List<string>();
@@ -87,6 +97,8 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
 
     public override AstNode VisitReturnStat(FishboneParser.ReturnStatContext context)
     {
+        if (_functionDepth == 0)
+            throw OutsideOf(context, "return", "a function");
         var val = (context.expr() is null) ? null : Visit(context.expr());
         return new ReturnNode(val) { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }
@@ -120,13 +132,21 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
 
     public override AstNode VisitBreakStat(FishboneParser.BreakStatContext context)
     {
+        if (_loopDepth == 0)
+            throw OutsideOf(context, "break", "a loop");
         return new BreakNode() { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }
 
     public override AstNode VisitContinueStat(FishboneParser.ContinueStatContext context)
     {
+        if (_loopDepth == 0)
+            throw OutsideOf(context, "continue", "a loop");
         return new ContinueNode() { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }
+
+    private static FishboneParseException OutsideOf(ParserRuleContext context, string keyword, string construct) =>
+        new([new ParseError(context.Start.Line, context.Start.Column + 1,
+            $"'{keyword}' can only be used inside {construct}.", keyword)]);
 
     public override AstNode VisitStatement(FishboneParser.StatementContext context)
     {
@@ -289,7 +309,7 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
     public override AstNode VisitWhileStat(FishboneParser.WhileStatContext context)
     {
         var condition = Visit(context.expr());
-        var body = VisitBody(context.statement());
+        var body = VisitLoopBody(context.statement());
         return new WhileNode(condition, body) { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }
 
@@ -298,7 +318,7 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         CheckReserved(context.ID().GetText(), context.Start.Line, context.Start.Column + 1);
         var iteratorName = context.ID().GetText();
         var iterable = Visit(context.expr());
-        var body = VisitBody(context.statement());
+        var body = VisitLoopBody(context.statement());
         return new ForeachNode(iteratorName, iterable, body) { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }
 
@@ -309,7 +329,7 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
         var start = Visit(context.expr(0));
         var end = Visit(context.expr(1));
         var step = (context.expr().Length > 2) ? Visit(context.expr(2)) : null;
-        var body = VisitBody(context.statement());
+        var body = VisitLoopBody(context.statement());
         return new ForNode(iteratorName, start, end, step, body)
         { Line = context.Start.Line, Column = context.Start.Column + 1 };
     }
@@ -320,6 +340,14 @@ internal sealed class AstBuilderVisitor : FishboneBaseVisitor<AstNode>
     {
         var node = Visit(context);
         return node is BlockNode ? node : WrapInBlock(node);
+    }
+
+    private AstNode VisitLoopBody(FishboneParser.StatementContext context)
+    {
+        _loopDepth++;
+        var body = VisitBody(context);
+        _loopDepth--;
+        return body;
     }
 
     private static BlockNode WrapInBlock(AstNode statement) =>
