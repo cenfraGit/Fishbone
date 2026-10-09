@@ -24,8 +24,11 @@ jobs:
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
+        # the projects target net8.0, so its runtime has to be there to run the tests
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: |
+            8.0.x
+            10.0.x
 
       # OpenCvSharp's linux-x64 native build links against the GTK3 stack. installing
       # libgtk-3-0 pulls in atk, cairo, pango, harfbuzz and gdk-pixbuf with it, so this
@@ -43,4 +46,5 @@ jobs:
         run: dotnet build Fishbone.slnx --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test Fishbone.slnx --configuration Release --no-build --verbosity minimal
+        # a hung test fails the run after two minutes instead of holding the job for hours
+        run: dotnet test Fishbone.slnx --configuration Release --no-build --verbosity minimal --blame-hang-timeout 2m
