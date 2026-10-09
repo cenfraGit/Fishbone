@@ -11,10 +11,12 @@ public class NumericEqualityTests
     public void Run_ScriptDictionary_KeysCompareLikeDotNet()
     {
         // like a c# Dictionary<object, ...>, an int key and a double key are different keys
-        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("""
+        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run("""
 let d = {1: "a"};
 let value = d[1.0];
 """, new FishboneConfiguration()));
+
+        Assert.Equal("The given key '1' was not present in the dictionary.", exception.Message);
     }
 
     [Fact]

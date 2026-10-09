@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Fishbone.Tests;
 
 public class StringVariantTests
@@ -29,12 +31,23 @@ let msg = $"hello {name}, next year: {age + 1}";
     [Fact]
     public void Run_InterpolatedString_NullBecomesEmpty_AndNumbersUseInvariantCulture()
     {
-        var env = FishboneProgram.Run("""
+        // de-DE would format 3.14 as "3,14"
+        var previous = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = new CultureInfo("de-DE");
+
+            var env = FishboneProgram.Run("""
 let nothing = null;
 let msg = $"[{nothing}] pi={3.14}";
 """, new FishboneConfiguration());
 
-        Assert.Equal("[] pi=3.14", env.GetValue("msg"));
+            Assert.Equal("[] pi=3.14", env.GetValue("msg"));
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = previous;
+        }
     }
 
     [Fact]

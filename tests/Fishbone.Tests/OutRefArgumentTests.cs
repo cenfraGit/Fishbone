@@ -41,38 +41,42 @@ sample.Increment(ref value);
     [Fact]
     public void Run_RefArgument_OnUndefinedVariable_Throws()
     {
-        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("sample.Increment(ref missing);", Config()));
+        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run("sample.Increment(ref missing);", Config()));
+
+        Assert.Equal("Undefined variable 'missing'.", exception.Message);
     }
 
     [Fact]
     public void Run_ByRefParameter_WithoutKeyword_Throws()
     {
-        var exception = Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("""
+        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run("""
 let value = 0;
 sample.Increment(value);
 """, Config()));
 
-        Assert.Contains("ref", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Parameter 'value' is a ref parameter; pass the argument with 'ref'.", exception.Message);
     }
 
     [Fact]
     public void Run_ValueParameter_WithByRefKeyword_Throws()
     {
-        var exception = Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("""
+        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run("""
 let value = 1;
 let echoed = sample.Echo(out value);
 """, Config()));
 
-        Assert.Contains("value", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Parameter 'value' is passed by value; remove 'out'.", exception.Message);
     }
 
     [Fact]
     public void Run_ByRefKeyword_OnFishboneFunction_Throws()
     {
-        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("""
+        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run("""
 func identity(a) { return a; }
 let result = identity(out x);
 """, Config()));
+
+        Assert.Equal("'out' arguments are only supported when calling .NET methods.", exception.Message);
     }
 
     private sealed class ByRefSample

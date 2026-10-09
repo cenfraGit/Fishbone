@@ -67,15 +67,21 @@ sample.Increment(ref value);
         var config = new FishboneConfiguration()
             .AddBuiltIn("sample", new ReflectionSample());
 
-        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("let value = sample.Missing;", config));
-        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("let value = null; let name = value.Name;", config));
-        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("let value = sample.Resize(1);", config));
-        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("let value = sample.Name();", config));
-        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("""let value = sample.Resize("wide", "high");""", config));
-        // Out parameter called without the 'out' keyword
-        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("""let ok = sample.TryGetNumber("answer", missing);""", config));
+        AssertError("let value = sample.Missing;", "Type 'ReflectionSample' does not have a public member named 'Missing'.");
+        AssertError("let value = null; let name = value.Name;", "Cannot access member 'Name' on null.");
+        AssertError("let value = sample.Resize(1);", "No argument supplied for parameter 'height', which has no default value.");
+        AssertError("let value = sample.Name();", "Object of type 'String' is not callable.");
+        AssertError("""let value = sample.Resize("wide", "high");""", "Argument 1 of type 'String' is not compatible with parameter 'width' of type 'Int32'.");
+        // out parameter called without the 'out' keyword
+        AssertError("""let number = 0; let ok = sample.TryGetNumber("answer", number);""", "Parameter 'value' is an out parameter; pass the argument with 'out'.");
         // 'out' given, but the target is not a plain variable
-        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("""let value = 0; let ok = sample.TryGetNumber("answer", out [value][0]);""", config));
+        AssertError("""let value = 0; let ok = sample.TryGetNumber("answer", out [value][0]);""", "Out argument 'value' must be a variable.");
+
+        void AssertError(string code, string message)
+        {
+            var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run(code, config));
+            Assert.Equal(message, exception.Message);
+        }
     }
 
     private sealed class ReflectionSample

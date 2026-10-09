@@ -66,6 +66,8 @@ greeting += " world";
     [Fact]
     public void Evaluate_CompoundAssignment_OnUndeclaredVariable_Throws()
     {
-        Assert.ThrowsAny<Exception>(() => InterpreterTestHelpers.Run("undeclared += 1;"));
+        var exception = Assert.Throws<FishboneRuntimeException>(() => InterpreterTestHelpers.Run("undeclared += 1;"));
+
+        Assert.Equal("Undefined variable 'undeclared'.", exception.Message);
     }
 }

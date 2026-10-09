@@ -52,8 +52,10 @@ public class OptionalParameterTests
     [Fact]
     public void TooManyArguments_StillFails()
     {
-        Assert.ThrowsAny<Exception>(() =>
+        var exception = Assert.Throws<FishboneRuntimeException>(() =>
             FishboneProgram.Run("let r = g.Join(\"a\", \"b\", \"c\", \"d\");", ConfigWithGreeter()));
+
+        Assert.Equal("No overload of 'Join' accepts 4 argument(s).", exception.Message);
     }
 
     [Fact]
@@ -62,6 +64,8 @@ public class OptionalParameterTests
         var config = new FishboneConfiguration()
             .AddBuiltIn("g", new Greeter());
 
-        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("let r = g.Join();", config));
+        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run("let r = g.Join();", config));
+
+        Assert.Equal("No argument supplied for parameter 'a', which has no default value.", exception.Message);
     }
 }

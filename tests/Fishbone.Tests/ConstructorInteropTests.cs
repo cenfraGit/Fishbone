@@ -68,7 +68,8 @@ let sum = v.Sum();
         Assert.Equal(3, env.GetValue("sum"));
 
         // The default type name is not registered when a custom name is given.
-        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("let p = Point(1, 2);", config));
+        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run("let p = Point(1, 2);", config));
+        Assert.Equal("Undefined variable 'Point'.", exception.Message);
     }
 
     [Fact]
@@ -77,7 +78,8 @@ let sum = v.Sum();
         var config = new FishboneConfiguration()
             .AddType<Point>();
 
-        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("let p = Point(1, 2, 3);", config));
+        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run("let p = Point(1, 2, 3);", config));
+        Assert.Equal("No overload of 'Point' accepts 3 argument(s).", exception.Message);
     }
 
     [Fact]
@@ -86,8 +88,8 @@ let sum = v.Sum();
         var config = new FishboneConfiguration()
             .AddType<Hidden>();
 
-        var exception = Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("let h = Hidden();", config));
-        Assert.Contains("constructor", exception.Message, StringComparison.OrdinalIgnoreCase);
+        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run("let h = Hidden();", config));
+        Assert.Equal("Type 'Hidden' has no public constructor to call.", exception.Message);
     }
 
     [Fact]

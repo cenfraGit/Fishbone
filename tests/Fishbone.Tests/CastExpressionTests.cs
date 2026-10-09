@@ -239,7 +239,7 @@ let size = widget.Size;
     [Fact]
     public void Run_CastToUnknownTypeName_RaisesRuntimeError()
     {
-        var exception = Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("""let x = 1 as NoSuchType;""", new FishboneConfiguration()));
+        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run("""let x = 1 as NoSuchType;""", new FishboneConfiguration()));
         Assert.Contains("not a type", exception.Message);
     }
 

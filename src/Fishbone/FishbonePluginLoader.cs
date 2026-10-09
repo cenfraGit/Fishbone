@@ -84,7 +84,9 @@ public static class FishbonePluginLoader
     {
         lock (_sync)
         {
-            _registeredPluginDirs.AddRange(Directory.EnumerateDirectories(pluginsPath));
+            foreach (var dir in Directory.EnumerateDirectories(pluginsPath))
+                if (!_registeredPluginDirs.Contains(dir))
+                    _registeredPluginDirs.Add(dir);
             if (_resolverRegistered)
                 return;
             _resolverRegistered = true;
@@ -92,7 +94,10 @@ public static class FishbonePluginLoader
             AppDomain.CurrentDomain.AssemblyResolve += (_, args) =>
             {
                 var assemblyName = new AssemblyName(args.Name).Name + ".dll";
-                foreach (var dir in _registeredPluginDirs)
+                // a copy, since another thread can be loading plugins and adding to the list
+                string[] dirs;
+                lock (_sync) dirs = _registeredPluginDirs.ToArray();
+                foreach (var dir in dirs)
                 {
                     var path = Path.Combine(dir, assemblyName);
                     if (File.Exists(path))

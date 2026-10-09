@@ -722,10 +722,11 @@ public class FishboneInterpreter
     internal object EvaluateCallNode(FishboneEnvironment env, CallNode node)
     {
         var callee = Evaluate(env, node.Callee);
-        return EvaluateCall(env, callee, node.Arguments);
+        // errors name what the script called, not the .net method behind it (Invoke, ReadImage)
+        return EvaluateCall(env, callee, node.Arguments, node.Callee is IdentifierNode identifier ? identifier.Name : null);
     }
 
-    internal object EvaluateCall(FishboneEnvironment env, object callee, IReadOnlyList<ArgumentNode> argumentNodes)
+    internal object EvaluateCall(FishboneEnvironment env, object callee, IReadOnlyList<ArgumentNode> argumentNodes, string? name = null)
     {
         if (callee is FishboneFunction fishboneFunction)
         {
@@ -745,10 +746,10 @@ public class FishboneInterpreter
         }
 
         if (callee is Delegate csharpDelegate)
-            return InvokeDelegate(env, csharpDelegate, argumentNodes);
+            return InvokeDelegate(env, csharpDelegate, argumentNodes, name);
 
         if (callee is BoundMethod boundMethod)
-            return InvokeBoundMethod(env, boundMethod, argumentNodes);
+            return InvokeBoundMethod(env, boundMethod, argumentNodes, name);
 
         if (callee is IManualCallable manualCallable)
             return InvokeManualCallable(env, manualCallable, argumentNodes);
@@ -762,15 +763,15 @@ public class FishboneInterpreter
         throw new FishboneRuntimeException($"Object of type '{callee.GetType().Name}' is not callable.");
     }
 
-    internal object InvokeBoundMethod(FishboneEnvironment env, BoundMethod boundMethod, IReadOnlyList<ArgumentNode> argumentNodes) =>
-        InvokeBestOverload(env, boundMethod.Target, boundMethod.Methods, argumentNodes, boundMethod.Methods[0].Name);
+    internal object InvokeBoundMethod(FishboneEnvironment env, BoundMethod boundMethod, IReadOnlyList<ArgumentNode> argumentNodes, string? name = null) =>
+        InvokeBestOverload(env, boundMethod.Target, boundMethod.Methods, argumentNodes, name ?? boundMethod.Methods[0].Name);
 
     internal object InvokeReflectedCallable(FishboneEnvironment env, object? target, MethodInfo method, IReadOnlyList<ArgumentNode> argumentNodes) =>
         InvokeBestOverload(env, target, [method], argumentNodes, method.Name);
 
     // calls through the delegate's own Invoke, so it runs like a c# call: every handler of a
     // multicast delegate, and the bound target or closure it carries
-    private object InvokeDelegate(FishboneEnvironment env, Delegate csharpDelegate, IReadOnlyList<ArgumentNode> argumentNodes)
+    private object InvokeDelegate(FishboneEnvironment env, Delegate csharpDelegate, IReadOnlyList<ArgumentNode> argumentNodes, string? name)
     {
         var invoke = csharpDelegate.GetType().GetMethod("Invoke")!;
 
@@ -781,7 +782,7 @@ public class FishboneInterpreter
         var inner = ReflectionCache.GetParameters(csharpDelegate.Method);
         var names = inner.Length >= count ? inner[^count..].Select(p => p.Name).ToArray() : null;
 
-        return InvokeBestOverload(env, csharpDelegate, [invoke], argumentNodes, invoke.Name, names);
+        return InvokeBestOverload(env, csharpDelegate, [invoke], argumentNodes, name ?? invoke.Name, names);
     }
 
     internal object InvokeConstructorOverload(FishboneEnvironment env, RegisteredType registeredType, IReadOnlyList<ArgumentNode> argumentNodes)

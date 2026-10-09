@@ -223,13 +223,11 @@ public class AstNodeEqualityTests
     }
 
     [Fact]
-    public void AstNode_ReferenceComparer_DistinguishesStructurallyEqualNodes()
+    public void AstNode_Equality_IgnoresSourceLocation()
     {
         var left = new LiteralNode(1) { Line = 1, Column = 1 };
-        var right = new LiteralNode(1) { Line = 2, Column = 1 };
+        var right = new LiteralNode(1) { Line = 2, Column = 3 };
 
         Assert.Equal(left, right);
-        Assert.False(ReferenceEqualityComparer.Instance.Equals(left, right));
-        Assert.True(ReferenceEqualityComparer.Instance.Equals(left, left));
     }
 }

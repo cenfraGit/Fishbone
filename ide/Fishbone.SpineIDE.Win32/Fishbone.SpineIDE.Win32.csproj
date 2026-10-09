@@ -26,10 +26,33 @@
   </ItemGroup>
 
   <!-- the debug client launches fishbone-dap from a daphost folder next to the exe, in a
-       build and in a publish -->
-  <ItemGroup>
-    <None Include="$(MSBuildProjectDirectory)\..\Fishbone.Dap\bin\$(Configuration)\$(TargetFramework)\**\*"
-          LinkBase="daphost\" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
-  </ItemGroup>
+       build and in a publish. the files are gathered inside targets because on a clean
+       checkout the dap output does not exist yet when the project is evaluated. the dap
+       project is asked for its own output folder, since a runtime adds a subfolder to it -->
+  <Target Name="FindFishboneDapHost">
+    <MSBuild Projects="..\Fishbone.Dap\Fishbone.Dap.csproj" Targets="GetTargetPath">
+      <Output TaskParameter="TargetOutputs" PropertyName="FishboneDapTargetPath" />
+    </MSBuild>
+    <PropertyGroup>
+      <FishboneDapDir>$([System.IO.Path]::GetDirectoryName('$(FishboneDapTargetPath)'))\</FishboneDapDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <FishboneDapHostFiles Include="$(FishboneDapDir)**\*" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="CopyFishboneDapHost" AfterTargets="Build" DependsOnTargets="FindFishboneDapHost">
+    <Copy SourceFiles="@(FishboneDapHostFiles)"
+          DestinationFiles="@(FishboneDapHostFiles->'$(OutDir)daphost\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="PublishFishboneDapHost" AfterTargets="ComputeResolvedFilesToPublishList" DependsOnTargets="FindFishboneDapHost">
+    <ItemGroup>
+      <ResolvedFileToPublish Include="@(FishboneDapHostFiles)"
+                             RelativePath="daphost\%(RecursiveDir)%(Filename)%(Extension)"
+                             CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
 
 </Project>

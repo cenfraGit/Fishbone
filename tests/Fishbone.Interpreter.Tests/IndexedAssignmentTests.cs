@@ -39,11 +39,13 @@ nested["items"][0] = 50;
     }
 
     [Theory]
-    [InlineData("let value = null; value[0] = 1;")]
-    [InlineData("let value = 10; value[0] = 1;")]
-    [InlineData("let value = [1]; value[5] = 1;")]
-    public void Evaluate_InvalidIndexedAssignment_Throws(string code)
+    [InlineData("let value = null; value[0] = 1;", "Cannot assign through an index on null.")]
+    [InlineData("let value = 10; value[0] = 1;", "Object of type 'Int32' does not support indexed assignment.")]
+    [InlineData("let value = [1]; value[5] = 1;", "Index was out of range.")]
+    public void Evaluate_InvalidIndexedAssignment_Throws(string code, string message)
     {
-        Assert.ThrowsAny<Exception>(() => InterpreterTestHelpers.Run(code));
+        var exception = Assert.Throws<FishboneRuntimeException>(() => InterpreterTestHelpers.Run(code));
+
+        Assert.StartsWith(message, exception.Message);
     }
 }

@@ -41,7 +41,7 @@ let assignableObject = sample.Describe(5);
         var config = new FishboneConfiguration()
             .AddBuiltIn("sample", new OverloadSample());
 
-        var exception = Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("""
+        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run("""
 let result = sample.Ambiguous(1, 2);
 """, config));
 

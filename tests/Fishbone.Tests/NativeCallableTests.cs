@@ -110,7 +110,10 @@ public class NativeCallableTests
     {
         var config = new FishboneConfiguration().AddBuiltIn("divmod", Divmod());
 
-        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("divmod(17, 5, q, r);", config));
+        var exception = Assert.Throws<FishboneRuntimeException>(() =>
+            FishboneProgram.Run("let q = 0; let r = 0; divmod(17, 5, q, r);", config));
+
+        Assert.Equal("Parameter 'quotient' is an out parameter; pass the argument with 'out'.", exception.Message);
     }
 
     [Fact]
@@ -121,7 +124,9 @@ public class NativeCallableTests
             args => args[0]);
         var config = new FishboneConfiguration().AddBuiltIn("echo", callable);
 
-        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("let s = echo(out x);", config));
+        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run("let s = echo(out x);", config));
+
+        Assert.Equal("Parameter 'a' is passed by value; remove 'out'.", exception.Message);
     }
 
     [Fact]
@@ -129,6 +134,8 @@ public class NativeCallableTests
     {
         var config = new FishboneConfiguration().AddBuiltIn("divmod", Divmod());
 
-        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("divmod(17, 5, out q);", config));
+        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run("divmod(17, 5, out q);", config));
+
+        Assert.Equal("Expected 4 argument(s) but got 3.", exception.Message);
     }
 }

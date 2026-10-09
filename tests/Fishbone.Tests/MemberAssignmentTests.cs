@@ -36,8 +36,10 @@ box.Label = "hi";
         FishboneProgram.Run("box.Count = 2.0;", config);
         Assert.Equal(2, box.Count);
 
-        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("box.Count = 2.5;", config));
-        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("box.Count = \"5\";", config));
+        var fromDouble = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run("box.Count = 2.5;", config));
+        Assert.Equal("Cannot assign a value of type 'Double' to 'Count' of type 'Int32'.", fromDouble.Message);
+        var fromString = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run("box.Count = \"5\";", config));
+        Assert.Equal("Cannot assign a value of type 'String' to 'Count' of type 'Int32'.", fromString.Message);
         Assert.Equal(2, box.Count);
     }
 
@@ -93,9 +95,9 @@ Counter.Total = 10;
     {
         var (config, _) = Setup();
 
-        var exception = Assert.ThrowsAny<Exception>(() => FishboneProgram.Run(code, config));
+        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run(code, config));
 
-        Assert.Contains(member, exception.Message);
+        Assert.Contains($"'{member}'", exception.Message);
     }
 
     [Fact]

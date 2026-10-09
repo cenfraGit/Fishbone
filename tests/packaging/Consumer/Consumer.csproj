@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- a host like a user's, built from the packed packages by tests/packaging/check.sh -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- the newest version in the local pack, prereleases included -->
+    <PackageReference Include="Fishbone" Version="*-*" />
+    <PackageReference Include="Fishbone.DebugAdapter" Version="*-*" />
+    <PackageReference Include="Fishbone.Plugins.Math" Version="*-*" />
+    <PackageReference Include="Fishbone.SpineIDE.win-x64" Version="*-*" Condition="'$(OS)' == 'Windows_NT'" />
+  </ItemGroup>
+
+</Project>

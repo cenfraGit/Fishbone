@@ -30,11 +30,14 @@ let outer = 1;
         Assert.Throws<FishboneRuntimeException>(() => env.GetValue("inner"));
     }
 
-    [Fact]
-    public void Evaluate_InvalidVariableOperations_Throw()
+    [Theory]
+    [InlineData("missing = 1;", "Undefined variable 'missing'.")]
+    [InlineData("let duplicate = 1; let duplicate = 2;", "Variable 'duplicate' is already declared.")]
+    [InlineData("let value = missing;", "Undefined variable 'missing'.")]
+    public void Evaluate_InvalidVariableOperations_Throw(string code, string message)
     {
-        Assert.ThrowsAny<Exception>(() => InterpreterTestHelpers.Run("missing = 1;"));
-        Assert.ThrowsAny<Exception>(() => InterpreterTestHelpers.Run("let duplicate = 1; let duplicate = 2;"));
-        Assert.ThrowsAny<Exception>(() => InterpreterTestHelpers.Run("let value = missing;"));
+        var exception = Assert.Throws<FishboneRuntimeException>(() => InterpreterTestHelpers.Run(code));
+
+        Assert.Equal(message, exception.Message);
     }
 }

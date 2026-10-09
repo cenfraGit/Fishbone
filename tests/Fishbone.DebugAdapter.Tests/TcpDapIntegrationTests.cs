@@ -86,7 +86,7 @@ public class TcpDapIntegrationTests
         }
     }
 
-    private sealed class RawDapClient(NetworkStream stream, CancellationToken cancellationToken)
+    internal sealed class RawDapClient(NetworkStream stream, CancellationToken cancellationToken)
     {
         private int _sequence;
         private readonly List<JsonElement> _pending = [];

@@ -146,7 +146,8 @@ let skippedOr = true or missingOr;
 
         Assert.Equal(false, env.GetValue("skippedAnd"));
         Assert.Equal(true, env.GetValue("skippedOr"));
-        Assert.ThrowsAny<Exception>(() => InterpreterTestHelpers.Run("let result = true xor missingXor;"));
+        var exception = Assert.Throws<FishboneRuntimeException>(() => InterpreterTestHelpers.Run("let result = true xor missingXor;"));
+        Assert.Equal("Undefined variable 'missingXor'.", exception.Message);
     }
 
     [Fact]
@@ -344,13 +345,13 @@ let b = not true or true;
     public void Evaluate_And_BindsTighterThanOr()
     {
         var env = InterpreterTestHelpers.Run("""
-let a = false or true and false;
-let b = true and false or true;
+let a = true or true and false;
+let b = false and true or true;
 """);
 
-        // 'and' binds tighter than 'or': false or (true and false) = false or false = false
-        Assert.Equal(false, env.GetValue("a"));
-        // (true and false) or true = false or true = true
+        // true or (true and false) = true. left to right would give false
+        Assert.Equal(true, env.GetValue("a"));
+        // (false and true) or true = true. 'or' first would give false
         Assert.Equal(true, env.GetValue("b"));
     }
 
@@ -358,10 +359,30 @@ let b = true and false or true;
     public void Evaluate_Xor_HasSamePrecedenceAsOr()
     {
         var env = InterpreterTestHelpers.Run("""
-let a = true and false xor true;
+let a = true or false xor true;
+let b = true xor true or true;
+let c = false and true xor true;
 """);
 
-        // 'xor' shares 'or''s precedence, looser than 'and': (true and false) xor true = false xor true = true
-        Assert.Equal(true, env.GetValue("a"));
+        // same level, left to right: (true or false) xor true = false. xor tighter would give true
+        Assert.Equal(false, env.GetValue("a"));
+        // (true xor true) or true = true. xor looser would give false
+        Assert.Equal(true, env.GetValue("b"));
+        // 'and' binds tighter: (false and true) xor true = true. xor tighter would give false
+        Assert.Equal(true, env.GetValue("c"));
+    }
+
+    [Fact]
+    public void Evaluate_ArithmeticOperators_GroupLeftToRight()
+    {
+        var env = InterpreterTestHelpers.Run("""
+let difference = 10 - 3 - 2;
+let quotient = 8 / 4 / 2;
+""");
+
+        // (10 - 3) - 2 = 5, not 10 - (3 - 2) = 9
+        Assert.Equal(5, env.GetValue("difference"));
+        // (8 / 4) / 2 = 1.0, not 8 / (4 / 2) = 4.0
+        Assert.Equal(1.0, env.GetValue("quotient"));
     }
 }

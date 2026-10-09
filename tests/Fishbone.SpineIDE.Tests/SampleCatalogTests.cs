@@ -61,6 +61,17 @@ public class SampleCatalogTests
         Assert.Contains("12.566", output.ToString());
     }
 
+    [Fact]
+    public void RiemannSum_ApproximatesTheIntegral()
+    {
+        string code = SampleCatalog.Load("riemann_sum.fb");
+
+        var env = FishboneProgram.Run(code, CreateOutputConfiguration(new StringBuilder()));
+
+        // the left sum of x^2 over [0, 3] in 100 steps is 0.03^3 times the sum of i^2 for i below 100
+        Assert.Equal(8.86545, (double)env.GetValue("riemann_sum"), precision: 9);
+    }
+
     private static FishboneConfiguration CreateOutputConfiguration(StringBuilder output)
     {
         var configuration = new FishboneConfiguration();

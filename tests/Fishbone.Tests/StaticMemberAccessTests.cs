@@ -68,20 +68,26 @@ let sum = add(1, 2);
         // the reflection cache is shared across runs, so check both orders: a static
         // lookup must not leak into instance access, and an instance miss must not
         // hide the static member
-        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("let x = settings.Name;", Config()));
+        AssertNoMember("let x = settings.Name;", "Name");
         var env = FishboneProgram.Run("let x = Settings.Name;", Config());
         Assert.Equal("settings", env.GetValue("x"));
 
         env = FishboneProgram.Run("let x = Settings.Version;", Config());
         Assert.Equal(3, env.GetValue("x"));
-        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("let x = settings.Version;", Config()));
+        AssertNoMember("let x = settings.Version;", "Version");
     }
 
     [Fact]
     public void Run_InstanceMembersThroughTypeName_RaiseError()
     {
-        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("let x = Settings.InstanceValue;", Config()));
-        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("let x = Settings.InstanceMethod();", Config()));
+        AssertNoMember("let x = Settings.InstanceValue;", "InstanceValue");
+        AssertNoMember("let x = Settings.InstanceMethod();", "InstanceMethod");
+    }
+
+    private static void AssertNoMember(string code, string member)
+    {
+        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run(code, Config()));
+        Assert.Equal($"Type 'Settings' does not have a public member named '{member}'.", exception.Message);
     }
 
     [Fact]
@@ -97,10 +103,10 @@ let sum = add(1, 2);
     [Fact]
     public void Run_StaticClassCalledAsConstructor_RaisesError()
     {
-        var exception = Assert.ThrowsAny<Exception>(() =>
+        var exception = Assert.Throws<FishboneRuntimeException>(() =>
             FishboneProgram.Run("let c = Calc();", Config()));
 
-        Assert.Contains("Calc", exception.Message);
+        Assert.Equal("Type 'Calc' has no public constructor to call.", exception.Message);
     }
 
     [Fact]
