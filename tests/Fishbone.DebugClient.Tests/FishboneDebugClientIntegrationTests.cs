@@ -208,4 +208,44 @@ x = 2;
         Assert.True(result.WasCancelled);
         Assert.Equal(1, result.ExitCode);
     }
+
+    [Fact]
+    public async Task EachStepsPause_CanExpandItsVariables()
+    {
+        // the adapter can announce the next pause before it answers the step request. the client
+        // used to retire the pause handles when that answer arrived, killing the new pause's handles
+        const int steps = 40;
+        string sourceCode = "let items = [1, 2, 3];\n" + string.Concat(Enumerable.Repeat("items.Add(4);\n", steps));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        await using FishboneDebugServerSession server = await FishboneDebugServer.StartAsync(new FishboneDebugServerOptions
+        {
+            SourceCode = sourceCode,
+            SourceName = "steps.fb",
+            SourceIdentity = "fishbone://tests/steps.fb",
+            ListenEndpoint = new IPEndPoint(IPAddress.Loopback, 0)
+        }, timeout.Token);
+        await using FishboneDebugClientSession client = FishboneDebugClientSession.Attach("127.0.0.1", server.Endpoint.Port);
+        var pauses = Channel.CreateUnbounded<FishbonePauseSnapshot>();
+        client.EventReceived += (_, debugEvent) =>
+        {
+            if (debugEvent is FishboneDebugPaused paused)
+                pauses.Writer.TryWrite(paused.Snapshot);
+        };
+        await client.ConnectAsync(stopOnEntry: true, timeout.Token);
+        await client.ConfigureAsync([], timeout.Token);
+        await pauses.Reader.ReadAsync(timeout.Token);
+
+        for (int step = 0; step < steps; step++)
+        {
+            await client.StepOverAsync(timeout.Token);
+            FishbonePauseSnapshot pause = await pauses.Reader.ReadAsync(timeout.Token);
+            var items = pause.Frames[0].Scopes.Single(scope => scope.Name == "Locals").Variables.Single(variable => variable.Name == "items");
+
+            var children = await client.GetVariablesAsync(items.ChildrenHandle!, timeout.Token);
+
+            Assert.Equal(3 + step, children.Count);
+        }
+
+        await client.DisconnectAsync(timeout.Token);
+    }
 }
