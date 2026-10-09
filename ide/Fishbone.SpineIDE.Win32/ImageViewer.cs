@@ -188,13 +188,14 @@ internal static partial class Program
             DeleteObject(previous.Bitmap);
         if (view is not null)
         {
-            view.Title = hwnd == _fullScreen ? view.Title + "   (Escape closes)" : "Image: " + view.Title;
+            if (hwnd != _fullScreen)
+                view.Title = "Image: " + view.Title;
             if (previous is not null && previous.Name == view.Name && previous.Width == view.Width && previous.Height == view.Height)
                 (view.Fit, view.Scale, view.X, view.Y) = (previous.Fit, previous.Scale, previous.X, previous.Y);
             _images[hwnd] = view;
         }
         if (hwnd == _fullScreen)
-            SetWindowTextW(_fullScreenHeader, view?.Title ?? "nothing checked   (Escape closes)");
+            SetWindowTextW(_fullScreenHeader, view?.Title ?? "nothing checked");
         InvalidateRect(hwnd, IntPtr.Zero, true);
         return view;
     }
@@ -223,12 +224,16 @@ internal static partial class Program
             var monitor = new MONITORINFO { cbSize = (uint)Marshal.SizeOf<MONITORINFO>() };
             GetMonitorInfoW(MonitorFromWindow(_window, 2), ref monitor); // MONITOR_DEFAULTTONEAREST
             RECT area = monitor.rcMonitor;
-            // clip the header, so painting the image doesn't cover it
+            // clip the header and its button, so painting the image doesn't cover them
+            int width = area.right - area.left, button = Scale(130);
             _fullScreen = CreateWindowExW(0, "SpineIDE.Image", "SpineIDE", WS_POPUP | WS_CLIPCHILDREN, area.left, area.top,
-                area.right - area.left, area.bottom - area.top, _window, IntPtr.Zero, GetModuleHandleW(null), IntPtr.Zero);
+                width, area.bottom - area.top, _window, IntPtr.Zero, GetModuleHandleW(null), IntPtr.Zero);
             _fullScreenHeader = CreateWindowExW(0, "STATIC", "", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE, Scale(6), 0,
-                area.right - area.left - Scale(6), Scale(HeaderHeight), _fullScreen, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+                width - Scale(6) - button, Scale(HeaderHeight), _fullScreen, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
             SendMessageW(_fullScreenHeader, WM_SETFONT, _headerFont, 1);
+            IntPtr exit = CreateWindowExW(0, "BUTTON", "Exit full screen (Esc)", WS_CHILD | WS_VISIBLE, width - button, Scale(1),
+                button, Scale(HeaderHeight - 2), _fullScreen, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+            SendMessageW(exit, WM_SETFONT, _guiFont, 1);
             ShowStack(_fullScreen, _previewStack);
         }
         ShowWindow(_fullScreen, 1);
@@ -258,11 +263,10 @@ internal static partial class Program
         }
         (width, height) = (Math.Max(1, width), Math.Max(1, height));
 
-        string names = string.Join(" + ", stack.Select(entry => entry.Name));
         return new ImageView
         {
             Bitmap = bitmap, BitmapWidth = bitmapWidth, BitmapHeight = bitmapHeight, Width = width, Height = height,
-            Name = stack[0].Name, Title = $"{names} ({width}x{height})", Layers = layers,
+            Name = stack[0].Name, Title = $"{width}x{height}", Layers = layers,
         };
     }
 
@@ -317,7 +321,8 @@ internal static partial class Program
             case WM_PAINT when hwnd == _preview || hwnd == _fullScreen:
                 PaintPlaceholder(hwnd);
                 return 0;
-            case WM_KEYDOWN when hwnd == _fullScreen && (int)wParam == VK_ESCAPE:
+            // Escape, or the exit button in the header
+            case WM_KEYDOWN or WM_COMMAND when hwnd == _fullScreen && (msg == WM_COMMAND || (int)wParam == VK_ESCAPE):
                 DestroyWindow(hwnd);
                 return 0;
             // the image paints its own background, so dragging doesn't flicker
