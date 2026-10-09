@@ -163,7 +163,7 @@ public class BreakpointCoordinatorTests
     }
 
     [Fact]
-    public void ExceptionPauseOnlyAllowsContinue()
+    public void AStepOnAnExceptionPause_LetsTheErrorEndTheScript()
     {
         using var coordinator = CreateStartedCoordinator(out var environment);
         int pauses = 0;
@@ -171,8 +171,6 @@ public class BreakpointCoordinatorTests
         {
             pauses++;
             coordinator.StepInto();
-            Assert.Equal(DebugSessionState.Paused, coordinator.State);
-            coordinator.Continue();
         };
 
         coordinator.OnRuntimeException(new InvalidOperationException("failed"), Node(7), environment);

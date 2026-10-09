@@ -286,8 +286,9 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
             if (_state != DebugSessionState.Paused)
                 return;
 
-            if (_exceptionPause && stepMode != StepMode.None)
-                return;
+            // an uncaught error ends the script, so there's nothing to step to. a step just lets it end
+            if (_exceptionPause)
+                stepMode = StepMode.None;
 
             _stepMode = stepMode;
             _exceptionPause = false;
