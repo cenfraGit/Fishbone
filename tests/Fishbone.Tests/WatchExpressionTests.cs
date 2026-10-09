@@ -37,6 +37,29 @@ public class WatchExpressionTests
         Assert.ThrowsAny<OperationCanceledException>(() => FishboneExpression.Evaluate("forever()", environment, null, cancelled.Token));
     }
 
+    // like a HALCON operator: nothing comes back, the results are out arguments
+    private delegate void CountDelegate(List<object?> items, out int count);
+    private delegate void SplitDelegate(int value, out int tens, out int ones);
+
+    private static readonly FishboneConfiguration Operators = new FishboneConfiguration()
+        .AddBuiltIn("count_items", new CountDelegate((List<object?> items, out int count) => count = items.Count))
+        .AddBuiltIn("split", new SplitDelegate((int value, out int tens, out int ones) => (tens, ones) = (value / 10, value % 10)));
+
+    [Fact]
+    public void Evaluate_ACallThatReturnsNothing_GivesItsOutValues()
+    {
+        var environment = FishboneProgram.Run("let items = [1, 2, 3]; let ones = 7;", Operators);
+
+        Assert.Equal(3, FishboneExpression.Evaluate("count_items(items, out n)", environment, Operators));
+        var both = Assert.IsAssignableFrom<IDictionary<string, object?>>(FishboneExpression.Evaluate("split(42, out tens, out ones)", environment, Operators));
+
+        Assert.Equal(4, both["tens"]);
+        Assert.Equal(2, both["ones"]);
+        // the outs stay in the watch: the script's ones is untouched, and n never appears
+        Assert.Equal(7, environment.GetValue("ones"));
+        Assert.False(environment.IsDefined("n"));
+    }
+
     [Fact]
     public void WatchCompletions_OfferTheNamesInScopeAtTheLine()
     {
