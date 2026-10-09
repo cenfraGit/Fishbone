@@ -11,7 +11,7 @@ cd -- "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 windows=0
 case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) windows=1 ;; esac
 
-if [ "$windows" -eq 1 ]; then ./pack.sh -i; else ./pack.sh; fi
+if [ "$windows" -eq 1 ]; then bash ./pack.sh -i; else bash ./pack.sh; fi
 
 # a package cache of its own, so a stale copy of the same version can't be used
 work="$(mktemp -d)"
