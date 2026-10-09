@@ -171,7 +171,10 @@ internal static partial class Program
 
         // a host started us to debug its script, like RunDebuggableAsync does
         if (options.AttachPort is int port)
+        {
             Attach(port);
+            ListenForReattach();
+        }
 
         while (GetMessageW(out MSG msg, IntPtr.Zero, 0, 0) > 0)
         {
