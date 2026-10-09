@@ -80,6 +80,8 @@ There are 25 of them:
 
 `let` `null` `true` `false` `if` `else` `while` `foreach` `for` `break` `continue` `try` `catch` `finally` `throw` `in` `as` `func` `return` `and` `or` `xor` `not` `out` `ref`
 
+**Recommendation:** don't use these as names either, since they may become keywords later: `is`, `const`, `match`, `switch`, `case`, `import`, `yield`, `async`, `await`. A script that uses one would stop parsing when that keyword is added.
+
 ### Reserved type names
 
 The C# keyword type names are reserved too. There are 15 of them:
@@ -179,9 +181,18 @@ When a value lands in a boolean context (`if`, `while`, `and`, `or`, `not`), her
 
 - `null` is falsy
 - `bool` is itself
-- `int` and `double` are falsy at zero, truthy otherwise
+- `int`, `long` and `double` are falsy at zero, truthy otherwise
 - `string` is falsy when empty, truthy otherwise
 - everything else is truthy
+
+**Recommendation:** don't rely on truthiness beyond `bool`s and `null` checks. Other number types (`float`, `decimal`, `byte`...) are truthy even at zero, and an empty list or dictionary is truthy too. These rules may get cleaned up, so write the check you mean:
+
+```csharp
+if (count != 0) { }        // not: if (count)
+if (items.Count > 0) { }   // not: if (items)
+if (name != "") { }        // not: if (name)
+if (result != null) { }    // fine either way
+```
 
 ---
 
