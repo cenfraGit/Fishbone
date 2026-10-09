@@ -30,8 +30,10 @@ public sealed class FishboneDebugAdapterSession :
     private readonly CancellationTokenSource _executionCancellation = new();
     private readonly DebugSnapshotHandles _handles;
     private readonly FishboneConfiguration? _configuration;
-    // made the first time a watch asks for completions
-    private FishboneAnalysis? _analysis;
+    // describing a configuration with a big plugin, like HALCON's thousands of operators, takes a
+    // while, so the analysis starts in the background at the first pause, before a watch asks
+    private Task<FishboneAnalysis>? _analysis;
+    private readonly object _analysisStart = new();
     // a watch runs on the paused script's values, so the script doesn't resume until it's done
     private readonly object _evaluating = new();
     private static readonly TimeSpan EvaluationTimeout = TimeSpan.FromSeconds(10);
@@ -214,6 +216,12 @@ public sealed class FishboneDebugAdapterSession :
         }
     }
 
+    private Task<FishboneAnalysis> Analysis()
+    {
+        lock (_analysisStart)
+            return _analysis ??= Task.Run(() => FishboneAnalysis.Analyze(_sourceCode, (_configuration ?? new FishboneConfiguration()).Describe()));
+    }
+
     /// <summary>Marks a watch's answer as the reason it failed.</summary>
     public const string FailedEvaluation = "failedEvaluation";
 
@@ -230,21 +238,23 @@ public sealed class FishboneDebugAdapterSession :
 
     // completions for a watch being typed, with the names in scope at the frame's line. after a
     // dot, the members of the value before it when its type isn't known from the script
-    public Task<CompletionsResponse> Handle(CompletionsArguments request, CancellationToken cancellationToken)
+    public async Task<CompletionsResponse> Handle(CompletionsArguments request, CancellationToken cancellationToken)
     {
-        var none = Task.FromResult(new CompletionsResponse { Targets = new Container<CompletionItem>() });
+        var none = new CompletionsResponse { Targets = new Container<CompletionItem>() };
+        if (string.IsNullOrEmpty(_sourceCode))
+            return none;
+        FishboneAnalysis analysis = await Analysis().ConfigureAwait(false);
         // columns start at 1, like lines
         int caret = Math.Clamp((int)request.Column - 1, 0, request.Text.Length);
         FishboneCompletions? completions;
         lock (_evaluating)
         {
-            if (_coordinator.State != DebugSessionState.Paused || string.IsNullOrEmpty(_sourceCode))
+            if (_coordinator.State != DebugSessionState.Paused)
                 return none;
             try
             {
                 DebugCallFrameSnapshot frame = _handles.GetFrame(request.FrameId);
-                _analysis ??= FishboneAnalysis.Analyze(_sourceCode, (_configuration ?? new FishboneConfiguration()).Describe());
-                completions = _analysis.WatchCompletionsAt(_sourceCode, frame.Location.Line, request.Text, caret,
+                completions = analysis.WatchCompletionsAt(_sourceCode, frame.Location.Line, request.Text, caret,
                     frame.Environment is { } environment ? expression => FishboneExpression.Evaluate(expression, environment, _configuration) : null);
             }
             catch (InvalidOperationException)
@@ -272,7 +282,7 @@ public sealed class FishboneDebugAdapterSession :
             Start = completions.Start + 1,
             Length = caret - completions.Start
         });
-        return Task.FromResult(new CompletionsResponse { Targets = new Container<CompletionItem>(items) });
+        return new CompletionsResponse { Targets = new Container<CompletionItem>(items) };
     }
 
     public Task<ContinueResponse> Handle(ContinueArguments request, CancellationToken cancellationToken)
@@ -434,6 +444,8 @@ public sealed class FishboneDebugAdapterSession :
     private void OnPaused(object? sender, DebugPausedEventArgs args)
     {
         _handles.SetSnapshot(args.Snapshot);
+        if (!string.IsNullOrEmpty(_sourceCode))
+            _ = Analysis();
         bool isEntryStop = Interlocked.Exchange(ref _entryStopPending, 0) == 1;
         Enqueue(new StoppedEvent
         {
