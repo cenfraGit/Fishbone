@@ -76,7 +76,10 @@ public sealed class FishboneDescription
         // a value shadows a built-in with the same name, so it's the one a script sees. a null
         // has no type of its own, so it's described as an object
         Symbols = configuration.Values
-            .Select(entry => new FishboneSymbol(entry.Key, FishboneSymbolKind.Value, entry.Value?.GetType() ?? typeof(object), []))
+            // a registered type stays a type when it comes in as a value, the way the interpreter treats it
+            .Select(entry => entry.Value is RegisteredType registered
+                ? DescribeBuiltIn(entry.Key, registered)
+                : new FishboneSymbol(entry.Key, FishboneSymbolKind.Value, entry.Value?.GetType() ?? typeof(object), []))
             .Concat(configuration.BuiltIns
                 .Where(entry => !configuration.Values.ContainsKey(entry.Key))
                 .Select(entry => DescribeBuiltIn(entry.Key, entry.Value)))
