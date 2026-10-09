@@ -153,7 +153,9 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
             _frames[^1].Location = new DebugSourceLocation(SourceId, node.Line, node.Column);
             var isNewLocation = _lastExecutableLocation != location;
             _lastExecutableLocation = location;
-            if (!isNewLocation)
+            // a pause request doesn't wait for a new line, or a loop that never leaves its line
+            // (while (true) { }) could never be paused
+            if (!isNewLocation && !_pauseRequested)
                 return;
 
             if (_pauseRequested)
