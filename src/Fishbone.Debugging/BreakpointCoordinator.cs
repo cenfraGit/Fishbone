@@ -24,6 +24,8 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
     private bool _stopRequested;
     private bool _exceptionPause;
     private (int Line, int Depth)? _lastExecutableLocation;
+    // an uncaught error ends the run, so there are no final values to pause on
+    private bool _failed;
     private (int Line, int Depth)? _resumeLocation;
     private int _targetDepth;
     private bool _pauseOnRuntimeExceptions = true;
@@ -121,6 +123,7 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
             _frames.Add(new Frame("<script>", environment));
             _lastExecutableLocation = null;
             _exceptionPause = false;
+            _failed = false;
         }
     }
 
@@ -178,6 +181,7 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
         lock (_sync)
         {
             ThrowIfStoppedLocked();
+            _failed = true;
             if (!_pauseOnRuntimeExceptions)
                 return;
 
@@ -220,7 +224,7 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
 
         lock (_sync)
         {
-            if (!_stopRequested && (_stepMode != StepMode.None || PauseAtEnd) && _state == DebugSessionState.Running)
+            if (!_stopRequested && !_failed && (_stepMode != StepMode.None || PauseAtEnd) && _state == DebugSessionState.Running)
             {
                 _stepMode = StepMode.None;
                 _pauseRequested = false;
