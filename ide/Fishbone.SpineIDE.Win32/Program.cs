@@ -317,6 +317,7 @@ internal static partial class Program
             SendMessageW(control, WM_SETFONT, _headerFont, 1);
         SendMessageW(_variables, WM_SETFONT, _treeFont, 1);
         SendMessageW(_variables, TVM_SETITEMHEIGHT, Scale(24), 0);
+        SetToolbarIcons();
         SetMarginWidths();
 
         GetClientRect(_window, out RECT client);
@@ -386,12 +387,14 @@ internal static partial class Program
     {
         int top = Scale(TopBarHeight), input = Scale(InputHeight), header = Scale(HeaderHeight), gap = Scale(Gap);
         int indent = Scale(6);
-        int x = Scale(8);
-        for (int i = 0; i < _toolbar.Count; i++)
+        // the toolbar sits on the right, laid out from its right end
+        int x = width - Scale(8), buttonWidth = Scale(88);
+        for (int i = _toolbar.Count - 1; i >= 0; i--)
         {
-            MoveWindow(_toolbar[i], x, Scale(4), Scale(80), Scale(24), true);
+            x -= buttonWidth;
+            MoveWindow(_toolbar[i], x, Scale(4), buttonWidth, Scale(24), true);
             // a wider gap between the run, the session and the stepping groups
-            x += Scale(i is 1 or 4 ? 96 : 84);
+            x -= Scale(i is 2 or 5 ? 16 : 4);
         }
 
         // the status bar sizes itself on WM_SIZE, the panes take the rest

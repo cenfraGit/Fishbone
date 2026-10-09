@@ -7,10 +7,9 @@ namespace SpineIDE.Win32;
 
 internal static partial class Program
 {
-    private const uint WM_PAINT = 0xF, WM_ERASEBKGND = 0x14, WS_EX_TOOLWINDOW = 0x80, WM_MOUSEMOVE = 0x200,
+    private const uint WM_PAINT = 0xF, WM_ERASEBKGND = 0x14, WM_MOUSEMOVE = 0x200,
         WM_LBUTTONDOWN = 0x201, WM_LBUTTONUP = 0x202, WM_LBUTTONDBLCLK = 0x203, WM_MOUSEWHEEL = 0x20A;
     private const uint WS_POPUP = 0x80000000, WS_CLIPCHILDREN = 0x02000000;
-    private const int CW_USEDEFAULT = unchecked((int)0x80000000);
     private const int NM_DBLCLK = -3;
 
     // the delegate has to stay referenced, like the main window's
@@ -55,7 +54,7 @@ internal static partial class Program
     // bumped when the variables change, so an image that finishes loading late is dropped
     private static int _previewVersion;
 
-    // the docked preview and the pop-out windows share one window class
+    // the docked preview and the full screen one share one window class
     private static void RegisterImageClass()
     {
         var windowClass = new WNDCLASSEX
@@ -267,40 +266,14 @@ internal static partial class Program
         };
     }
 
-    // double-clicking an image variable also opens it in its own, bigger window. one that's in
-    // the preview opens with everything stacked there
-    private static async void OpenImage(VariableNode node)
+    // the whole image again, centered, like before it was zoomed or moved
+    private static void FitImage(IntPtr hwnd)
     {
-        try
-        {
-            List<StackEntry> stack = _previewStack.Any(entry => entry.Name == node.Name)
-                ? _previewStack
-                : await LoadImage(node) is { } image ? [new StackEntry(node.Name, image)] : [];
-            if (stack.Count > 0)
-                Post(() => OpenImageWindow(stack));
-        }
-        catch (Exception exception)
-        {
-            Post(() => SetWindowTextW(_status, $"the image couldn't be shown: {exception.Message}"));
-        }
-    }
-
-    private static void OpenImageWindow(List<StackEntry> stack)
-    {
-        ImageView? view = CreateView(stack);
-        if (view is null)
-        {
-            SetWindowTextW(_status, "the image couldn't be decoded");
+        if (!_images.TryGetValue(hwnd, out ImageView? view))
             return;
-        }
-
-        // show it at its own size, up to most of a typical screen
-        var frame = new RECT { right = Math.Min(view.Width, 1400), bottom = Math.Min(view.Height, 900) };
-        AdjustWindowRectEx(ref frame, WS_OVERLAPPEDWINDOW, false, WS_EX_TOOLWINDOW);
-        IntPtr window = CreateWindowExW(WS_EX_TOOLWINDOW, "SpineIDE.Image", view.Title, WS_OVERLAPPEDWINDOW,
-            CW_USEDEFAULT, CW_USEDEFAULT, frame.right - frame.left, frame.bottom - frame.top, _window, IntPtr.Zero, GetModuleHandleW(null), IntPtr.Zero);
-        _images[window] = view;
-        ShowWindow(window, 1);
+        view.Fit = true;
+        SetWindowTextW(HeaderOf(hwnd), view.Title);
+        InvalidateRect(hwnd, IntPtr.Zero, false);
     }
 
     // the GDI+ flat api decodes PNG with plain calls, no COM wrappers
@@ -386,10 +359,8 @@ internal static partial class Program
                 view.Dragging = false;
                 ReleaseCapture();
                 return 0;
-            case WM_LBUTTONDBLCLK when _images.TryGetValue(hwnd, out var view):
-                view.Fit = true;
-                SetWindowTextW(HeaderOf(hwnd), view.Title);
-                InvalidateRect(hwnd, IntPtr.Zero, false);
+            case WM_LBUTTONDBLCLK:
+                FitImage(hwnd);
                 return 0;
             case WM_DESTROY:
                 if (hwnd == _fullScreen)
@@ -401,8 +372,7 @@ internal static partial class Program
         return DefWindowProcW(hwnd, msg, wParam, lParam);
     }
 
-    // the pixel under the cursor and the zoom, in the preview's header or the pop-out's title.
-    // row and column, like HALCON counts them
+    // the pixel under the cursor and the zoom, in the header. row and column, like HALCON counts them
     private static void ShowPointer(IntPtr hwnd, ImageView view, int x, int y)
     {
         int column = (int)Math.Floor((x - view.X) / view.Scale), row = (int)Math.Floor((y - view.Y) / view.Scale);
@@ -410,10 +380,7 @@ internal static partial class Program
         SetWindowTextW(HeaderOf(hwnd), $"{view.Title}   {view.Scale * 100:F0}%{pointer}");
     }
 
-    // where an image window shows its title: the preview and the full screen one have a header,
-    // and a pop-out its title bar
-    private static IntPtr HeaderOf(IntPtr hwnd) =>
-        hwnd == _preview ? _previewHeader : hwnd == _fullScreen ? _fullScreenHeader : hwnd;
+    private static IntPtr HeaderOf(IntPtr hwnd) => hwnd == _fullScreen ? _fullScreenHeader : _previewHeader;
 
     private static void PaintPlaceholder(IntPtr hwnd)
     {
@@ -687,9 +654,6 @@ internal static partial class Program
 
     [DllImport("shlwapi.dll")]
     private static extern IntPtr SHCreateMemStream(byte[] data, uint size);
-
-    [DllImport("user32.dll")]
-    private static extern bool AdjustWindowRectEx(ref RECT rect, uint style, bool menu, uint exStyle);
 
     [DllImport("user32.dll")]
     private static extern IntPtr BeginPaint(IntPtr hwnd, out PAINTSTRUCT paint);
