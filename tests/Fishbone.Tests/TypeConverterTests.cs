@@ -74,6 +74,8 @@ let result = unwrap(b);
         var config = new FishboneConfiguration()
             .AddBuiltIn("unwrap", new Func<Boxed, int>(box => box.Value));
 
-        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("let result = unwrap(21);", config));
+        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run("let result = unwrap(21);", config));
+
+        Assert.Equal("Argument 1 of type 'Int32' is not compatible with parameter 'box' of type 'Boxed'.", exception.Message);
     }
 }

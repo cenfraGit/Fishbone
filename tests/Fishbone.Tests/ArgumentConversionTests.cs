@@ -46,30 +46,32 @@ let intToFloat = takeFloat(2);
     }
 
     [Theory]
-    [InlineData("takeInt(0.5)")]
-    [InlineData("takeInt(1.5)")]
-    [InlineData("takeInt(2.5)")]
-    [InlineData("takeInt(-2.7)")]
-    [InlineData("takeInt(null)")]
-    [InlineData("takeInt(\"0\")")]
-    [InlineData("takeInt(true)")]
-    [InlineData("takeInt(3000000000)")]
-    [InlineData("takeInt(3000000000.0)")]
-    [InlineData("takeDouble(\"3.5\")")]
-    [InlineData("takeFloat(400000000000000000000000000000000000000.0)")]
-    [InlineData("takeLong(null)")]
-    [InlineData("takeDay(\"Monday\")")]
-    [InlineData("takeDay(1.5)")]
-    public void Run_LossyArgumentToDelegate_RaisesError(string call)
+    [InlineData("takeInt(0.5)", "Int32")]
+    [InlineData("takeInt(1.5)", "Int32")]
+    [InlineData("takeInt(2.5)", "Int32")]
+    [InlineData("takeInt(-2.7)", "Int32")]
+    [InlineData("takeInt(null)", "Int32")]
+    [InlineData("takeInt(\"0\")", "Int32")]
+    [InlineData("takeInt(true)", "Int32")]
+    [InlineData("takeInt(3000000000)", "Int32")]
+    [InlineData("takeInt(3000000000.0)", "Int32")]
+    [InlineData("takeDouble(\"3.5\")", "Double")]
+    [InlineData("takeFloat(400000000000000000000000000000000000000.0)", "Single")]
+    [InlineData("takeLong(null)", "Int64")]
+    [InlineData("takeDay(\"Monday\")", "DayOfWeek")]
+    [InlineData("takeDay(1.5)", "DayOfWeek")]
+    public void Run_LossyArgumentToDelegate_RaisesError(string call, string parameterType)
     {
-        Assert.ThrowsAny<Exception>(() =>
+        var exception = Assert.Throws<FishboneRuntimeException>(() =>
             FishboneProgram.Run($"let result = {call};", Config()));
+
+        Assert.Contains($"not compatible with parameter 'value' of type '{parameterType}'", exception.Message);
     }
 
     [Fact]
     public void Run_LossyArgumentToMethod_RaisesError()
     {
-        var exception = Assert.ThrowsAny<Exception>(() =>
+        var exception = Assert.Throws<FishboneRuntimeException>(() =>
             FishboneProgram.Run("let result = sample.Read(1.5);", Config()));
 
         Assert.Contains("'index'", exception.Message);
@@ -80,7 +82,7 @@ let intToFloat = takeFloat(2);
     {
         var config = new FishboneConfiguration().AddType<Sample>();
 
-        var exception = Assert.ThrowsAny<Exception>(() =>
+        var exception = Assert.Throws<FishboneRuntimeException>(() =>
             FishboneProgram.Run("let s = Sample(0.5);", config));
 
         Assert.Contains("'size'", exception.Message);
@@ -91,7 +93,7 @@ let intToFloat = takeFloat(2);
     {
         // 2.5 can't go to Pick(int) and a number never becomes a string, so neither
         // overload applies. it's a conversion error, not an ambiguous call
-        var exception = Assert.ThrowsAny<Exception>(() =>
+        var exception = Assert.Throws<FishboneRuntimeException>(() =>
             FishboneProgram.Run("let result = sample.Pick(2.5);", Config()));
 
         Assert.DoesNotContain("ambiguous", exception.Message, StringComparison.OrdinalIgnoreCase);

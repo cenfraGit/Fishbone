@@ -56,12 +56,6 @@ public class ParseErrorCollectionTests
     }
 
     [Fact]
-    public void FishboneParseException_DerivesFromException()
-    {
-        Assert.ThrowsAny<Exception>(() => ASTParser.Parse("let x = ;"));
-    }
-
-    [Fact]
     public void Parse_SingleErrorMessage_IncludesLocation()
     {
         var ex = Assert.Throws<FishboneParseException>(() => ASTParser.Parse("let x = ;"));

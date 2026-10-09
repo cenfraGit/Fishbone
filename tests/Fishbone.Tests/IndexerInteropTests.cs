@@ -44,20 +44,22 @@ let result = values[1];
     }
 
     [Theory]
-    [InlineData("sample[\"2\"] = 7;")]
-    [InlineData("sample[2] = \"7\";")]
-    [InlineData("values[1] = \"9\";")]
-    [InlineData("values[1] = 2.5;")]
-    [InlineData("dictionary[123] = 8;")]
-    [InlineData("dictionary[\"123\"] = \"8\";")]
-    public void Run_LossyIndexerArgument_RaisesError(string assignment)
+    [InlineData("sample[\"2\"] = 7;", "No writable indexer on type 'CustomIndexer' accepts the supplied index.")]
+    [InlineData("sample[2] = \"7\";", "Value is not compatible with a writable indexer on type 'CustomIndexer'.")]
+    [InlineData("values[1] = \"9\";", "Value is not compatible with element type 'Int32'.")]
+    [InlineData("values[1] = 2.5;", "Value is not compatible with element type 'Int32'.")]
+    [InlineData("dictionary[123] = 8;", "(Parameter 'key')")]
+    [InlineData("dictionary[\"123\"] = \"8\";", "(Parameter 'value')")]
+    public void Run_LossyIndexerArgument_RaisesError(string assignment, string message)
     {
         var configuration = new FishboneConfiguration()
             .AddBuiltIn("sample", new CustomIndexer())
             .AddBuiltIn("values", new int[] { 1, 2, 3 })
             .AddBuiltIn("dictionary", new Dictionary<string, int>());
 
-        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run(assignment, configuration));
+        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run(assignment, configuration));
+
+        Assert.Contains(message, exception.Message);
     }
 
     [Fact]
@@ -86,7 +88,7 @@ let dictionaryValue = dictionary["new"];
         var configuration = new FishboneConfiguration()
             .AddBuiltIn("sample", new ReadOnlyIndexer());
 
-        Exception exception = Assert.ThrowsAny<Exception>(() =>
+        var exception = Assert.Throws<FishboneRuntimeException>(() =>
             FishboneProgram.Run("sample[0] = 10;", configuration));
 
         Assert.Contains("read-only", exception.Message);
@@ -98,7 +100,7 @@ let dictionaryValue = dictionary["new"];
         var configuration = new FishboneConfiguration()
             .AddBuiltIn("sample", new CustomIndexer());
 
-        Exception exception = Assert.ThrowsAny<Exception>(() =>
+        var exception = Assert.Throws<FishboneRuntimeException>(() =>
             FishboneProgram.Run("sample[0] = [1];", configuration));
 
         Assert.Contains("not compatible", exception.Message);

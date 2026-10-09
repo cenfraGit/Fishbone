@@ -87,7 +87,9 @@ getValues()[3] = 40;
     [Fact]
     public void Parse_NonIndexedExpressionAssignment_Throws()
     {
-        Assert.ThrowsAny<Exception>(() => ParserTestHelpers.ParseProgram("(a + b) = 10;"));
+        var exception = Assert.Throws<FishboneParseException>(() => ParserTestHelpers.ParseProgram("(a + b) = 10;"));
+
+        Assert.Equal("Line 1, column 1: Assignment requires a variable, an indexed target or a member, but found BinaryOpNode.", exception.Message);
     }
 
     [Fact]
@@ -138,7 +140,9 @@ values[1] += 5;
     [Fact]
     public void Parse_CompoundAssignmentToNonAssignableTarget_Throws()
     {
-        Assert.ThrowsAny<Exception>(() => ParserTestHelpers.ParseProgram("(a + b) += 1;"));
+        var exception = Assert.Throws<FishboneParseException>(() => ParserTestHelpers.ParseProgram("(a + b) += 1;"));
+
+        Assert.Equal("Line 1, column 1: Compound assignment requires a variable, an indexed target or a member, but found BinaryOpNode.", exception.Message);
     }
 
     [Fact]

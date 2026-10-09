@@ -159,8 +159,10 @@ public class ConfigurationDescriptionTests
     }
 
     [Fact]
-    public void Members_OverriddenMethod_AppearsOnce()
+    public void Members_HiddenMethod_AppearsOnce()
     {
+        // reflection lists both Base.Name and the 'new' Derived.Name, so the cache has to
+        // drop the hidden one
         var describe = Assert.Single(Config().Describe().Members(typeof(Derived), isStatic: false), member => member.Name == "Name");
 
         Assert.Single(describe.Signatures);
@@ -234,11 +236,11 @@ public class ConfigurationDescriptionTests
 
     public class Base
     {
-        public virtual string Name() => "base";
+        public string Name() => "base";
     }
 
     public sealed class Derived : Base
     {
-        public override string Name() => "derived";
+        public new string Name() => "derived";
     }
 }

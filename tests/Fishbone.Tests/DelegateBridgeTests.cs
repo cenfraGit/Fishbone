@@ -36,9 +36,11 @@ let scriptResult = doubleValue(21);
         var config = new FishboneConfiguration()
             .AddBuiltIn("add", new Func<int, int, int>((left, right) => left + right));
 
-        Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("""
+        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run("""
 let scriptResult = add(1);
 """, config));
+
+        Assert.Equal("No argument supplied for parameter 'right', which has no default value.", exception.Message);
     }
 
     [Fact]
@@ -47,7 +49,7 @@ let scriptResult = add(1);
         var config = new FishboneConfiguration()
             .AddBuiltIn("explode", new Func<int>(() => throw new InvalidOperationException("boom")));
 
-        var exception = Assert.ThrowsAny<Exception>(() => FishboneProgram.Run("""
+        var exception = Assert.Throws<FishboneRuntimeException>(() => FishboneProgram.Run("""
 let scriptResult = explode();
 """, config));
 

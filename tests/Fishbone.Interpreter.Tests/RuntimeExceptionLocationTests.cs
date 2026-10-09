@@ -47,15 +47,6 @@ fail();
     }
 
     [Fact]
-    public void FishboneRuntimeException_DerivesFromException()
-    {
-        var ast = ASTParser.Parse("let value = missing;");
-        var interpreter = new FishboneInterpreter();
-
-        Assert.ThrowsAny<Exception>(() => interpreter.Evaluate(new FishboneEnvironment(), ast));
-    }
-
-    [Fact]
     public void RuntimeException_PreservesOriginalMessage()
     {
         var ast = ASTParser.Parse("let value = missing;");
