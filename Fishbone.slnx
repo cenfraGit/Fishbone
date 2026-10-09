@@ -8,6 +8,7 @@
     <Project Path="tests/Fishbone.Parser.Tests/Fishbone.Parser.Tests.csproj" />
     <Project Path="tests/Fishbone.Plugins.Halcon24111.Tests/Fishbone.Plugins.Halcon24111.Tests.csproj" />
     <Project Path="tests/Fishbone.Plugins.OpenCV.Tests/Fishbone.Plugins.OpenCV.Tests.csproj" />
+    <Project Path="tests/Fishbone.TestPlugin/Fishbone.TestPlugin.csproj" />
     <Project Path="tests/Fishbone.Tests/Fishbone.Tests.csproj" />
     <Project Path="tests/Fishbone.SpineIDE.Tests/Fishbone.SpineIDE.Tests.csproj" />
   </Folder>

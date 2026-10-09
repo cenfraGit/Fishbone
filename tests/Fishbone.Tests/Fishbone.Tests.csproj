@@ -22,6 +22,9 @@
     <ProjectReference Include="..\..\src\Fishbone.Interpreter\Fishbone.Interpreter.csproj" />
     <!-- the cli runs as its own process in CliTests, from this output folder -->
     <ProjectReference Include="..\..\ide\Fishbone.SpineCLI\Fishbone.SpineCLI.csproj" />
+    <!-- copied into a temp plugins folder by FishbonePluginLoaderTests, never used directly -->
+    <ProjectReference Include="..\Fishbone.TestPlugin\Fishbone.TestPlugin.csproj" />
+    <ProjectReference Include="..\..\plugins\Fishbone.Plugins.Math\Fishbone.Plugins.Math.csproj" />
   </ItemGroup>
 
   <ItemGroup>
