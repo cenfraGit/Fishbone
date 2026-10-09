@@ -20,8 +20,9 @@ public sealed class ManualFactAttribute : FactAttribute
 
 /// <summary>
 /// Opens the SpineIDE built from this repo, attached to a host the way <c>RunDebuggableAsync</c>
-/// does for an app. The IDE stops on the first line. Step around, check picture and shapes into
-/// the preview, then continue to the end, and the test checks what the script left behind.
+/// does for an app. The IDE stops on the first line. Step around, check images into the preview,
+/// try watches, then continue to the end, and the test checks the script ran. The host loads the
+/// plugins installed in ~/.fishbone/plugins, like SpineIDE's own debug host does.
 /// </summary>
 [Collection("DebugServer")]
 public class SpineIdeAttachTests
@@ -43,27 +44,48 @@ public class SpineIdeAttachTests
     [ManualFact]
     public async Task RunDebuggableAsync_OpensSpineIdeAttached()
     {
-        string ide = FindSpineIde();
-        // attached, println goes to the IDE's output instead
         var config = new FishboneConfiguration()
-            .AddBuiltIn("println", new Action<object?>(Console.WriteLine))
             .AddBuiltIn("picture", new Picture())
             .AddBuiltIn("squares", new Shapes(Squares: true))
             .AddBuiltIn("ring", new Shapes(Squares: false))
             .AddVisualizer<Picture>(_ => Gradient())
             .AddVisualizer<Shapes>(shapes => shapes.Squares ? SquareRegions() : RingContour());
 
-        var result = await FishboneProgram.FromSourceCode(Script).RunDebuggableAsync(config, new FishboneDebugOptions
+        var result = await RunAttachedAsync(Script, "attach-test.fb", config);
+
+        Assert.Equal(10, result.Environment!.GetValue("total"));
+    }
+
+    // the regions sample, for HALCON regions and contours in the preview, and watches like
+    // count_obj(blobs, out n). it needs the HALCON plugin installed
+    [ManualFact]
+    public async Task RunDebuggableAsync_OpensSpineIdeOnTheHalconRegionsSample()
+    {
+        string sample = Path.Combine(RepositoryRoot().FullName, "samples", "halcon_regions.fb");
+
+        var result = await RunAttachedAsync(File.ReadAllText(sample), Path.GetFileName(sample), new FishboneConfiguration());
+
+        Assert.True(result.Environment!.IsDefined("blobs"));
+    }
+
+    private static async Task<FishboneRunResult> RunAttachedAsync(string script, string name, FishboneConfiguration config)
+    {
+        string ide = FindSpineIde();
+        // attached, println goes to the IDE's output instead
+        config.AddBuiltIn("println", new Action<object?>(Console.WriteLine));
+        FishbonePluginLoader.LoadPlugins(FishbonePluginLoader.DefaultPluginsDirectory, config);
+
+        var result = await FishboneProgram.FromSourceCode(script).RunDebuggableAsync(config, new FishboneDebugOptions
         {
             OpenIde = true,
             AttachTimeout = TimeSpan.FromSeconds(30),
-            SourceName = "attach-test.fb",
+            SourceName = name,
             IdeLauncher = endpoint => Process.Start(ide, $"--attach {endpoint.Port}"),
         });
 
         Assert.True(result.DebuggerAttached, "SpineIDE didn't attach within 30 seconds");
         Assert.Null(result.Error);
-        Assert.Equal(10, result.Environment!.GetValue("total"));
+        return result;
     }
 
     // SPINEIDE_PATH when it's set, otherwise the IDE built next to this test, in the same configuration
@@ -73,16 +95,19 @@ public class SpineIdeAttachTests
             return fromEnvironment;
 
         // bin/<configuration>/net8.0 under the test project
-        var output = new DirectoryInfo(AppContext.BaseDirectory);
-        string configuration = output.Parent!.Name;
-        DirectoryInfo? root = output;
+        string configuration = new DirectoryInfo(AppContext.BaseDirectory).Parent!.Name;
+        string ide = Path.Combine(RepositoryRoot().FullName, "ide", "Fishbone.SpineIDE.Win32", "bin", configuration, "net8.0", "spineide.exe");
+        Assert.True(File.Exists(ide), $"build ide/Fishbone.SpineIDE.Win32 ({configuration}) first, or set SPINEIDE_PATH: {ide}");
+        return ide;
+    }
+
+    private static DirectoryInfo RepositoryRoot()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
         while (root is not null && !File.Exists(Path.Combine(root.FullName, "Fishbone.slnx")))
             root = root.Parent;
         Assert.NotNull(root);
-
-        string ide = Path.Combine(root.FullName, "ide", "Fishbone.SpineIDE.Win32", "bin", configuration, "net8.0", "spineide.exe");
-        Assert.True(File.Exists(ide), $"build ide/Fishbone.SpineIDE.Win32 ({configuration}) first, or set SPINEIDE_PATH: {ide}");
-        return ide;
+        return root;
     }
 
     private sealed class Picture;

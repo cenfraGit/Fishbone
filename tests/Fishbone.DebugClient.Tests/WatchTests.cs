@@ -36,6 +36,19 @@ public class WatchTests
         Assert.Equal(3, (await paused.Client.GetVariablesAsync(items.ChildrenHandle!, paused.Timeout)).Count);
     }
 
+    // like count_obj: a host built-in that answers through an out argument
+    private delegate void CountDelegate(List<object?> items, out int count);
+
+    [Fact]
+    public async Task AWatchOnABuiltInWithAnOut_ShowsTheOutValue()
+    {
+        var config = new FishboneConfiguration()
+            .AddBuiltIn("count_items", new CountDelegate((List<object?> items, out int count) => count = items.Count));
+        await using var paused = await PausedSession.StartAsync([8], config);
+
+        Assert.Equal("3", (await paused.Client.EvaluateAsync("count_items(items, out n)", paused.Timeout)).Value);
+    }
+
     [Fact]
     public async Task AWatchThatFails_SaysWhy()
     {
@@ -82,7 +95,7 @@ public class WatchTests
         public FishboneDebugClientSession Client { get; private set; } = null!;
         public CancellationToken Timeout => _timeout.Token;
 
-        public static async Task<PausedSession> StartAsync(int[] breakpoints)
+        public static async Task<PausedSession> StartAsync(int[] breakpoints, FishboneConfiguration? configuration = null)
         {
             var paused = new PausedSession();
             paused._server = await FishboneDebugServer.StartAsync(new FishboneDebugServerOptions
@@ -90,6 +103,7 @@ public class WatchTests
                 SourceCode = Script,
                 SourceName = "watch.fb",
                 SourceIdentity = "fishbone://tests/watch.fb",
+                Configuration = configuration ?? new FishboneConfiguration(),
                 ListenEndpoint = new IPEndPoint(IPAddress.Loopback, 0)
             }, paused.Timeout);
             paused.Client = FishboneDebugClientSession.Attach("127.0.0.1", paused._server.Endpoint.Port);
