@@ -123,6 +123,20 @@ let done = true;
     }
 
     [Fact]
+    public async Task Detaching_DropsThePauseAtTheEnd()
+    {
+        using var coordinator = new BreakpointCoordinator("test.fb");
+        using var session = new FishboneDebugAdapterSession(coordinator, "test.fb", 1, _ => Task.CompletedTask);
+        var attach = new AttachRequestArguments();
+        attach.ExtensionData["pauseAtEnd"] = true;
+        await session.Handle(attach, CancellationToken.None);
+
+        session.Detach();
+
+        Assert.False(coordinator.PauseAtEnd);
+    }
+
+    [Fact]
     public async Task ExposesSourceAndAcceptsBreakpointBySourceReference()
     {
         const string sourceCode = "let answer = 42;";

@@ -399,6 +399,8 @@ public sealed class FishboneDebugAdapterSession :
         _detached = true;
         _coordinator.ReplaceBreakpoints([]);
         _coordinator.PauseOnRuntimeExceptions = false;
+        // no one is left to resume a pause at the end, and the script would wait there forever
+        _coordinator.PauseAtEnd = false;
         _coordinator.Continue();
         _handles.Clear();
         if (Interlocked.Exchange(ref _executionStarted, 1) == 0)

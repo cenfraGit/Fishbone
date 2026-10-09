@@ -85,6 +85,36 @@ public class WatchTests
         Assert.Contains("Count", listMembers.Items);
     }
 
+    [Fact]
+    public async Task AClientThatGoesAwayWhilePaused_LetsAHostHeldAtTheEndFinish()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await using var server = await FishboneDebugServer.StartAsync(new FishboneDebugServerOptions
+        {
+            SourceCode = Script,
+            SourceName = "watch.fb",
+            SourceIdentity = "fishbone://tests/held.fb",
+            ListenEndpoint = new IPEndPoint(IPAddress.Loopback, 0)
+        }, timeout.Token);
+        var client = FishboneDebugClientSession.Attach("127.0.0.1", server.Endpoint.Port);
+        client.PauseAtEnd = true;
+        var paused = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.EventReceived += (_, debugEvent) =>
+        {
+            if (debugEvent is FishboneDebugPaused)
+                paused.TrySetResult();
+        };
+        await client.ConnectAsync(stopOnEntry: false, timeout.Token);
+        await client.ConfigureAsync([8], timeout.Token);
+        await paused.Task.WaitAsync(timeout.Token);
+
+        // like closing SpineIDE: the script runs on, and doesn't stop at its end for no one
+        await client.DisposeAsync();
+
+        var result = await server.Completion.WaitAsync(timeout.Token);
+        Assert.Equal(60, result.Environment!.GetValue("scaled"));
+    }
+
     // a session attached to the script above and paused at its first breakpoint
     private sealed class PausedSession : IAsyncDisposable
     {
