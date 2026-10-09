@@ -64,13 +64,11 @@ internal static partial class Program
             SendMessageW(_variables, TVM_EXPAND, (nint)TVE_EXPAND, scopeItem);
         }
 
-        // the preview keeps showing the same variable from pause to pause
-        FishboneDebugVariable? followed = frame.Scopes.SelectMany(scope => scope.Variables)
-            .FirstOrDefault(variable => variable.Name == _previewName && variable.ImageHandle is not null);
-        if (followed is null)
-            ClearPreview();
-        else
-            ShowPreview(new VariableNode { Name = followed.Name, IsImage = true, Debug = followed });
+        // the preview keeps showing the same variables from pause to pause
+        FishboneDebugVariable[] variables = frame.Scopes.SelectMany(scope => scope.Variables).ToArray();
+        FollowPreview(name => variables.FirstOrDefault(variable => variable.Name == name && variable.ImageHandle is not null) is { } followed
+            ? new VariableNode { Name = followed.Name, IsImage = true, Debug = followed }
+            : null);
     }
 
     // after a run without the debugger, the script's own variables. functions registered by the
@@ -83,11 +81,9 @@ internal static partial class Program
             if (value is not Delegate)
                 InsertLocalValue(TVI_ROOT, name, value);
 
-        if (_previewName is not null && environment.Values.TryGetValue(_previewName, out object? shown)
-            && configuration?.CanVisualize(shown) == true)
-            ShowPreview(new VariableNode { Name = _previewName, IsImage = true, Value = shown });
-        else
-            ClearPreview();
+        FollowPreview(name => environment.Values.TryGetValue(name, out object? shown) && configuration?.CanVisualize(shown) == true
+            ? new VariableNode { Name = name, IsImage = true, Value = shown }
+            : null);
     }
 
     private static void InsertDebugVariable(IntPtr parent, FishboneDebugVariable variable)

@@ -1,4 +1,6 @@
 using Fishbone;
+using Fishbone.DebugClient;
+using Fishbone.Debugging;
 using System.Runtime.InteropServices;
 
 namespace SpineIDE.Win32;
@@ -15,22 +17,37 @@ internal static partial class Program
     private static readonly Dictionary<IntPtr, ImageView> _images = [];
 
     // one shown image and how it's zoomed. Scale is screen pixels per image pixel, and X, Y is
-    // where the image's top left corner sits in the window
+    // where the image's top left corner sits in the window. Width and Height are the image's own
+    // size, which the shapes are in. the bitmap can be smaller, since big images are sent scaled
+    // down, and it's 0 for shapes alone, which sit on a black canvas
     private sealed class ImageView
     {
         public required IntPtr Bitmap;
-        public required int Width, Height;
+        public required int BitmapWidth, BitmapHeight, Width, Height;
         public required string Name, Title;
+        public required List<ShapeLayer> Layers;
         public bool Fit = true;
         public double Scale = 1, X, Y;
         public int DragX, DragY;
         public bool Dragging;
     }
+
+    // one variable's shapes, drawn over the image in one color
+    private sealed record ShapeLayer(uint Color, IReadOnlyList<FishboneDebugRegion> Regions, IReadOnlyList<FishboneDebugContour> Contours);
+
+    // a variable's loaded image, by name
+    private sealed record StackEntry(string Name, FishboneDebugImage Image);
+
+    // red, green, blue, yellow, cyan, magenta, like HDevelop's colors. ARGB
+    private static readonly uint[] LayerColors = [0xFFFF0000, 0xFF00FF00, 0xFF0000FF, 0xFFFFFF00, 0xFF00FFFF, 0xFFFF00FF];
+
     private static IntPtr _gdiplusToken;
 
-    // the docked preview. it follows a variable by name, so stepping keeps showing the same one
+    // the docked preview: an image, then the shapes stacked over it. it follows the variables by
+    // name, so stepping keeps showing the same ones
     private static IntPtr _preview, _previewHeader;
-    private static string? _previewName;
+    private static readonly List<string> _previewNames = [];
+    private static List<StackEntry> _previewStack = [];
     // bumped on every change, so an image that finishes loading late is dropped
     private static int _previewVersion;
 
@@ -51,7 +68,7 @@ internal static partial class Program
     }
 
     // a paused image comes from the debug host. a final value is rendered here, with the run's visualizers
-    private static async Task<byte[]?> LoadPng(VariableNode node)
+    private static async Task<FishboneDebugImage?> LoadImage(VariableNode node)
     {
         if (node.Debug is not null)
             return node.Debug.ImageHandle is { } handle && _pausedSession is { } session
@@ -59,71 +76,169 @@ internal static partial class Program
                 : null;
         FishboneConfiguration? configuration = _finalConfiguration;
         object? value = node.Value;
-        return await Task.Run(() => configuration?.Visualize(value)?.ToPng());
+        return await Task.Run(() => configuration?.Visualize(value) is { } image ? ToDebugImage(image) : null);
     }
 
+    private static FishboneDebugImage ToDebugImage(FishboneImage image) => new(
+        image.HasPixels ? image.ToPng() : [], image.Width, image.Height,
+        image.Regions.Select(region => new FishboneDebugRegion(region.Rows, region.ColumnStarts, region.ColumnEnds)).ToArray(),
+        image.Contours.Select(contour => new FishboneDebugContour(contour.Rows, contour.Columns)).ToArray());
+
+    private static bool IsOnlyShapes(FishboneDebugImage image) => image.Png.Length == 0;
+
+    // selecting a variable shows it. shapes stack over what the preview already shows, and
+    // anything else starts over
     private static async void ShowPreview(VariableNode node)
     {
-        _previewName = node.Name;
         int version = ++_previewVersion;
         try
         {
-            byte[]? png = await LoadPng(node);
-            Post(() =>
-            {
-                if (version == _previewVersion)
-                    SetPreview(node.Name, png);
-            });
-        }
-        catch (Exception exception)
-        {
+            FishboneDebugImage? image = await LoadImage(node);
             Post(() =>
             {
                 if (version != _previewVersion)
                     return;
-                ClearPreview();
-                SetWindowTextW(_previewHeader, $"Image: {node.Name} couldn't be shown ({exception.Message})");
+                bool stacks = image is not null && IsOnlyShapes(image) && _previewStack.Count > 0 && _previewStack[0].Name != node.Name;
+                List<StackEntry> stack = stacks
+                    ? [.. _previewStack.Where(entry => entry.Name != node.Name), new StackEntry(node.Name, image!)]
+                    : image is null ? [] : [new StackEntry(node.Name, image)];
+                _previewNames.Clear();
+                _previewNames.AddRange(stack.Count > 0 ? stack.Select(entry => entry.Name) : [node.Name]);
+                SetPreview(node.Name, stack);
             });
+        }
+        catch (Exception exception)
+        {
+            Post(() => ShowPreviewError(version, node.Name, exception));
         }
     }
 
-    private static void SetPreview(string name, byte[]? png)
+    // after a pause or a run, shows the same variables again. a stacked one that's gone is left
+    // out, and without the first one there's nothing to stack on
+    private static async void FollowPreview(Func<string, VariableNode?> find)
+    {
+        List<VariableNode?> nodes = _previewNames.Select(find).ToList();
+        if (nodes.Count == 0 || nodes[0] is null)
+        {
+            ClearPreview();
+            return;
+        }
+
+        int version = ++_previewVersion;
+        string name = nodes[0]!.Name;
+        try
+        {
+            var stack = new List<StackEntry>();
+            foreach (VariableNode node in nodes.OfType<VariableNode>())
+            {
+                // a stacked variable that can't be read is just left out
+                FishboneDebugImage? image;
+                try
+                {
+                    image = await LoadImage(node);
+                }
+                catch when (stack.Count > 0)
+                {
+                    continue;
+                }
+                if (image is not null)
+                    stack.Add(new StackEntry(node.Name, image));
+                else if (stack.Count == 0)
+                    break;
+            }
+            Post(() =>
+            {
+                if (version == _previewVersion)
+                    SetPreview(name, stack);
+            });
+        }
+        catch (Exception exception)
+        {
+            Post(() => ShowPreviewError(version, name, exception));
+        }
+    }
+
+    private static void ShowPreviewError(int version, string name, Exception exception)
+    {
+        if (version != _previewVersion)
+            return;
+        ClearPreview();
+        SetWindowTextW(_previewHeader, $"Image: {name} couldn't be shown ({exception.Message})");
+    }
+
+    private static void SetPreview(string name, List<StackEntry> stack)
     {
         ImageView? previous = _images.GetValueOrDefault(_preview);
         ClearPreview();
-        var (bitmap, width, height) = png is null ? (0, 0, 0) : DecodePng(png);
-        if (bitmap == 0)
+        ImageView? view = stack.Count > 0 ? CreateView(stack) : null;
+        if (view is null)
         {
             SetWindowTextW(_previewHeader, $"Image: {name} has nothing to show");
             return;
         }
-        var view = new ImageView { Bitmap = bitmap, Width = width, Height = height, Name = name, Title = $"Image: {name} ({width}x{height})" };
+        _previewStack = stack;
+        view.Title = "Image: " + view.Title;
         // stepping refreshes the same image, so it keeps its zoom
-        if (previous is not null && previous.Name == name && previous.Width == width && previous.Height == height)
+        if (previous is not null && previous.Name == view.Name && previous.Width == view.Width && previous.Height == view.Height)
             (view.Fit, view.Scale, view.X, view.Y) = (previous.Fit, previous.Scale, previous.X, previous.Y);
         _images[_preview] = view;
         SetWindowTextW(_previewHeader, view.Title);
         InvalidateRect(_preview, IntPtr.Zero, true);
     }
 
-    // keeps _previewName, so the variable shows again once it has an image
+    // keeps _previewNames, so the variables show again once they have an image
     private static void ClearPreview()
     {
         _previewVersion++;
+        _previewStack = [];
         if (_images.Remove(_preview, out var view))
             DeleteObject(view.Bitmap);
         SetWindowTextW(_previewHeader, "Image");
         InvalidateRect(_preview, IntPtr.Zero, true);
     }
 
-    // double-clicking an image variable also opens it in its own, bigger window
+    // the first entry is the image, and every entry with shapes adds a layer in the next color.
+    // null when the image can't be decoded
+    private static ImageView? CreateView(List<StackEntry> stack)
+    {
+        FishboneDebugImage first = stack[0].Image;
+        var (bitmap, bitmapWidth, bitmapHeight) = IsOnlyShapes(first) ? (0, 0, 0) : DecodePng(first.Png);
+        if (!IsOnlyShapes(first) && bitmap == 0)
+            return null;
+
+        // an adapter that doesn't send the size sends the png at full size
+        int width = first.Width > 0 ? first.Width : bitmapWidth, height = first.Height > 0 ? first.Height : bitmapHeight;
+        var layers = new List<ShapeLayer>();
+        foreach (StackEntry entry in stack)
+        {
+            if (entry.Image.Regions.Count == 0 && entry.Image.Contours.Count == 0)
+                continue;
+            layers.Add(new ShapeLayer(LayerColors[layers.Count % LayerColors.Length], entry.Image.Regions, entry.Image.Contours));
+            // shapes alone sit on a canvas big enough for all of them
+            if (bitmap == 0)
+                (width, height) = (Math.Max(width, entry.Image.Width), Math.Max(height, entry.Image.Height));
+        }
+        (width, height) = (Math.Max(1, width), Math.Max(1, height));
+
+        string names = string.Join(" + ", stack.Select(entry => entry.Name));
+        return new ImageView
+        {
+            Bitmap = bitmap, BitmapWidth = bitmapWidth, BitmapHeight = bitmapHeight, Width = width, Height = height,
+            Name = stack[0].Name, Title = $"{names} ({width}x{height})", Layers = layers,
+        };
+    }
+
+    // double-clicking an image variable also opens it in its own, bigger window. one that's in
+    // the preview opens with everything stacked there
     private static async void OpenImage(VariableNode node)
     {
         try
         {
-            byte[]? png = await LoadPng(node);
-            if (png is not null)
-                Post(() => OpenImageWindow(node.Name, png));
+            List<StackEntry> stack = _previewStack.Any(entry => entry.Name == node.Name)
+                ? _previewStack
+                : await LoadImage(node) is { } image ? [new StackEntry(node.Name, image)] : [];
+            if (stack.Count > 0)
+                Post(() => OpenImageWindow(stack));
         }
         catch (Exception exception)
         {
@@ -131,34 +246,28 @@ internal static partial class Program
         }
     }
 
-    private static void OpenImageWindow(string name, byte[] png)
+    private static void OpenImageWindow(List<StackEntry> stack)
     {
-        var (bitmap, width, height) = DecodePng(png);
-        if (bitmap == 0)
+        ImageView? view = CreateView(stack);
+        if (view is null)
         {
             SetWindowTextW(_status, "the image couldn't be decoded");
             return;
         }
 
         // show it at its own size, up to most of a typical screen
-        var frame = new RECT { right = Math.Min(width, 1400), bottom = Math.Min(height, 900) };
+        var frame = new RECT { right = Math.Min(view.Width, 1400), bottom = Math.Min(view.Height, 900) };
         AdjustWindowRectEx(ref frame, WS_OVERLAPPEDWINDOW, false, WS_EX_TOOLWINDOW);
-        string title = $"{name} ({width}x{height})";
-        IntPtr window = CreateWindowExW(WS_EX_TOOLWINDOW, "SpineIDE.Image", title, WS_OVERLAPPEDWINDOW,
+        IntPtr window = CreateWindowExW(WS_EX_TOOLWINDOW, "SpineIDE.Image", view.Title, WS_OVERLAPPEDWINDOW,
             CW_USEDEFAULT, CW_USEDEFAULT, frame.right - frame.left, frame.bottom - frame.top, _window, IntPtr.Zero, GetModuleHandleW(null), IntPtr.Zero);
-        _images[window] = new ImageView { Bitmap = bitmap, Width = width, Height = height, Name = name, Title = title };
+        _images[window] = view;
         ShowWindow(window, 1);
     }
 
     // the GDI+ flat api decodes PNG with plain calls, no COM wrappers
     private static (IntPtr Bitmap, int Width, int Height) DecodePng(byte[] png)
     {
-        if (_gdiplusToken == 0)
-        {
-            var input = new GdiplusStartupInput { GdiplusVersion = 1 };
-            GdiplusStartup(out _gdiplusToken, ref input, IntPtr.Zero);
-        }
-
+        StartGdiplus();
         IntPtr stream = SHCreateMemStream(png, (uint)png.Length);
         if (stream == 0)
             return (0, 0, 0);
@@ -286,15 +395,29 @@ internal static partial class Program
         IntPtr previousBuffer = SelectObject(buffer, bufferBitmap);
         FillRect(buffer, ref client, GetSysColorBrush(12)); // COLOR_APPWORKSPACE, like the class background
 
-        IntPtr source = CreateCompatibleDC(dc);
-        IntPtr previous = SelectObject(source, view.Bitmap);
-        // smooth when shrinking, sharp pixels when enlarging
-        SetStretchBltMode(buffer, view.Scale < 1 ? 4 : 3); // HALFTONE : COLORONCOLOR
-        SetBrushOrgEx(buffer, 0, 0, IntPtr.Zero);
-        StretchBlt(buffer, (int)Math.Round(view.X), (int)Math.Round(view.Y), (int)Math.Round(view.Width * view.Scale),
-            (int)Math.Round(view.Height * view.Scale), source, 0, 0, view.Width, view.Height, 0x00CC0020); // SRCCOPY
-        SelectObject(source, previous);
-        DeleteDC(source);
+        var target = new RECT
+        {
+            left = (int)Math.Round(view.X), top = (int)Math.Round(view.Y),
+            right = (int)Math.Round(view.X + view.Width * view.Scale), bottom = (int)Math.Round(view.Y + view.Height * view.Scale),
+        };
+        if (view.Bitmap == 0)
+        {
+            FillRect(buffer, ref target, GetStockObject(4)); // BLACK_BRUSH
+        }
+        else
+        {
+            IntPtr source = CreateCompatibleDC(dc);
+            IntPtr previous = SelectObject(source, view.Bitmap);
+            // smooth when shrinking, sharp pixels when enlarging
+            SetStretchBltMode(buffer, target.right - target.left < view.BitmapWidth ? 4 : 3); // HALFTONE : COLORONCOLOR
+            SetBrushOrgEx(buffer, 0, 0, IntPtr.Zero);
+            StretchBlt(buffer, target.left, target.top, target.right - target.left, target.bottom - target.top,
+                source, 0, 0, view.BitmapWidth, view.BitmapHeight, 0x00CC0020); // SRCCOPY
+            SelectObject(source, previous);
+            DeleteDC(source);
+        }
+        if (view.Layers.Count > 0)
+            PaintShapes(buffer, view, client);
 
         BitBlt(dc, 0, 0, client.right, client.bottom, buffer, 0, 0, 0x00CC0020);
         SelectObject(buffer, previousBuffer);
@@ -302,6 +425,151 @@ internal static partial class Program
         DeleteDC(buffer);
         EndPaint(hwnd, ref paint);
     }
+
+    private static void StartGdiplus()
+    {
+        if (_gdiplusToken != 0)
+            return;
+        var input = new GdiplusStartupInput { GdiplusVersion = 1 };
+        GdiplusStartup(out _gdiplusToken, ref input, IntPtr.Zero);
+    }
+
+    // regions fill see-through, so the image shows under them, and contours are lines. pixel
+    // (row, column) covers column to column + 1 on screen, and a contour point at a whole row and
+    // column sits on that pixel's center, like HALCON places them
+    private static void PaintShapes(IntPtr dc, ImageView view, RECT client)
+    {
+        StartGdiplus();
+        GdipCreateFromHDC(dc, out IntPtr graphics);
+        try
+        {
+            GdipSetPixelOffsetMode(graphics, 4); // PixelOffsetModeHalf, so pixel x spans x to x + 1 like in gdi
+            foreach (ShapeLayer layer in view.Layers)
+            {
+                GdipSetSmoothingMode(graphics, 3); // SmoothingModeNone, so run edges stay sharp
+                GdipCreateSolidFill(layer.Color & 0x00FFFFFF | 0x80000000, out IntPtr brush);
+                foreach (FishboneDebugRegion region in layer.Regions)
+                {
+                    GpRectF[] rects = RegionRects(region, view, client);
+                    if (rects.Length > 0)
+                        GdipFillRectangles(graphics, brush, rects, rects.Length);
+                }
+                GdipDeleteBrush(brush);
+
+                GdipSetSmoothingMode(graphics, 4); // SmoothingModeAntiAlias
+                GdipCreatePen1(layer.Color, 1, 2, out IntPtr pen); // UnitPixel
+                foreach (FishboneDebugContour contour in layer.Contours)
+                {
+                    if (contour.Rows.Length < 2)
+                        continue;
+                    var points = new GpPointF[contour.Rows.Length];
+                    for (int i = 0; i < points.Length; i++)
+                        points[i] = new GpPointF((float)(view.X + (contour.Columns[i] + 0.5) * view.Scale),
+                            (float)(view.Y + (contour.Rows[i] + 0.5) * view.Scale));
+                    GdipDrawLines(graphics, pen, points, points.Length);
+                }
+                GdipDeletePen(pen);
+            }
+        }
+        finally
+        {
+            GdipDeleteGraphics(graphics);
+        }
+    }
+
+    // the runs that are on screen. zoomed out, several rows land on one screen row, so there the
+    // runs are merged per screen row, or the see-through fill would darken where they overlap
+    private static GpRectF[] RegionRects(FishboneDebugRegion region, ImageView view, RECT client)
+    {
+        double scale = view.Scale;
+        var rects = new List<GpRectF>();
+        if (scale >= 1)
+        {
+            for (int i = 0; i < region.Rows.Length; i++)
+            {
+                double top = view.Y + region.Rows[i] * scale;
+                double left = view.X + region.ColumnStarts[i] * scale, right = view.X + (region.ColumnEnds[i] + 1) * scale;
+                if (top + scale >= 0 && top <= client.bottom && right >= 0 && left <= client.right)
+                    rects.Add(new GpRectF((float)left, (float)top, (float)(right - left), (float)scale));
+            }
+            return [.. rects];
+        }
+
+        var spans = new Dictionary<int, List<(int Start, int End)>>();
+        for (int i = 0; i < region.Rows.Length; i++)
+        {
+            int y = (int)Math.Floor(view.Y + region.Rows[i] * scale);
+            int start = (int)Math.Floor(view.X + region.ColumnStarts[i] * scale);
+            int end = Math.Max(start + 1, (int)Math.Ceiling(view.X + (region.ColumnEnds[i] + 1) * scale));
+            if (y < 0 || y >= client.bottom || end <= 0 || start >= client.right)
+                continue;
+            if (!spans.TryGetValue(y, out var row))
+                spans[y] = row = [];
+            row.Add((Math.Max(0, start), Math.Min(client.right, end)));
+        }
+        foreach (var (y, row) in spans)
+        {
+            row.Sort();
+            var (start, end) = row[0];
+            foreach (var span in row.Skip(1))
+            {
+                if (span.Start <= end)
+                {
+                    end = Math.Max(end, span.End);
+                    continue;
+                }
+                rects.Add(new GpRectF(start, y, end - start, 1));
+                (start, end) = span;
+            }
+            rects.Add(new GpRectF(start, y, end - start, 1));
+        }
+        return [.. rects];
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct GpRectF(float x, float y, float width, float height)
+    {
+        public float X = x, Y = y, Width = width, Height = height;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct GpPointF(float x, float y)
+    {
+        public float X = x, Y = y;
+    }
+
+    [DllImport("gdiplus.dll")]
+    private static extern int GdipCreateFromHDC(IntPtr dc, out IntPtr graphics);
+
+    [DllImport("gdiplus.dll")]
+    private static extern int GdipDeleteGraphics(IntPtr graphics);
+
+    [DllImport("gdiplus.dll")]
+    private static extern int GdipSetSmoothingMode(IntPtr graphics, int mode);
+
+    [DllImport("gdiplus.dll")]
+    private static extern int GdipSetPixelOffsetMode(IntPtr graphics, int mode);
+
+    [DllImport("gdiplus.dll")]
+    private static extern int GdipCreateSolidFill(uint argb, out IntPtr brush);
+
+    [DllImport("gdiplus.dll")]
+    private static extern int GdipDeleteBrush(IntPtr brush);
+
+    [DllImport("gdiplus.dll")]
+    private static extern int GdipFillRectangles(IntPtr graphics, IntPtr brush, GpRectF[] rects, int count);
+
+    [DllImport("gdiplus.dll")]
+    private static extern int GdipCreatePen1(uint argb, float width, int unit, out IntPtr pen);
+
+    [DllImport("gdiplus.dll")]
+    private static extern int GdipDeletePen(IntPtr pen);
+
+    [DllImport("gdiplus.dll")]
+    private static extern int GdipDrawLines(IntPtr graphics, IntPtr pen, GpPointF[] points, int count);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr GetStockObject(int index);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct POINT
