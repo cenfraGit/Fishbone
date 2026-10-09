@@ -760,6 +760,9 @@ A value added with `AddValue` hides a built-in with the same name, so `Symbols` 
 - `Diagnostics`: the syntax errors, or, when the script parses, members that can't exist, like `p.Nope` on a registered `Point`. Each one has a start and end line and column
 - `TypeOf(expression, line, column)` and `VisibleAt(line, column)`: the type of an expression at a place, and the script variables in scope there
 - `CompletionsAt(text, caret)` and `CallAt(text, caret)`: what to suggest at a caret, and which call and argument the caret is in. They take the current text, which usually doesn't parse while someone is typing, so they read its tokens and take the scopes from the analysis
+- `WatchCompletionsAt(source, line, expression, caret, evaluate)`: what to suggest for a debugger's watch, as if the expression were typed at the start of that line. When the type before a dot isn't known and it's a name or a chain of names, `evaluate` can give its value, like a paused script's, and the members of the value's type are listed
+
+`FishboneExpression.Evaluate(expression, environment, config)` evaluates one expression in an environment a script made, like the one `Run` returns or a paused frame's. It runs in a scope of its own without a debugger, but it's real code: a call runs, and an assignment changes what the script sees. The Fishbone debug adapter answers the Debug Adapter Protocol's `evaluate` and `completions` requests with these two while paused.
 
 The analyzer only reports what it's certain of. An unknown type is always silent, never an error. A type is known for:
 
