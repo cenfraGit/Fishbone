@@ -9,6 +9,7 @@ internal static partial class Program
 {
     private const uint WM_PAINT = 0xF, WM_ERASEBKGND = 0x14, WS_EX_TOOLWINDOW = 0x80, WM_MOUSEMOVE = 0x200,
         WM_LBUTTONDOWN = 0x201, WM_LBUTTONUP = 0x202, WM_LBUTTONDBLCLK = 0x203, WM_MOUSEWHEEL = 0x20A;
+    private const uint WS_POPUP = 0x80000000, WS_CLIPCHILDREN = 0x02000000;
     private const int CW_USEDEFAULT = unchecked((int)0x80000000);
     private const int NM_DBLCLK = -3;
 
@@ -43,12 +44,15 @@ internal static partial class Program
 
     private static IntPtr _gdiplusToken;
 
-    // the docked preview: an image, then the shapes stacked over it. it follows the variables by
-    // name, so stepping keeps showing the same ones
-    private static IntPtr _preview, _previewHeader;
+    // the docked preview shows the checked variables: the image, with the shapes stacked over it
+    // in the order they were checked. it follows them by name, so stepping keeps showing the same
+    // ones. the full screen window, while it's open, shows the same
+    private static IntPtr _preview, _previewHeader, _fullScreen, _fullScreenHeader;
     private static readonly List<string> _previewNames = [];
+    // the checked variables' images, for the current pause or run
+    private static readonly Dictionary<string, FishboneDebugImage> _previewImages = [];
     private static List<StackEntry> _previewStack = [];
-    // bumped on every change, so an image that finishes loading late is dropped
+    // bumped when the variables change, so an image that finishes loading late is dropped
     private static int _previewVersion;
 
     // the docked preview and the pop-out windows share one window class
@@ -86,115 +90,150 @@ internal static partial class Program
 
     private static bool IsOnlyShapes(FishboneDebugImage image) => image.Png.Length == 0;
 
-    // selecting a variable shows it. shapes stack over what the preview already shows, and
-    // anything else starts over
-    private static async void ShowPreview(VariableNode node)
+    // checking a variable stacks it over the preview, and unchecking takes it out. one image
+    // shows at a time, so checking an image unchecks the one shown before
+    private static async void CheckPreview(VariableNode node, bool isChecked)
     {
-        int version = ++_previewVersion;
+        string name = node.Name;
+        _previewNames.Remove(name);
+        _previewImages.Remove(name);
+        if (!isChecked)
+        {
+            UpdatePreview();
+            return;
+        }
+        _previewNames.Add(name);
+
+        int version = _previewVersion;
         try
         {
             FishboneDebugImage? image = await LoadImage(node);
             Post(() =>
             {
-                if (version != _previewVersion)
+                if (version != _previewVersion || image is null || !_previewNames.Contains(name))
                     return;
-                bool stacks = image is not null && IsOnlyShapes(image) && _previewStack.Count > 0 && _previewStack[0].Name != node.Name;
-                List<StackEntry> stack = stacks
-                    ? [.. _previewStack.Where(entry => entry.Name != node.Name), new StackEntry(node.Name, image!)]
-                    : image is null ? [] : [new StackEntry(node.Name, image)];
-                _previewNames.Clear();
-                _previewNames.AddRange(stack.Count > 0 ? stack.Select(entry => entry.Name) : [node.Name]);
-                SetPreview(node.Name, stack);
+                if (!IsOnlyShapes(image))
+                    foreach (string other in _previewImages.Where(entry => !IsOnlyShapes(entry.Value)).Select(entry => entry.Key).ToList())
+                    {
+                        _previewNames.Remove(other);
+                        _previewImages.Remove(other);
+                        SetChecked(other, false);
+                    }
+                _previewImages[name] = image;
+                UpdatePreview();
             });
         }
         catch (Exception exception)
         {
-            Post(() => ShowPreviewError(version, node.Name, exception));
+            Post(() => SetWindowTextW(_status, $"{name} couldn't be shown: {exception.Message}"));
         }
     }
 
-    // after a pause or a run, shows the same variables again. a stacked one that's gone is left
-    // out, and without the first one there's nothing to stack on
+    // after a pause or a run, loads the checked variables again. one that's gone stays checked,
+    // and shows again once it's back
     private static async void FollowPreview(Func<string, VariableNode?> find)
     {
-        List<VariableNode?> nodes = _previewNames.Select(find).ToList();
-        if (nodes.Count == 0 || nodes[0] is null)
-        {
-            ClearPreview();
-            return;
-        }
-
         int version = ++_previewVersion;
-        string name = nodes[0]!.Name;
-        try
+        _previewImages.Clear();
+        List<VariableNode> nodes = _previewNames.Select(find).OfType<VariableNode>().ToList();
+        var images = new Dictionary<string, FishboneDebugImage>();
+        foreach (VariableNode node in nodes)
         {
-            var stack = new List<StackEntry>();
-            foreach (VariableNode node in nodes.OfType<VariableNode>())
+            try
             {
-                // a stacked variable that can't be read is just left out
-                FishboneDebugImage? image;
-                try
-                {
-                    image = await LoadImage(node);
-                }
-                catch when (stack.Count > 0)
-                {
-                    continue;
-                }
-                if (image is not null)
-                    stack.Add(new StackEntry(node.Name, image));
-                else if (stack.Count == 0)
-                    break;
+                if (await LoadImage(node) is { } image)
+                    images[node.Name] = image;
             }
-            Post(() =>
+            catch (Exception exception)
             {
-                if (version == _previewVersion)
-                    SetPreview(name, stack);
-            });
+                Post(() => SetWindowTextW(_status, $"{node.Name} couldn't be shown: {exception.Message}"));
+            }
         }
-        catch (Exception exception)
+        Post(() =>
         {
-            Post(() => ShowPreviewError(version, name, exception));
-        }
+            if (version != _previewVersion)
+                return;
+            foreach (var (name, image) in images)
+                if (_previewNames.Contains(name))
+                    _previewImages[name] = image;
+            UpdatePreview();
+        });
     }
 
-    private static void ShowPreviewError(int version, string name, Exception exception)
+    // the checked ones in the order they were checked, with the image moved under the shapes.
+    // two images can be checked when one of them was gone at the time, and then the last one shows
+    private static void UpdatePreview()
     {
-        if (version != _previewVersion)
-            return;
-        ClearPreview();
-        SetWindowTextW(_previewHeader, $"Image: {name} couldn't be shown ({exception.Message})");
+        List<StackEntry> stack = _previewNames.Where(_previewImages.ContainsKey)
+            .Select(name => new StackEntry(name, _previewImages[name])).ToList();
+        if (stack.FindLast(entry => !IsOnlyShapes(entry.Image)) is { } image)
+            stack = [image, .. stack.Where(entry => IsOnlyShapes(entry.Image))];
+        SetPreview(stack);
     }
 
-    private static void SetPreview(string name, List<StackEntry> stack)
+    private static void SetPreview(List<StackEntry> stack)
     {
-        ImageView? previous = _images.GetValueOrDefault(_preview);
-        ClearPreview();
-        ImageView? view = stack.Count > 0 ? CreateView(stack) : null;
-        if (view is null)
-        {
-            SetWindowTextW(_previewHeader, $"Image: {name} has nothing to show");
-            return;
-        }
         _previewStack = stack;
-        view.Title = "Image: " + view.Title;
-        // stepping refreshes the same image, so it keeps its zoom
-        if (previous is not null && previous.Name == view.Name && previous.Width == view.Width && previous.Height == view.Height)
-            (view.Fit, view.Scale, view.X, view.Y) = (previous.Fit, previous.Scale, previous.X, previous.Y);
-        _images[_preview] = view;
-        SetWindowTextW(_previewHeader, view.Title);
-        InvalidateRect(_preview, IntPtr.Zero, true);
+        ImageView? view = ShowStack(_preview, stack);
+        SetWindowTextW(_previewHeader, view?.Title ?? (stack.Count > 0 ? "Image: couldn't be decoded" : "Image"));
+        if (_fullScreen != 0)
+            ShowStack(_fullScreen, stack);
+    }
+
+    // puts the stack in an image window. the same image as before keeps its zoom, so stepping
+    // and checking shapes don't move it
+    private static ImageView? ShowStack(IntPtr hwnd, List<StackEntry> stack)
+    {
+        ImageView? view = stack.Count > 0 ? CreateView(stack) : null;
+        if (_images.Remove(hwnd, out ImageView? previous))
+            DeleteObject(previous.Bitmap);
+        if (view is not null)
+        {
+            view.Title = hwnd == _fullScreen ? view.Title + "   (Escape closes)" : "Image: " + view.Title;
+            if (previous is not null && previous.Name == view.Name && previous.Width == view.Width && previous.Height == view.Height)
+                (view.Fit, view.Scale, view.X, view.Y) = (previous.Fit, previous.Scale, previous.X, previous.Y);
+            _images[hwnd] = view;
+        }
+        if (hwnd == _fullScreen)
+            SetWindowTextW(_fullScreenHeader, view?.Title ?? "nothing checked   (Escape closes)");
+        InvalidateRect(hwnd, IntPtr.Zero, true);
+        return view;
     }
 
     // keeps _previewNames, so the variables show again once they have an image
     private static void ClearPreview()
     {
         _previewVersion++;
-        _previewStack = [];
-        if (_images.Remove(_preview, out var view))
-            DeleteObject(view.Bitmap);
-        SetWindowTextW(_previewHeader, "Image");
-        InvalidateRect(_preview, IntPtr.Zero, true);
+        _previewImages.Clear();
+        SetPreview([]);
+    }
+
+    private static void UncheckAll()
+    {
+        foreach (string name in _previewNames)
+            SetChecked(name, false);
+        _previewNames.Clear();
+        ClearPreview();
+    }
+
+    // the preview over the whole monitor, following it like the docked one
+    private static void ShowFullScreen()
+    {
+        if (_fullScreen == 0)
+        {
+            var monitor = new MONITORINFO { cbSize = (uint)Marshal.SizeOf<MONITORINFO>() };
+            GetMonitorInfoW(MonitorFromWindow(_window, 2), ref monitor); // MONITOR_DEFAULTTONEAREST
+            RECT area = monitor.rcMonitor;
+            // clip the header, so painting the image doesn't cover it
+            _fullScreen = CreateWindowExW(0, "SpineIDE.Image", "SpineIDE", WS_POPUP | WS_CLIPCHILDREN, area.left, area.top,
+                area.right - area.left, area.bottom - area.top, _window, IntPtr.Zero, GetModuleHandleW(null), IntPtr.Zero);
+            _fullScreenHeader = CreateWindowExW(0, "STATIC", "", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE, Scale(6), 0,
+                area.right - area.left - Scale(6), Scale(HeaderHeight), _fullScreen, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+            SendMessageW(_fullScreenHeader, WM_SETFONT, _headerFont, 1);
+            ShowStack(_fullScreen, _previewStack);
+        }
+        ShowWindow(_fullScreen, 1);
+        SetFocus(_fullScreen);
     }
 
     // the first entry is the image, and every entry with shapes adds a layer in the next color.
@@ -302,8 +341,11 @@ internal static partial class Program
             case WM_PAINT when _images.TryGetValue(hwnd, out var view):
                 PaintImage(hwnd, view);
                 return 0;
-            case WM_PAINT when hwnd == _preview:
+            case WM_PAINT when hwnd == _preview || hwnd == _fullScreen:
                 PaintPlaceholder(hwnd);
+                return 0;
+            case WM_KEYDOWN when hwnd == _fullScreen && (int)wParam == VK_ESCAPE:
+                DestroyWindow(hwnd);
                 return 0;
             // the image paints its own background, so dragging doesn't flicker
             case WM_ERASEBKGND when _images.ContainsKey(hwnd):
@@ -346,11 +388,14 @@ internal static partial class Program
                 return 0;
             case WM_LBUTTONDBLCLK when _images.TryGetValue(hwnd, out var view):
                 view.Fit = true;
-                SetWindowTextW(hwnd == _preview ? _previewHeader : hwnd, view.Title);
+                SetWindowTextW(HeaderOf(hwnd), view.Title);
                 InvalidateRect(hwnd, IntPtr.Zero, false);
                 return 0;
-            case WM_DESTROY when _images.Remove(hwnd, out var view):
-                DeleteObject(view.Bitmap);
+            case WM_DESTROY:
+                if (hwnd == _fullScreen)
+                    _fullScreen = 0;
+                if (_images.Remove(hwnd, out var gone))
+                    DeleteObject(gone.Bitmap);
                 return 0;
         }
         return DefWindowProcW(hwnd, msg, wParam, lParam);
@@ -362,8 +407,13 @@ internal static partial class Program
     {
         int column = (int)Math.Floor((x - view.X) / view.Scale), row = (int)Math.Floor((y - view.Y) / view.Scale);
         string pointer = column >= 0 && row >= 0 && column < view.Width && row < view.Height ? $"   row {row}, col {column}" : "";
-        SetWindowTextW(hwnd == _preview ? _previewHeader : hwnd, $"{view.Title}   {view.Scale * 100:F0}%{pointer}");
+        SetWindowTextW(HeaderOf(hwnd), $"{view.Title}   {view.Scale * 100:F0}%{pointer}");
     }
+
+    // where an image window shows its title: the preview and the full screen one have a header,
+    // and a pop-out its title bar
+    private static IntPtr HeaderOf(IntPtr hwnd) =>
+        hwnd == _preview ? _previewHeader : hwnd == _fullScreen ? _fullScreenHeader : hwnd;
 
     private static void PaintPlaceholder(IntPtr hwnd)
     {
@@ -372,7 +422,7 @@ internal static partial class Program
         SetBkMode(dc, 1); // TRANSPARENT
         SetTextColor(dc, 0xE0E0E0);
         IntPtr previous = SelectObject(dc, _guiFont);
-        DrawTextW(dc, "select an image variable to preview it", -1, ref client, 0x25); // DT_CENTER | DT_VCENTER | DT_SINGLELINE
+        DrawTextW(dc, "check an image variable to preview it", -1, ref client, 0x25); // DT_CENTER | DT_VCENTER | DT_SINGLELINE
         SelectObject(dc, previous);
         EndPaint(hwnd, ref paint);
     }
@@ -384,16 +434,18 @@ internal static partial class Program
         GetClientRect(hwnd, out RECT client);
         if (view.Fit)
         {
-            // the whole image, centered, keeping its proportions
-            view.Scale = Math.Min((double)client.right / view.Width, (double)client.bottom / view.Height);
+            // the whole image, centered, keeping its proportions. full screen, it fits under the header
+            int top = hwnd == _fullScreen ? Scale(HeaderHeight) : 0;
+            view.Scale = Math.Min((double)client.right / view.Width, (double)(client.bottom - top) / view.Height);
             view.X = (client.right - view.Width * view.Scale) / 2;
-            view.Y = (client.bottom - view.Height * view.Scale) / 2;
+            view.Y = top + (client.bottom - top - view.Height * view.Scale) / 2;
         }
 
         IntPtr buffer = CreateCompatibleDC(dc);
         IntPtr bufferBitmap = CreateCompatibleBitmap(dc, client.right, client.bottom);
         IntPtr previousBuffer = SelectObject(buffer, bufferBitmap);
-        FillRect(buffer, ref client, GetSysColorBrush(12)); // COLOR_APPWORKSPACE, like the class background
+        // COLOR_APPWORKSPACE, like the class background. full screen, a dark gray that's easier on the eyes
+        FillRect(buffer, ref client, hwnd == _fullScreen ? GetStockObject(3) : GetSysColorBrush(12)); // DKGRAY_BRUSH
 
         var target = new RECT
         {

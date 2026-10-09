@@ -8,11 +8,13 @@ namespace SpineIDE.Win32;
 
 internal static partial class Program
 {
-    private const uint TVS_HASBUTTONS = 0x1, TVS_LINESATROOT = 0x4, TVS_SHOWSELALWAYS = 0x20, TVS_FULLROWSELECT = 0x1000;
+    private const uint TVS_HASBUTTONS = 0x1, TVS_LINESATROOT = 0x4, TVS_SHOWSELALWAYS = 0x20, TVS_CHECKBOXES = 0x100, TVS_FULLROWSELECT = 0x1000;
     private const uint TVM_DELETEITEM = 0x1101, TVM_EXPAND = 0x1102, TVM_SETITEMHEIGHT = 0x111B, TVM_SETEXTENDEDSTYLE = 0x112C,
-        TVM_INSERTITEMW = 0x1132, TVS_EX_DOUBLEBUFFER = 0x4;
+        TVM_INSERTITEMW = 0x1132, TVM_SETITEMW = 0x113F, TVS_EX_DOUBLEBUFFER = 0x4;
     private const uint TVIF_TEXT = 0x1, TVIF_STATE = 0x8, TVIF_PARAM = 0x4, TVIF_CHILDREN = 0x40, TVIS_BOLD = 0x10, TVE_EXPAND = 0x2;
-    private const int TVN_SELCHANGEDW = -451, TVN_ITEMEXPANDINGW = -454;
+    // the checkbox is the state image: 0 is none, 1 unchecked, 2 checked
+    private const uint TVIS_STATEIMAGEMASK = 0xF000, Unchecked = 1 << 12, Checked = 2 << 12;
+    private const int TVN_SELCHANGEDW = -451, TVN_ITEMEXPANDINGW = -454, TVN_ITEMCHANGEDW = -419;
     private static readonly IntPtr TVI_ROOT = -0x10000, TVI_LAST = -0xFFFE;
 
     // what a tree item stands for. a pause hands out debug variables, whose children come from the
@@ -32,6 +34,11 @@ internal static partial class Program
     private static FishboneConfiguration? _finalConfiguration;
     private static int _nextNode = 1;
     private static VariableNode? _selectedNode;
+    // the checkbox of each variable the preview can show, by name. only the first of a name gets
+    // one, the same one the preview finds again after a step
+    private static readonly Dictionary<string, IntPtr> _checkItems = [];
+    // set while checkboxes change from code, so that isn't taken for a click
+    private static bool _settingChecks;
 
     // bumped whenever the tree is refilled, so children that finish loading late are dropped
     private static int _treeVersion;
@@ -40,6 +47,7 @@ internal static partial class Program
     {
         SendMessageW(_variables, TVM_DELETEITEM, 0, TVI_ROOT);
         _nodes.Clear();
+        _checkItems.Clear();
         _selectedNode = null;
         _pausedSession = null;
         _finalConfiguration = null;
@@ -60,7 +68,7 @@ internal static partial class Program
         {
             IntPtr scopeItem = InsertItem(TVI_ROOT, scope.Name, hasChildren: scope.Variables.Length > 0, node: null, bold: true);
             foreach (FishboneDebugVariable variable in scope.Variables)
-                InsertDebugVariable(scopeItem, variable);
+                InsertDebugVariable(scopeItem, variable, checkable: true);
             SendMessageW(_variables, TVM_EXPAND, (nint)TVE_EXPAND, scopeItem);
         }
 
@@ -79,26 +87,49 @@ internal static partial class Program
         _finalConfiguration = configuration;
         foreach (var (name, value) in environment.Values)
             if (value is not Delegate)
-                InsertLocalValue(TVI_ROOT, name, value);
+                InsertLocalValue(TVI_ROOT, name, value, checkable: true);
 
         FollowPreview(name => environment.Values.TryGetValue(name, out object? shown) && configuration?.CanVisualize(shown) == true
             ? new VariableNode { Name = name, IsImage = true, Value = shown }
             : null);
     }
 
-    private static void InsertDebugVariable(IntPtr parent, FishboneDebugVariable variable)
+    // checkable: one of the script's own variables, which the preview finds by name. the ones
+    // inside lists and objects have no checkbox, and open in their own window with a double-click
+    private static void InsertDebugVariable(IntPtr parent, FishboneDebugVariable variable, bool checkable = false)
     {
         bool isImage = variable.ImageHandle is not null;
-        InsertItem(parent, ItemText(variable.Name, variable.Value, variable.Type, isImage),
-            hasChildren: variable.ChildrenHandle is not null, new VariableNode { Name = variable.Name, IsImage = isImage, Debug = variable });
+        InsertVariableItem(parent, ItemText(variable.Name, variable.Value, variable.Type, isImage),
+            hasChildren: variable.ChildrenHandle is not null, new VariableNode { Name = variable.Name, IsImage = isImage, Debug = variable }, checkable);
     }
 
-    private static void InsertLocalValue(IntPtr parent, string name, object? value)
+    private static void InsertLocalValue(IntPtr parent, string name, object? value, bool checkable = false)
     {
         bool isImage = _finalConfiguration?.CanVisualize(value) == true;
-        InsertItem(parent, ItemText(name, DebugValueFormatter.FormatValue(value), DebugValueFormatter.FormatType(value), isImage),
+        InsertVariableItem(parent, ItemText(name, DebugValueFormatter.FormatValue(value), DebugValueFormatter.FormatType(value), isImage),
             hasChildren: value is IDictionary or (IEnumerable and not string),
-            new VariableNode { Name = name, IsImage = isImage, Value = value });
+            new VariableNode { Name = name, IsImage = isImage, Value = value }, checkable);
+    }
+
+    // an image the preview can show gets a checkbox, checked when the preview has it
+    private static void InsertVariableItem(IntPtr parent, string text, bool hasChildren, VariableNode node, bool checkable)
+    {
+        if (!checkable || !node.IsImage || _checkItems.ContainsKey(node.Name))
+        {
+            InsertItem(parent, text, hasChildren, node);
+            return;
+        }
+        _checkItems[node.Name] = InsertItem(parent, text, hasChildren, node, check: _previewNames.Contains(node.Name));
+    }
+
+    private static void SetChecked(string name, bool isChecked)
+    {
+        if (!_checkItems.TryGetValue(name, out IntPtr item))
+            return;
+        var change = new TVITEMW { mask = TVIF_STATE, hItem = item, state = isChecked ? Checked : Unchecked, stateMask = TVIS_STATEIMAGEMASK };
+        _settingChecks = true;
+        SendMessageW(_variables, TVM_SETITEMW, 0, ref change);
+        _settingChecks = false;
     }
 
     // the type is left out when the value already says it, like an object shown by its type name
@@ -108,7 +139,8 @@ internal static partial class Program
         return isImage ? text + "   [image]" : text;
     }
 
-    private static IntPtr InsertItem(IntPtr parent, string text, bool hasChildren, VariableNode? node, bool bold = false)
+    // check is null for an item without a checkbox
+    private static IntPtr InsertItem(IntPtr parent, string text, bool hasChildren, VariableNode? node, bool bold = false, bool? check = null)
     {
         IntPtr id = 0;
         if (node is not null)
@@ -127,23 +159,25 @@ internal static partial class Program
                 item = new TVITEMW
                 {
                     mask = TVIF_TEXT | TVIF_PARAM | TVIF_CHILDREN | TVIF_STATE,
-                    state = bold ? TVIS_BOLD : 0,
-                    stateMask = TVIS_BOLD,
+                    state = (bold ? TVIS_BOLD : 0) | (check is null ? 0 : check.Value ? Checked : Unchecked),
+                    stateMask = TVIS_BOLD | TVIS_STATEIMAGEMASK,
                     pszText = textPointer,
                     cChildren = hasChildren ? 1 : 0,
                     lParam = id
                 }
             };
+            _settingChecks = true;
             return SendMessageW(_variables, TVM_INSERTITEMW, 0, ref insert);
         }
         finally
         {
+            _settingChecks = false;
             Marshal.FreeHGlobal(textPointer);
         }
     }
 
-    // selecting an image previews it, double-clicking opens it in its own window, and children
-    // load the first time an item opens
+    // checking an image adds it to the preview, double-clicking one opens it in its own window,
+    // and children load the first time an item opens
     private static void OnVariablesNotification(IntPtr lParam)
     {
         int code = Marshal.PtrToStructure<NMHDR>(lParam).code;
@@ -153,12 +187,19 @@ internal static partial class Program
                 OpenImage(selected);
             return;
         }
+        if (code == TVN_ITEMCHANGEDW)
+        {
+            // a click on the checkbox, or the space key
+            var change = Marshal.PtrToStructure<NMTVITEMCHANGE>(lParam);
+            uint before = change.uStateOld & TVIS_STATEIMAGEMASK, after = change.uStateNew & TVIS_STATEIMAGEMASK;
+            if (!_settingChecks && before != after && after != 0 && _nodes.GetValueOrDefault(change.lParam) is { IsImage: true } checkedNode)
+                CheckPreview(checkedNode, after == Checked);
+            return;
+        }
         var notification = Marshal.PtrToStructure<NMTREEVIEWW>(lParam);
         if (code == TVN_SELCHANGEDW)
         {
             _selectedNode = _nodes.GetValueOrDefault(notification.itemNew.lParam);
-            if (_selectedNode is { IsImage: true } chosen)
-                ShowPreview(chosen);
             return;
         }
         if (code != TVN_ITEMEXPANDINGW || notification.action != TVE_EXPAND)

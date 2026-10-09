@@ -9,7 +9,7 @@ internal static partial class Program
     // menu command ids. the run and debug buttons share theirs
     private const int CommandNew = 100, CommandOpen = 101, CommandSave = 102, CommandSaveAs = 103, CommandExit = 104,
         CommandContinue = 110, CommandPause = 111, CommandStop = 112, CommandStepOver = 113, CommandStepInto = 114,
-        CommandStepOut = 115, CommandBreakpoint = 116, CommandSampleFirst = 1000;
+        CommandStepOut = 115, CommandBreakpoint = 116, CommandFullScreen = 120, CommandUncheckAll = 121, CommandSampleFirst = 1000;
 
     private static IntPtr CreateMainMenu()
     {
@@ -66,6 +66,8 @@ internal static partial class Program
             case CommandStepInto: if (_paused) _ = _session.StepIntoAsync(); break;
             case CommandStepOut: if (_paused) _ = _session.StepOutAsync(); break;
             case CommandBreakpoint: ToggleBreakpoint(CaretLine()); break;
+            case CommandFullScreen: ShowFullScreen(); break;
+            case CommandUncheckAll: UncheckAll(); break;
             case >= CommandSampleFirst when command - CommandSampleFirst < SampleCatalog.Samples.Count:
                 OpenSample(command - CommandSampleFirst);
                 break;

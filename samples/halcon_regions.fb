@@ -1,8 +1,8 @@
 // title: HALCON Regions
 // note: requires the Fishbone.Plugins.Halcon24111 plugin installed in ~/.fishbone/plugins
-// select fabrik in the tree, then blobs, edges or outlines: each one stacks over the image in
-// its own color. selecting an image again starts over. a region or contour selected on its own
-// shows on a black canvas
+// check fabrik in the tree, then blobs, edges or outlines: each one stacks over the image in
+// its own color, the last checked on top. one image shows at a time. regions and contours
+// checked without an image show on a black canvas
 
 println("HALCON regions and contours\n");
 

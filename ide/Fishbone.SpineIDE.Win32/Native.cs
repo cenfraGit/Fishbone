@@ -108,6 +108,16 @@ internal static partial class Program
     }
 
     [StructLayout(LayoutKind.Sequential)]
+    private struct NMTVITEMCHANGE
+    {
+        public NMHDR hdr;
+        public uint uChanged;
+        public IntPtr hItem;
+        public uint uStateNew, uStateOld;
+        public IntPtr lParam;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
     private struct INITCOMMONCONTROLSEX
     {
         public uint dwSize, dwICC;
@@ -118,6 +128,9 @@ internal static partial class Program
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr SendMessageW(IntPtr hwnd, uint msg, IntPtr wParam, ref TVINSERTSTRUCTW lParam);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr SendMessageW(IntPtr hwnd, uint msg, IntPtr wParam, ref TVITEMW lParam);
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct OPENFILENAMEW
@@ -270,6 +283,18 @@ internal static partial class Program
 
     [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
     private static extern int SetWindowTheme(IntPtr hwnd, string appName, string? idList);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr GetWindowLongPtrW(IntPtr hwnd, int index);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr SetWindowLongPtrW(IntPtr hwnd, int index, IntPtr value);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SetCursor(IntPtr cursor);
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
