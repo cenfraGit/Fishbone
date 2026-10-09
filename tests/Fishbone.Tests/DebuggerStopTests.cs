@@ -158,4 +158,27 @@ let done = true;
 
         Assert.Equal([1, 2, 3, 4], lines);
     }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Run_PauseAtEnd_ShowsTheFinalValuesWithoutStepping(bool pauseAtEnd)
+    {
+        // a debug session that runs to the end still shows where it finished, when asked to
+        using var coordinator = new BreakpointCoordinator("test.fb") { PauseAtEnd = pauseAtEnd };
+        var pauses = new List<(DebugPauseReason Reason, object? X)>();
+        coordinator.Paused += (_, args) =>
+        {
+            object? x = args.Snapshot.VisibleVariables.FirstOrDefault(variable => variable.Name == "x")?.Value;
+            pauses.Add((args.Snapshot.Reason, x));
+            coordinator.Continue();
+        };
+
+        FishboneProgram.Run("let x = 1;\nx = 2;", new FishboneConfiguration(), coordinator);
+
+        if (pauseAtEnd)
+            Assert.Equal([(DebugPauseReason.Completed, (object?)2)], pauses);
+        else
+            Assert.Empty(pauses);
+    }
 }

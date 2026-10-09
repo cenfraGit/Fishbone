@@ -61,6 +61,22 @@ internal static class ReflectionCache
     public static MemberLookup ResolveMember(Type type, string name, bool isStatic) => 
         Members.GetOrAdd((type, name, isStatic), static key => ComputeMember(key.Type, key.Name, key.IsStatic));
 
+    /// <summary>
+    /// Every member name a script can reach on a type, each resolved with <see cref="ResolveMember"/>
+    /// so the list matches what member access finds.
+    /// </summary>
+    public static IEnumerable<(string Name, MemberLookup Lookup)> ListMembers(Type type, bool isStatic)
+    {
+        BindingFlags bindingScope = (isStatic) ? StaticMembers : InstanceMembers;
+        var names = type.GetProperties(bindingScope)
+            .Where(property => property.GetIndexParameters().Length == 0)
+            .Select(property => property.Name)
+            .Concat(type.GetFields(bindingScope).Select(field => field.Name))
+            .Concat(type.GetMethods(bindingScope).Where(method => !method.IsSpecialName).Select(method => method.Name))
+            .Distinct();
+        return names.Select(name => (name, ResolveMember(type, name, isStatic)));
+    }
+
     private static MemberLookup ComputeMember(Type type, string name, bool isStatic)
     {
         BindingFlags bindingScope = (isStatic) ? StaticMembers : InstanceMembers;

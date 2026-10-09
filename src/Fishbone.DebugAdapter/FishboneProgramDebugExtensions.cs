@@ -94,7 +94,7 @@ public static class FishboneProgramDebugExtensions
             return besideHost;
 
         // the Fishbone.SpineIDE.<rid> package drops the IDE into its own subfolder rather
-        // than next to the host, so its ~130 files cannot collide with the host's own
+        // than next to the host, so its files cannot collide with the host's own
         // dependencies. it still runs out of that folder using its own deps.json
         var inSubfolder = Path.Combine(AppContext.BaseDirectory, SpineIdeFolderName, executableName);
         if (File.Exists(inSubfolder))

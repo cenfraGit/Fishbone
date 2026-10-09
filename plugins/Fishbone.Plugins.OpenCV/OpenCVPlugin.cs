@@ -38,6 +38,7 @@ public sealed partial class OpenCVPlugin : IFishbonePlugin
 
         RegisterConverters(config);
         RegisterCv2Operations(config);
+        config.AddVisualizer<Mat>(OpenCVVisualizer.ToImage, OpenCVVisualizer.CanShow);
     }
 
     private static void RegisterConverters(FishboneConfiguration config)

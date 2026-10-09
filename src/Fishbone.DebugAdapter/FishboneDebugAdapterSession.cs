@@ -28,7 +28,7 @@ public sealed class FishboneDebugAdapterSession :
     private readonly SortedSet<int>? _statementLines;
     private readonly Func<CancellationToken, Task> _execute;
     private readonly CancellationTokenSource _executionCancellation = new();
-    private readonly DebugSnapshotHandles _handles = new();
+    private readonly DebugSnapshotHandles _handles;
     private readonly Channel<IRequest> _events = Channel.CreateUnbounded<IRequest>(new UnboundedChannelOptions { SingleReader = true });
     private readonly TaskCompletionSource<int> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private IDebugAdapterServer? _server;
@@ -53,9 +53,11 @@ public sealed class FishboneDebugAdapterSession :
         string sourceName,
         string sourceCode,
         int lineCount,
-        Func<CancellationToken, Task> execute)
+        Func<CancellationToken, Task> execute,
+        FishboneConfiguration? configuration = null)
     {
         _coordinator = coordinator;
+        _handles = new DebugSnapshotHandles(configuration);
         _sourceIdentity = sourceIdentity;
         _sourceCode = sourceCode;
         _source = new Source
@@ -89,10 +91,14 @@ public sealed class FishboneDebugAdapterSession :
 
     public Task<AttachResponse> Handle(AttachRequestArguments request, CancellationToken cancellationToken)
     {
-        if (request.ExtensionData.TryGetValue("stopOnEntry", out object? value))
-            _stopOnEntry = value is bool boolean ? boolean : bool.TryParse(value?.ToString(), out bool parsed) && parsed;
+        _stopOnEntry = ReadFlag(request, "stopOnEntry");
+        _coordinator.PauseAtEnd = ReadFlag(request, "pauseAtEnd");
         return Task.FromResult(new AttachResponse());
     }
+
+    private static bool ReadFlag(AttachRequestArguments request, string name) =>
+        request.ExtensionData.TryGetValue(name, out object? value)
+        && (value is bool boolean ? boolean : bool.TryParse(value?.ToString(), out bool parsed) && parsed);
 
     public Task<ConfigurationDoneResponse> Handle(ConfigurationDoneArguments request, CancellationToken cancellationToken)
     {
@@ -157,6 +163,9 @@ public sealed class FishboneDebugAdapterSession :
             return null;
         }
     }
+
+    public Task<FishboneImageResponse> Handle(FishboneImageArguments request, CancellationToken cancellationToken) =>
+        Task.FromResult(new FishboneImageResponse { Png = Convert.ToBase64String(_handles.GetImagePng(request.VariablesReference)) });
 
     public Task<ContinueResponse> Handle(ContinueArguments request, CancellationToken cancellationToken)
     {

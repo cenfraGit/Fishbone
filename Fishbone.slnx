@@ -7,6 +7,7 @@
     <Project Path="tests/Fishbone.Debugging.Tests/Fishbone.Debugging.Tests.csproj" />
     <Project Path="tests/Fishbone.Interpreter.Tests/Fishbone.Interpreter.Tests.csproj" />
     <Project Path="tests/Fishbone.Parser.Tests/Fishbone.Parser.Tests.csproj" />
+    <Project Path="tests/Fishbone.Plugins.Halcon24111.Tests/Fishbone.Plugins.Halcon24111.Tests.csproj" />
     <Project Path="tests/Fishbone.Plugins.OpenCV.Tests/Fishbone.Plugins.OpenCV.Tests.csproj" />
     <Project Path="tests/Fishbone.Tests/Fishbone.Tests.csproj" />
     <Project Path="tests/Fishbone.SpineIDE.Tests/Fishbone.SpineIDE.Tests.csproj" />
@@ -14,7 +15,8 @@
   <Folder Name="/IDE/">
     <Project Path="ide/Fishbone.Dap/Fishbone.Dap.csproj" />
     <Project Path="ide/Fishbone.SpineCLI/Fishbone.SpineCLI.csproj" />
-    <Project Path="ide/Fishbone.SpineIDE/Fishbone.SpineIDE.csproj" />
+    <Project Path="ide/Fishbone.SpineIDE.Shared/Fishbone.SpineIDE.Shared.csproj" />
+    <Project Path="ide/Fishbone.SpineIDE.Win32/Fishbone.SpineIDE.Win32.csproj" />
   </Folder>
   <Folder Name="/Plugins/">
     <Project Path="plugins/Fishbone.Plugins.Halcon24111/Fishbone.Plugins.Halcon24111.csproj" />

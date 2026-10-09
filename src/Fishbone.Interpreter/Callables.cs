@@ -55,6 +55,9 @@ internal class FishboneFunction
 
     public int Arity => _definition.Parameters.Length;
 
+    // what the debugger and variable views show for a script function
+    public override string ToString() => $"func {_definition.Name}({string.Join(", ", _definition.Parameters)})";
+
     public object? Call(FishboneInterpreter interpreter, List<object> arguments)
     {
         // new env for function scope

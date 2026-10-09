@@ -16,6 +16,7 @@ public partial class HalconOperatorPlugin : IFishbonePlugin
             typeof(HTuple),
             toNet: value => HalconConverters.ToHTuple(value),
             fromNet: value => HalconConverters.FromHTuple((HTuple)value));
+        HalconVisualizer.Register(config);
 
         var methods = typeof(HOperatorSet)
             .GetMethods(BindingFlags.Public | BindingFlags.Static)

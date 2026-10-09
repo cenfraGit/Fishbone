@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>spineide</AssemblyName>
+    <RootNamespace>SpineIDE.Win32</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>fishbone.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- only the native editor dll is used, not the winforms wrapper around it -->
+    <PackageReference Include="Scintilla5.NET" Version="7.0.0" ExcludeAssets="all" GeneratePathProperty="true" />
+    <None Include="$(PkgScintilla5_NET)\runtimes\win-x64\native\Scintilla.dll" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fishbone.SpineIDE.Shared\Fishbone.SpineIDE.Shared.csproj" />
+    <ProjectReference Include="..\..\src\Fishbone\Fishbone.csproj" />
+    <ProjectReference Include="..\..\src\Fishbone.Core\Fishbone.Core.csproj" />
+    <ProjectReference Include="..\..\src\Fishbone.Parser\Fishbone.Parser.csproj" />
+    <ProjectReference Include="..\..\src\Fishbone.Interpreter\Fishbone.Interpreter.csproj" />
+    <ProjectReference Include="..\..\src\Fishbone.DebugClient\Fishbone.DebugClient.csproj" />
+    <ProjectReference Include="..\Fishbone.Dap\Fishbone.Dap.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <!-- the debug client launches fishbone-dap from a daphost folder next to the exe, in a
+       build and in a publish -->
+  <ItemGroup>
+    <None Include="$(MSBuildProjectDirectory)\..\Fishbone.Dap\bin\$(Configuration)\$(TargetFramework)\**\*"
+          LinkBase="daphost\" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+
+</Project>

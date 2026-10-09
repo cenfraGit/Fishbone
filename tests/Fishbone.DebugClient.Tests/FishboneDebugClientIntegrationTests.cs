@@ -1,5 +1,6 @@
 using Fishbone.DebugClient;
 using Fishbone.DebugAdapter;
+using Fishbone.Debugging;
 using System.Net;
 using System.Threading.Channels;
 
@@ -14,21 +15,28 @@ public class FishboneDebugClientIntegrationTests
         await File.WriteAllTextAsync(scriptPath, "let x = 1;\nprintln(x);\nx = x + 1;");
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await using var session = new FishboneDebugClientSession(scriptPath, new FishboneDapHostLocator(AppContext.BaseDirectory));
-        var paused = new TaskCompletionSource<FishbonePauseSnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var paused = Channel.CreateUnbounded<FishbonePauseSnapshot>();
         var terminated = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var output = new List<string>();
         session.EventReceived += (_, debugEvent) =>
         {
-            if (debugEvent is FishboneDebugPaused value) paused.TrySetResult(value.Snapshot);
+            if (debugEvent is FishboneDebugPaused value) paused.Writer.TryWrite(value.Snapshot);
             if (debugEvent is FishboneDebugTerminated) terminated.TrySetResult();
             if (debugEvent is FishboneDebugOutput valueOutput) output.Add(valueOutput.Text);
         };
 
         await session.StartAsync([2], timeout.Token);
-        FishbonePauseSnapshot snapshot = await paused.Task.WaitAsync(timeout.Token);
+        FishbonePauseSnapshot snapshot = await paused.Reader.ReadAsync(timeout.Token);
 
         FishboneDebugScope visible = snapshot.Frames[0].Scopes.Single(scope => scope.Name == "Locals"); // at global scope "Visible Variables" dedupes into "Locals"
         Assert.Contains(visible.Variables, variable => variable.Name == "x" && variable.Value == "1");
+        await session.ContinueAsync(timeout.Token);
+
+        // a session that launched its own host pauses once more at the end, with the final values
+        FishbonePauseSnapshot end = await paused.Reader.ReadAsync(timeout.Token);
+        Assert.Equal(FishbonePauseSnapshot.ProgramExitReason, end.Reason);
+        FishboneDebugScope final = end.Frames[0].Scopes.Single(scope => scope.Name == "Locals");
+        Assert.Contains(final.Variables, variable => variable.Name == "x" && variable.Value == "2");
         await session.ContinueAsync(timeout.Token);
         await terminated.Task.WaitAsync(timeout.Token);
         Assert.Contains("1" + Environment.NewLine, output);
@@ -117,6 +125,58 @@ foreach (i in c)
 
         FishboneDebugServerResult final = await server.Completion.WaitAsync(timeout.Token);
         Assert.Equal(0, final.ExitCode);
+    }
+
+    [Fact]
+    public async Task ImageVariableIsFetchedAsPngWhilePaused()
+    {
+        const string sourceCode = """
+let x = 1;
+x = 2;
+""";
+        var configuration = new FishboneConfiguration()
+            .AddValue("picture", new Picture(200))
+            .AddVisualizer<Picture>(picture => new FishboneImage(2, 1, 1, [picture.Level, 0]));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await using FishboneDebugServerSession server = await FishboneDebugServer.StartAsync(new FishboneDebugServerOptions
+        {
+            SourceCode = sourceCode,
+            SourceName = "image.fb",
+            SourceIdentity = "fishbone://tests/image.fb",
+            ListenEndpoint = new IPEndPoint(IPAddress.Loopback, 0),
+            Configuration = configuration
+        }, timeout.Token);
+        await using FishboneDebugClientSession client = FishboneDebugClientSession.Attach("127.0.0.1", server.Endpoint.Port);
+        var pauses = Channel.CreateUnbounded<FishbonePauseSnapshot>();
+        client.EventReceived += (_, debugEvent) =>
+        {
+            if (debugEvent is FishboneDebugPaused paused)
+                pauses.Writer.TryWrite(paused.Snapshot);
+        };
+
+        await client.ConnectAsync(stopOnEntry: false, timeout.Token);
+        await client.ConfigureAsync([2], timeout.Token);
+        FishbonePauseSnapshot pause = await pauses.Reader.ReadAsync(timeout.Token);
+        var locals = pause.Frames[0].Scopes.Single(scope => scope.Name == "Locals").Variables;
+        FishboneDebugVariable picture = locals.Single(variable => variable.Name == "picture");
+        FishboneDebugVariable x = locals.Single(variable => variable.Name == "x");
+
+        Assert.Null(x.ImageHandle);
+        Assert.NotNull(picture.ImageHandle);
+        byte[] png = await client.GetImageAsync(picture.ImageHandle, timeout.Token);
+        Assert.Equal(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }, png[..8]);
+
+        // the handle belongs to this pause
+        await client.ContinueAsync(timeout.Token);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => client.GetImageAsync(picture.ImageHandle, timeout.Token));
+
+        FishboneDebugServerResult result = await server.Completion.WaitAsync(timeout.Token);
+        Assert.Equal(0, result.ExitCode);
+    }
+
+    private sealed class Picture(byte level)
+    {
+        public byte Level { get; } = level;
     }
 
     [Fact]

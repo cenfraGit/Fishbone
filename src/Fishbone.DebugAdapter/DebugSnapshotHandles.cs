@@ -6,6 +6,46 @@ namespace Fishbone.DebugAdapter;
 
 public sealed class DebugSnapshotHandles
 {
+    /// <summary>Marks a variable whose value the debugger can show as an image.</summary>
+    public const string ImageKind = "fishbone.image";
+
+    private readonly FishboneConfiguration? _configuration;
+
+    /// <summary>
+    /// The configuration the script runs with, which says which values can be shown as images.
+    /// </summary>
+    public DebugSnapshotHandles(FishboneConfiguration? configuration = null)
+    {
+        _configuration = configuration;
+    }
+
+    /// <summary>
+    /// The image behind a variable reference, as PNG. Only valid while paused, like any other
+    /// reference.
+    /// </summary>
+    public byte[] GetImagePng(long reference)
+    {
+        lock (_sync)
+        {
+            if (_snapshot is null || !_variables.TryGetValue(reference, out var target))
+                throw new InvalidOperationException("The variable reference is no longer available.");
+            if (!IsImage(target))
+                throw new InvalidOperationException("The variable isn't an image.");
+
+            // the script is paused, so the visualizer can read the value safely
+            FishboneImage? image;
+            try
+            {
+                image = _configuration!.Visualize(target);
+            }
+            catch (Exception exception)
+            {
+                throw new InvalidOperationException($"The image couldn't be read: {exception.Message}", exception);
+            }
+            return image?.ToPng() ?? throw new InvalidOperationException("The variable has no image to show.");
+        }
+    }
+
     private readonly object _sync = new();
     private readonly Dictionary<long, DebugCallFrameSnapshot> _frames = [];
     private readonly Dictionary<long, object> _variables = [];
@@ -115,16 +155,31 @@ public sealed class DebugSnapshotHandles
 
     private Variable CreateVariable(DebugVariableSnapshot variable)
     {
-        long reference = variable.Value is IList or IDictionary ? AddHandle(variable.Value) : 0;
+        bool isImage = IsImage(variable.Value);
+        long reference = variable.Value is IList or IDictionary || isImage ? AddHandle(variable.Value!) : 0;
         return new Variable
         {
             Name = variable.Name,
             Value = DebugValueFormatter.FormatValue(variable.Value),
             Type = DebugValueFormatter.FormatType(variable.Value),
             VariablesReference = reference,
+            PresentationHint = isImage ? new VariablePresentationHint { Kind = ImageKind } : null,
             IndexedVariables = variable.Value is IList list ? list.Count : null,
             NamedVariables = variable.Value is IDictionary dictionary ? dictionary.Count : null
         };
+    }
+
+    // a visualizer's check runs plugin code, so a failing one just means "not an image"
+    private bool IsImage(object? value)
+    {
+        try
+        {
+            return _configuration?.CanVisualize(value) == true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private long AddHandle(object value)

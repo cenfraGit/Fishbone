@@ -110,7 +110,7 @@ See [docs/quickstart.md](https://github.com/cenfraGit/Fishbone/blob/main/docs/qu
 
 ## SpineIDE
 
-The cross-platform [SpineIDE](https://github.com/cenfraGit/Fishbone/tree/main/ide/Fishbone.SpineIDE) app allows you to easily write, run and debug Fishbone programs. It can be used for standalone Fishbone development, or can be used to launch a debug session from your app automatically.
+The [SpineIDE](https://github.com/cenfraGit/Fishbone/tree/main/ide/Fishbone.SpineIDE.Win32) app allows you to easily write, run and debug Fishbone programs. It's a small native Windows app; a Linux version is planned. It can be used for standalone Fishbone development, or can be used to launch a debug session from your app automatically.
 
 ![Image of IDE running Fishbone script](https://raw.githubusercontent.com/cenfraGit/Fishbone/main/docs/images/Image1.png)
 

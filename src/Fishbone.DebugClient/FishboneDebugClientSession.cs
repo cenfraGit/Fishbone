@@ -101,6 +101,9 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
             await _client.Initialize(linked.Token).ConfigureAwait(false);
             var attach = new AttachRequestArguments();
             attach.ExtensionData["stopOnEntry"] = stopOnEntry;
+            // a host this session started has no one else waiting on it, so it can stay paused at
+            // the end to show the final values. someone else's host shouldn't be held up like that
+            attach.ExtensionData["pauseAtEnd"] = Ownership == FishboneDebugSessionOwnership.Launched;
             await _client.Attach(attach, linked.Token).ConfigureAwait(false);
             var loaded = await _client.RequestLoadedSources(new LoadedSourcesArguments(), linked.Token).ConfigureAwait(false);
             _dapSource = loaded.Sources?.FirstOrDefault()
@@ -186,6 +189,23 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
             _requestGate.Release();
         }
     }
+
+    public async Task<byte[]> GetImageAsync(FishboneVariableHandle handle, CancellationToken cancellationToken = default)
+    {
+        if (State != FishboneDebugSessionState.Paused || handle.Generation != Volatile.Read(ref _generation))
+            throw new InvalidOperationException("The image belongs to an inactive pause.");
+        var response = await RequireClient()
+            .SendRequest(ImageCommand, new { variablesReference = handle.Reference })
+            .Returning<ImageResponse>(cancellationToken)
+            .ConfigureAwait(false);
+        return Convert.FromBase64String(response.Png);
+    }
+
+    // the custom request the Fishbone debug adapter serves, see FishboneImageArguments there
+    private const string ImageCommand = "fishbone/image";
+    private const string ImageKind = "fishbone.image";
+
+    private sealed record ImageResponse(string Png);
 
     public async Task<IReadOnlyList<FishboneDebugVariable>> GetVariablesAsync(FishboneVariableHandle handle, CancellationToken cancellationToken = default)
     {
@@ -301,6 +321,9 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
     {
         if (State != FishboneDebugSessionState.Paused) return;
         await request(RequireClient()).ConfigureAwait(false);
+        // the pause is over once the adapter accepts, before its continued event arrives, so
+        // this pause's handles stop working now
+        Interlocked.Increment(ref _generation);
     }
 
     private async Task PumpEventsAsync(CancellationToken cancellationToken)
@@ -380,10 +403,17 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
             frames.ToImmutable(), exception)));
     }
 
-    private static FishboneDebugVariable MapVariable(Variable variable, int generation) => new(
-        variable.Name, variable.Value, variable.Type,
-        variable.VariablesReference == 0 ? null : new FishboneVariableHandle(generation, variable.VariablesReference),
-        variable.NamedVariables, variable.IndexedVariables);
+    // an image's reference is for fetching the image, not for expanding it
+    private static FishboneDebugVariable MapVariable(Variable variable, int generation)
+    {
+        var handle = variable.VariablesReference == 0 ? null : new FishboneVariableHandle(generation, variable.VariablesReference);
+        bool isImage = handle is not null && variable.PresentationHint?.Kind?.ToString() == ImageKind;
+        return new FishboneDebugVariable(
+            variable.Name, variable.Value, variable.Type,
+            isImage ? null : handle,
+            variable.NamedVariables, variable.IndexedVariables,
+            isImage ? handle : null);
+    }
 
     private void Enqueue(ProtocolEvent item) => _events.Writer.TryWrite(item);
     private void Publish(FishboneDebugEvent item) => EventReceived?.Invoke(this, item);

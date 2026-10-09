@@ -1,0 +1,272 @@
+using Fishbone.DebugClient;
+using SpineIDE.Services;
+
+namespace SpineIDE.Tests;
+
+/// <summary>
+/// <see cref="ScriptSession"/> runs, debugs and attaches to scripts for any front end, one at a
+/// time, and reports what happens through events.
+/// </summary>
+public class ScriptSessionTests
+{
+    private static readonly Func<CancellationToken, Task<string>> NoInput = _ => Task.FromResult(string.Empty);
+
+    private static (ScriptSession Session, FakeDebugSession Debug, List<string> Output) Create()
+    {
+        var debug = new FakeDebugSession();
+        var session = new ScriptSession(new FakeFactory(debug));
+        var output = new List<string>();
+        session.Output += text => { lock (output) output.Add(text); };
+        return (session, debug, output);
+    }
+
+    private static string Joined(List<string> output)
+    {
+        lock (output) return string.Concat(output);
+    }
+
+    [Fact]
+    public async Task RunAsync_SendsOutputAndReturnsEnvironment()
+    {
+        var (session, _, output) = Create();
+
+        var outcome = await session.RunAsync("println(\"hi\"); let x = 2;", null, NoInput);
+
+        Assert.NotNull(outcome);
+        Assert.Empty(outcome.Errors);
+        Assert.Equal(2, outcome.Environment!.GetValue("x"));
+        Assert.Equal("hi" + Environment.NewLine, Joined(output));
+    }
+
+    [Fact]
+    public async Task RunAsync_Input_FlushesOutputFirstAndEchoesTheLine()
+    {
+        var (session, _, output) = Create();
+        string? shownBeforeAsking = null;
+
+        var outcome = await session.RunAsync("print(\"name? \"); let name = input();", null, _ =>
+        {
+            shownBeforeAsking = Joined(output);
+            return Task.FromResult("Ada");
+        });
+
+        Assert.Equal("name? ", shownBeforeAsking);
+        Assert.Equal("Ada", outcome!.Environment!.GetValue("name"));
+        Assert.Equal("name? Ada" + Environment.NewLine, Joined(output));
+    }
+
+    [Fact]
+    public async Task RunAsync_RuntimeError_ReturnsErrorWithLocation()
+    {
+        var (session, _, _) = Create();
+
+        var outcome = await session.RunAsync("let x = 1;\nlet y = missing;", null, NoInput);
+
+        var error = Assert.Single(outcome!.Errors);
+        Assert.Equal(2, error.Line);
+        Assert.Contains("missing", error.ExMessage);
+        Assert.Null(outcome.Environment);
+    }
+
+    [Fact]
+    public async Task RunAsync_ParseError_ReturnsEachError()
+    {
+        var (session, _, _) = Create();
+
+        var outcome = await session.RunAsync("let = 1;\nlet = 2;", null, NoInput);
+
+        Assert.Equal([1, 2], outcome!.Errors.Select(error => error.Line));
+    }
+
+    [Fact]
+    public async Task RunAsync_RaisesStartedBeforeAnyOutput()
+    {
+        var (session, _, output) = Create();
+        int outputWhenStarted = -1;
+        session.Started += () => outputWhenStarted = output.Count;
+
+        await session.RunAsync("println(1);", null, NoInput);
+
+        Assert.Equal(0, outputWhenStarted);
+    }
+
+    [Fact]
+    public async Task RunAsync_NewerRunCancelsTheOneBefore()
+    {
+        var (session, _, output) = Create();
+
+        var first = session.RunAsync("while (true) { }", null, NoInput);
+        await Task.Delay(100);
+        var second = await session.RunAsync("let x = 1;", null, NoInput);
+
+        Assert.Null((await first.WaitAsync(TimeSpan.FromSeconds(5)))?.Environment);
+        Assert.Equal(1, second!.Environment!.GetValue("x"));
+        // the cancelled run was replaced, so it doesn't report itself as cancelled
+        Assert.DoesNotContain("cancelled", Joined(output));
+    }
+
+    [Fact]
+    public async Task StopAsync_CancelsARun()
+    {
+        var (session, _, output) = Create();
+
+        var run = session.RunAsync("while (true) { }", null, NoInput);
+        await Task.Delay(100);
+        await session.StopAsync();
+        var outcome = await run.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Null(outcome!.Environment);
+        Assert.Contains("[FishboneProgram] Execution cancelled.", Joined(output));
+    }
+
+    [Fact]
+    public async Task DebugAsync_ConfiguresBreakpointsAndReportsEvents()
+    {
+        var (session, debug, output) = Create();
+        var pauses = new List<bool>();
+        session.Paused += (_, _, isProgramExit) => pauses.Add(isProgramExit);
+
+        var run = session.DebugAsync(TempScript(), [3]);
+        await debug.Configured.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        debug.Raise(new FishboneDebugOutput("hello", FishboneDebugOutputCategory.Stdout));
+        debug.Raise(new FishboneDebugPaused(Snapshot("breakpoint")));
+        debug.Raise(new FishboneDebugPaused(Snapshot(FishbonePauseSnapshot.ProgramExitReason)));
+        debug.Raise(new FishboneDebugTerminated(0));
+        var outcome = await run.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal([3], debug.ConfiguredLines);
+        Assert.Equal([false, true], pauses);
+        Assert.Equal("hello", Joined(output));
+        Assert.Empty(outcome!.Errors);
+        Assert.True(debug.Disposed);
+    }
+
+    [Fact]
+    public async Task DebugAsync_HostExitCode_IsAnError()
+    {
+        var (session, debug, _) = Create();
+
+        var run = session.DebugAsync(TempScript(), []);
+        await debug.Configured.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        debug.Raise(new FishboneDebugTerminated(3));
+        var outcome = await run.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Contains("3", Assert.Single(outcome!.Errors).ExMessage);
+    }
+
+    [Fact]
+    public async Task UpdateBreakpointsAsync_SendsLinesWhileDebugging()
+    {
+        var (session, debug, _) = Create();
+
+        var run = session.DebugAsync(TempScript(), []);
+        await debug.Configured.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var results = await session.UpdateBreakpointsAsync([5, 7]);
+        debug.Raise(new FishboneDebugTerminated(0));
+        await run.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal([5, 7], debug.UpdatedLines);
+        Assert.Equal([5, 7], results!.Select(result => result.Line));
+        // with no session, there's nothing to update
+        Assert.Null(await session.UpdateBreakpointsAsync([1]));
+    }
+
+    [Fact]
+    public async Task AttachAsync_OpensTheSourceAndUsesItsBreakpoints()
+    {
+        var (session, debug, _) = Create();
+        FishboneDebugSource? opened = null;
+
+        var run = session.AttachAsync("127.0.0.1", 4711, source =>
+        {
+            opened = source;
+            return Task.FromResult<IReadOnlyList<int>>([2]);
+        });
+        await debug.Configured.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        debug.Raise(new FishboneDebugFailed(new InvalidOperationException("host went away")));
+        var outcome = await run.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal("remote.fb", opened!.Name);
+        Assert.True(debug.ConnectedStoppingOnEntry);
+        Assert.Equal([2], debug.ConfiguredLines);
+        Assert.Equal("host went away", Assert.Single(outcome!.Errors).ExMessage);
+    }
+
+    private static string TempScript()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"session-{Guid.NewGuid():N}.fb");
+        File.WriteAllText(path, "let x = 1;");
+        return path;
+    }
+
+    private static FishbonePauseSnapshot Snapshot(string reason) =>
+        new(1, reason, null, [new FishboneDebugFrame(1, "<script>", "test.fb", 2, 1, [])], null);
+
+    private sealed class FakeFactory(FakeDebugSession session) : IFishboneDebugClientSessionFactory
+    {
+        public IFishboneDebugClientSession CreateLaunched(string scriptPath) => session;
+        public IFishboneDebugClientSession CreateAttached(string host, int port) => session;
+    }
+
+    private sealed class FakeDebugSession : IFishboneDebugClientSession
+    {
+        public event EventHandler<FishboneDebugEvent>? EventReceived;
+        public FishboneDebugSessionState State { get; private set; } = FishboneDebugSessionState.Starting;
+        public FishboneDebugSessionOwnership Ownership => FishboneDebugSessionOwnership.Launched;
+        public FishboneDebugSource? Source { get; private set; }
+        public TaskCompletionSource Configured { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public IReadOnlyList<int>? ConfiguredLines { get; private set; }
+        public IReadOnlyList<int>? UpdatedLines { get; private set; }
+        public bool ConnectedStoppingOnEntry { get; private set; }
+        public bool Disposed { get; private set; }
+
+        public void Raise(FishboneDebugEvent debugEvent)
+        {
+            if (debugEvent is FishboneDebugTerminated)
+                State = FishboneDebugSessionState.Completed;
+            EventReceived?.Invoke(this, debugEvent);
+        }
+
+        public Task<FishboneDebugSource> ConnectAsync(bool stopOnEntry = false, CancellationToken cancellationToken = default)
+        {
+            ConnectedStoppingOnEntry = stopOnEntry;
+            Source = new FishboneDebugSource("remote.fb", "remote.fb", 1, "let x = 1;", "text/plain");
+            return Task.FromResult(Source);
+        }
+
+        public Task<IReadOnlyList<FishboneBreakpointResult>> ConfigureAsync(IReadOnlyList<int> breakpoints, CancellationToken cancellationToken = default)
+        {
+            ConfiguredLines = breakpoints;
+            State = FishboneDebugSessionState.Running;
+            Configured.TrySetResult();
+            return Task.FromResult(Results(breakpoints));
+        }
+
+        public Task<IReadOnlyList<FishboneBreakpointResult>> SetBreakpointsAsync(IReadOnlyList<int> lines, CancellationToken cancellationToken = default)
+        {
+            UpdatedLines = lines;
+            return Task.FromResult(Results(lines));
+        }
+
+        private static IReadOnlyList<FishboneBreakpointResult> Results(IReadOnlyList<int> lines) =>
+            lines.Select(line => new FishboneBreakpointResult(line, true, null)).ToArray();
+
+        public Task StartAsync(IReadOnlyList<int> breakpoints, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<IReadOnlyList<FishboneDebugVariable>> GetVariablesAsync(FishboneVariableHandle handle, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<FishboneDebugVariable>>([]);
+        public Task<byte[]> GetImageAsync(FishboneVariableHandle handle, CancellationToken cancellationToken = default) => Task.FromResult(Array.Empty<byte>());
+        public Task ContinueAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task PauseAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task StepIntoAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task StepOverAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task StepOutAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task DisconnectAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task StopAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public ValueTask DisposeAsync()
+        {
+            Disposed = true;
+            return ValueTask.CompletedTask;
+        }
+    }
+}

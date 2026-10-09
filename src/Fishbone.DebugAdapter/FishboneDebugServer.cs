@@ -127,7 +127,8 @@ public sealed class FishboneDebugServerSession : IAsyncDisposable
                         throw;
                     }
                     return Task.CompletedTask;
-                });
+                },
+                configuration);
             session = activeSession;
             lock (_sync) _adapterSession = activeSession;
             using CancellationTokenRegistration cancellationRegistration = cancellationToken.Register(() =>
@@ -142,6 +143,7 @@ public sealed class FishboneDebugServerSession : IAsyncDisposable
             using DebugAdapterServer server = DebugAdapterServer.Create(options =>
             {
                 options.WithInput(stream).WithOutput(stream).AddHandler(activeSession);
+                options.OnRequest<FishboneImageArguments, FishboneImageResponse>(FishboneImageArguments.Command, activeSession.Handle);
                 options.Capabilities = CreateCapabilities();
             });
             activeSession.AttachServer(server, CancellationToken.None);
