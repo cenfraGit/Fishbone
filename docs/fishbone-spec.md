@@ -6,15 +6,16 @@ The grammar and semantics of the language. If you want to embed Fishbone in an a
 
 1. [What Fishbone is](#what-fishbone-is)
 2. [What Fishbone is not](#what-fishbone-is-not)
-3. [Writing a script](#writing-a-script)
-4. [Values](#values)
-5. [Expressions and operators](#expressions-and-operators)
-6. [Statements](#statements)
-7. [Functions](#functions)
-8. [Errors](#errors)
-9. [Talking to .NET](#talking-to-net)
-10. [What the host gives you](#what-the-host-gives-you)
-11. [Security](#security)
+3. [Syntax stability](#syntax-stability)
+4. [Writing a script](#writing-a-script)
+5. [Values](#values)
+6. [Expressions and operators](#expressions-and-operators)
+7. [Statements](#statements)
+8. [Functions](#functions)
+9. [Errors](#errors)
+10. [Talking to .NET](#talking-to-net)
+11. [What the host gives you](#what-the-host-gives-you)
+12. [Security](#security)
 
 ---
 
@@ -35,6 +36,14 @@ Fishbone is **not** trying to be Python or Lua for .NET. Don't expect any simila
 It's also not meant to exist outside .NET. Interfacing with .NET types is the entire point, and that interfacing comes from the fact that the interpreter is written in C# and uses .NET types directly instead of wrapping them.
 
 It is not a standalone CLR language either. It does not compile to MSIL and it does not run on the DLR.
+
+## Syntax stability
+
+Fishbone is still in alpha and far from 1.0, but the syntax already follows these rules, so scripts you write keep working:
+
+- Syntax is only **added**. Existing syntax is never removed.
+- Existing syntax doesn't change meaning.
+- New syntax never makes a valid script fail to parse or behave differently.
 
 ---
 
@@ -70,6 +79,8 @@ Identifiers are case sensitive, and they can't collide with a reserved keyword o
 There are 25 of them:
 
 `let` `null` `true` `false` `if` `else` `while` `foreach` `for` `break` `continue` `try` `catch` `finally` `throw` `in` `as` `func` `return` `and` `or` `xor` `not` `out` `ref`
+
+**Recommendation:** don't use these as names either, since they may become keywords later: `is`, `const`, `match`, `switch`, `case`, `import`, `yield`, `async`, `await`. A script that uses one would stop parsing when that keyword is added.
 
 ### Reserved type names
 
@@ -170,9 +181,18 @@ When a value lands in a boolean context (`if`, `while`, `and`, `or`, `not`), her
 
 - `null` is falsy
 - `bool` is itself
-- `int` and `double` are falsy at zero, truthy otherwise
+- `int`, `long` and `double` are falsy at zero, truthy otherwise
 - `string` is falsy when empty, truthy otherwise
 - everything else is truthy
+
+**Recommendation:** don't rely on truthiness beyond `bool`s and `null` checks. Other number types (`float`, `decimal`, `byte`...) are truthy even at zero, and an empty list or dictionary is truthy too. These rules may get cleaned up, so write the check you mean:
+
+```csharp
+if (count != 0) { }        // not: if (count)
+if (items.Count > 0) { }   // not: if (items)
+if (name != "") { }        // not: if (name)
+if (result != null) { }    // fine either way
+```
 
 ---
 

@@ -43,6 +43,14 @@ See the [language specification](https://github.com/cenfraGit/Fishbone/blob/main
 
 Fishbone is **not** trying to be Python or Lua for .NET, and it is not an independent CLR language. It does not compile to MSIL or run on the DLR. It's a deliberately small scripting layer whose runtime behavior is, by design, mostly just .NET's.
 
+## Syntax stability
+
+Fishbone is still in alpha and far from 1.0, but the syntax already follows these rules, so scripts you write keep working:
+
+- Syntax is only **added**. Existing syntax is never removed.
+- Existing syntax doesn't change meaning.
+- New syntax never makes a valid script fail to parse or behave differently.
+
 ## How to use?
 
 1. Create a `FishboneConfiguration` object, injecting your C# types, objects and delegates:
