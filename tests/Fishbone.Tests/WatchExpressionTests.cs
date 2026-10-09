@@ -107,6 +107,18 @@ public class WatchExpressionTests
     }
 
     [Fact]
+    public void WatchCallAt_FindsTheCallInTheWatch_NotInTheScript()
+    {
+        var call = Analysis.WatchCallAt(Source, 99, "1 + same(", 9);
+
+        Assert.NotNull(call);
+        Assert.Equal("same", call.Name);
+        Assert.Equal(8, call.OpenParen);
+        Assert.Equal(0, call.Argument);
+        Assert.Null(Analysis.WatchCallAt(Source, 99, "first", 5));
+    }
+
+    [Fact]
     public void WatchCompletions_DontEvaluateACall()
     {
         int evaluated = 0;

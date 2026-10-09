@@ -113,13 +113,31 @@ public sealed partial class FishboneAnalysis
     public FishboneCompletions? WatchCompletionsAt(string source, int line, string expression, int caret,
         Func<string, object?>? evaluate = null)
     {
-        int offset = 0;
-        for (int i = 1; i < line && offset >= 0; i++)
-            offset = source.IndexOf('\n', offset) is var next and >= 0 ? next + 1 : -1;
-        string before = offset >= 0 ? source[..offset] : source + "\n";
+        string before = LinesBefore(source, line);
         if (CompletionsAt(before + expression, before.Length + caret) is { } completions)
             return completions with { Start = completions.Start - before.Length };
         return evaluate is null ? null : ValueMembersAt(expression, caret, evaluate);
+    }
+
+    /// <summary>
+    /// The call the caret is inside in a debugger's watch, typed as <see cref="WatchCompletionsAt"/>
+    /// says. The result's <see cref="FishboneCallInfo.OpenParen"/> is an index into the expression.
+    /// </summary>
+    public FishboneCallInfo? WatchCallAt(string source, int line, string expression, int caret)
+    {
+        string before = LinesBefore(source, line);
+        return CallAt(before + expression, before.Length + caret) is { } call && call.OpenParen >= before.Length
+            ? call with { OpenParen = call.OpenParen - before.Length }
+            : null;
+    }
+
+    // the script up to the start of a line, or all of it and a line break past its end
+    private static string LinesBefore(string source, int line)
+    {
+        int offset = 0;
+        for (int i = 1; i < line && offset >= 0; i++)
+            offset = source.IndexOf('\n', offset) is var next and >= 0 ? next + 1 : -1;
+        return offset >= 0 ? source[..offset] : source + "\n";
     }
 
     // the members of the value before the dot at the caret, when it's a chain of names
