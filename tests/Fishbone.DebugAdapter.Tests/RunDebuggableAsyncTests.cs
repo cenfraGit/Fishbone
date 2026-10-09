@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using System.Text.Json;
 using Fishbone;
 using Fishbone.DebugClient;
@@ -68,6 +67,8 @@ public class RunDebuggableAsyncTests
         // the fallback paths above never exercise a real client. this drives an actual DAP
         // attach through IdeLauncher, which hands us the endpoint, and continues to the end
         var program = FishboneProgram.FromSourceCode("let seed = 21; let doubled = seed * 2;");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        Task? client = null;
 
         var result = await program.RunDebuggableAsync(new FishboneConfiguration(), new FishboneDebugOptions
         {
@@ -75,26 +76,30 @@ public class RunDebuggableAsyncTests
             AttachTimeout = TimeSpan.FromSeconds(30),
             IdeLauncher   = endpoint =>
             {
-                _ = Task.Run(async () =>
+                client = Task.Run(async () =>
                 {
                     await using var session = FishboneDebugClientSession.Attach("127.0.0.1", endpoint.Port);
-                    await session.ConnectAsync(stopOnEntry: true);
-                    await session.ConfigureAsync([]);
-
-                    var terminated = new TaskCompletionSource();
+                    var paused = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    var terminated = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                     session.EventReceived += (_, e) =>
                     {
+                        if (e is FishboneDebugPaused)
+                            paused.TrySetResult();
                         if (e is FishboneDebugTerminated)
                             terminated.TrySetResult();
                     };
 
-                    await session.ContinueAsync();
-                    await terminated.Task.WaitAsync(TimeSpan.FromSeconds(20));
+                    await session.ConnectAsync(stopOnEntry: true, timeout.Token);
+                    await session.ConfigureAsync([], timeout.Token);
+                    await paused.Task.WaitAsync(timeout.Token);
+                    await session.ContinueAsync(timeout.Token);
+                    await terminated.Task.WaitAsync(timeout.Token);
                 });
                 return null;   // no process to launch, we attached in-proc
             },
         });
 
+        await client!.WaitAsync(timeout.Token);
         Assert.True(result.DebuggerAttached);
         Assert.False(result.WasCancelled);
         Assert.Null(result.Error);
@@ -108,6 +113,8 @@ public class RunDebuggableAsyncTests
         // closing the debugger window kills the socket without sending a disconnect request.
         // the script should carry on as if continued, not be cancelled half way
         var program = FishboneProgram.FromSourceCode("let seed = 21; let doubled = seed * 2;");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        Task? client = null;
 
         var result = await program.RunDebuggableAsync(new FishboneConfiguration(), new FishboneDebugOptions
         {
@@ -115,39 +122,29 @@ public class RunDebuggableAsyncTests
             AttachTimeout = TimeSpan.FromSeconds(30),
             IdeLauncher   = endpoint =>
             {
-                _ = Task.Run(async () =>
+                client = Task.Run(async () =>
                 {
                     using var tcp = new TcpClient();
-                    await tcp.ConnectAsync(IPAddress.Loopback, endpoint.Port);
-                    Stream stream = tcp.GetStream();
+                    await tcp.ConnectAsync(IPAddress.Loopback, endpoint.Port, timeout.Token);
+                    var dap = new TcpDapIntegrationTests.RawDapClient(tcp.GetStream(), timeout.Token);
 
-                    int seq = 1;
-                    await SendRequestAsync(stream, seq++, "initialize", new { adapterID = "fishbone" });
-                    await Task.Delay(300);
-                    await SendRequestAsync(stream, seq++, "attach", new { stopOnEntry = true });
-                    await Task.Delay(300);
-                    await SendRequestAsync(stream, seq++, "configurationDone", new { });
+                    await dap.RequestAsync("initialize", new { adapterID = "fishbone" });
+                    await dap.RequestAsync("attach", new { stopOnEntry = true });
+                    await dap.RequestAsync("configurationDone", new { });
+                    JsonElement stopped = await dap.ReadUntilAsync(message =>
+                        message.TryGetProperty("event", out var name) && name.GetString() == "stopped");
+                    Assert.Equal("entry", stopped.GetProperty("body").GetProperty("reason").GetString());
 
-                    // let it settle on the entry stop, then yank the socket
-                    await Task.Delay(1500);
                     tcp.Client.Close(0);   // abortive, no FIN and no disconnect request
                 });
                 return null;
             },
         });
 
+        await client!.WaitAsync(timeout.Token);
         Assert.True(result.DebuggerAttached);
         Assert.False(result.WasCancelled);
         Assert.NotNull(result.Environment);
         Assert.Equal(42, result.Environment!.GetValue("doubled"));
-    }
-
-    private static async Task SendRequestAsync(Stream stream, int seq, string command, object arguments)
-    {
-        byte[] body = JsonSerializer.SerializeToUtf8Bytes(new { seq, type = "request", command, arguments });
-        byte[] header = Encoding.ASCII.GetBytes($"Content-Length: {body.Length}\r\n\r\n");
-        await stream.WriteAsync(header);
-        await stream.WriteAsync(body);
-        await stream.FlushAsync();
     }
 }

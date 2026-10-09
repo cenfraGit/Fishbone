@@ -1,6 +1,7 @@
 using Fishbone.DebugClient;
 using Fishbone.DebugAdapter;
 using Fishbone.Debugging;
+using System.Diagnostics;
 using System.Net;
 using System.Threading.Channels;
 
@@ -247,5 +248,203 @@ x = 2;
         }
 
         await client.DisconnectAsync(timeout.Token);
+    }
+
+    [Fact]
+    public async Task LaunchedSessionPausesOnARuntimeErrorThenFailsWithExitCodeOne()
+    {
+        string scriptPath = Path.Combine(Path.GetTempPath(), $"fishbone-client-{Guid.NewGuid():N}.fb");
+        await File.WriteAllTextAsync(scriptPath, "let x = 1;\nlet y = null;\ny.Anything();\nx = 2;");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await using var session = new FishboneDebugClientSession(scriptPath, new FishboneDapHostLocator(AppContext.BaseDirectory));
+        var events = Channel.CreateUnbounded<FishboneDebugEvent>();
+        session.EventReceived += (_, debugEvent) => events.Writer.TryWrite(debugEvent);
+
+        await session.StartAsync([], timeout.Token);
+        FishbonePauseSnapshot pause = (await NextAsync<FishboneDebugPaused>(events.Reader, timeout.Token)).Snapshot;
+        Assert.Equal("exception", pause.Reason, ignoreCase: true);
+        Assert.Equal(3, pause.Frames[0].Line);
+        Assert.NotNull(pause.Exception);
+        Assert.False(string.IsNullOrWhiteSpace(pause.Exception!.Description));
+        await session.ContinueAsync(timeout.Token);
+
+        var after = new List<FishboneDebugEvent>();
+        FishboneDebugEvent next;
+        do
+        {
+            next = await events.Reader.ReadAsync(timeout.Token);
+            after.Add(next);
+            // a launched host pauses at the end to show final values, but a failed run has none,
+            // so continuing once ends it. a second pause here used to need another continue
+            if (next is FishboneDebugPaused)
+                break;
+        } while (next is not FishboneDebugTerminated);
+
+        Assert.DoesNotContain(after, debugEvent => debugEvent is FishboneDebugPaused);
+        Assert.Single(after.OfType<FishboneDebugFailed>());
+        Assert.Equal(1, ((FishboneDebugTerminated)next).ExitCode);
+        Assert.Equal(FishboneDebugSessionState.Completed, session.State);
+    }
+
+    [Fact]
+    public async Task StoppingALaunchedSessionWhilePausedEndsTheHost()
+    {
+        string scriptPath = Path.Combine(Path.GetTempPath(), $"fishbone-client-{Guid.NewGuid():N}.fb");
+        await File.WriteAllTextAsync(scriptPath, "let x = 1;\nx = 2;\nx = 3;");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await using var session = new FishboneDebugClientSession(scriptPath, new FishboneDapHostLocator(AppContext.BaseDirectory));
+        var events = Channel.CreateUnbounded<FishboneDebugEvent>();
+        session.EventReceived += (_, debugEvent) => events.Writer.TryWrite(debugEvent);
+        HashSet<int> existing = HostProcessIds();
+
+        await session.StartAsync([2], timeout.Token);
+        using Process host = LaunchedHost(existing);
+        await NextAsync<FishboneDebugPaused>(events.Reader, timeout.Token);
+        await session.StopAsync(timeout.Token);
+
+        await NextAsync<FishboneDebugTerminated>(events.Reader, timeout.Token);
+        await host.WaitForExitAsync(timeout.Token).WaitAsync(TimeSpan.FromSeconds(5));
+        // the host ended the cancelled run itself. a kill would leave -1
+        Assert.Equal(1, host.ExitCode);
+        Assert.Equal(FishboneDebugSessionState.Completed, session.State);
+    }
+
+    [Fact]
+    public async Task HostCrashingWhilePausedFaultsTheSession()
+    {
+        string scriptPath = Path.Combine(Path.GetTempPath(), $"fishbone-client-{Guid.NewGuid():N}.fb");
+        await File.WriteAllTextAsync(scriptPath, "let x = 1;\nx = 2;\nx = 3;");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await using var session = new FishboneDebugClientSession(scriptPath, new FishboneDapHostLocator(AppContext.BaseDirectory));
+        var events = Channel.CreateUnbounded<FishboneDebugEvent>();
+        session.EventReceived += (_, debugEvent) => events.Writer.TryWrite(debugEvent);
+        HashSet<int> existing = HostProcessIds();
+
+        await session.StartAsync([2], timeout.Token);
+        using Process host = LaunchedHost(existing);
+        await NextAsync<FishboneDebugPaused>(events.Reader, timeout.Token);
+        host.Kill();
+
+        await NextAsync<FishboneDebugFailed>(events.Reader, timeout.Token);
+        Assert.Equal(FishboneDebugSessionState.Faulted, session.State);
+    }
+
+    [Fact]
+    public async Task PauseStopsARunningScriptAndContinueResumesIt()
+    {
+        const string sourceCode = """
+ready();
+let n = 0;
+while (keepGoing()) {
+    n = n + 1;
+}
+let done = true;
+""";
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var finish = new ManualResetEventSlim();
+        var configuration = new FishboneConfiguration()
+            .AddBuiltIn("ready", new Action(() => ready.TrySetResult()))
+            .AddBuiltIn("keepGoing", new Func<bool>(() => !finish.IsSet));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await using FishboneDebugServerSession server = await FishboneDebugServer.StartAsync(new FishboneDebugServerOptions
+        {
+            SourceCode = sourceCode,
+            SourceName = "loop.fb",
+            SourceIdentity = "fishbone://tests/loop.fb",
+            ListenEndpoint = new IPEndPoint(IPAddress.Loopback, 0),
+            Configuration = configuration
+        }, timeout.Token);
+        await using FishboneDebugClientSession client = FishboneDebugClientSession.Attach("127.0.0.1", server.Endpoint.Port);
+        var events = Channel.CreateUnbounded<FishboneDebugEvent>();
+        client.EventReceived += (_, debugEvent) => events.Writer.TryWrite(debugEvent);
+
+        await client.ConnectAsync(stopOnEntry: false, timeout.Token);
+        await client.ConfigureAsync([], timeout.Token);
+        await ready.Task.WaitAsync(timeout.Token);
+        await client.PauseAsync(timeout.Token);
+
+        FishbonePauseSnapshot pause = (await NextAsync<FishboneDebugPaused>(events.Reader, timeout.Token)).Snapshot;
+        Assert.Equal("pause", pause.Reason, ignoreCase: true);
+        Assert.InRange(pause.Frames[0].Line, 3, 4);
+        await client.ContinueAsync(timeout.Token);
+        await NextAsync<FishboneDebugContinued>(events.Reader, timeout.Token);
+        finish.Set();
+
+        FishboneDebugServerResult result = await server.Completion.WaitAsync(timeout.Token);
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(true, result.Environment!.GetValue("done"));
+    }
+
+    [Fact]
+    public async Task FunctionFrameShowsItsLocalsTheVisibleVariablesAndTheGlobals()
+    {
+        const string sourceCode = """
+let total = 100;
+func add(a, b) {
+    let sum = a + b;
+    return sum;
+}
+let result = add(1, 2);
+""";
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await using FishboneDebugServerSession server = await FishboneDebugServer.StartAsync(new FishboneDebugServerOptions
+        {
+            SourceCode = sourceCode,
+            SourceName = "scopes.fb",
+            SourceIdentity = "fishbone://tests/scopes.fb",
+            ListenEndpoint = new IPEndPoint(IPAddress.Loopback, 0)
+        }, timeout.Token);
+        await using FishboneDebugClientSession client = FishboneDebugClientSession.Attach("127.0.0.1", server.Endpoint.Port);
+        var events = Channel.CreateUnbounded<FishboneDebugEvent>();
+        client.EventReceived += (_, debugEvent) => events.Writer.TryWrite(debugEvent);
+
+        await client.ConnectAsync(stopOnEntry: false, timeout.Token);
+        await client.ConfigureAsync([4], timeout.Token);
+        FishbonePauseSnapshot pause = (await NextAsync<FishboneDebugPaused>(events.Reader, timeout.Token)).Snapshot;
+
+        Assert.Equal(["add", "<script>"], pause.Frames.Select(frame => frame.Name));
+        FishboneDebugFrame function = pause.Frames[0];
+        Assert.Equal(["Locals", "Visible Variables", "Globals"], function.Scopes.Select(scope => scope.Name));
+        // the body's lets are locals too, though the body is a block of its own
+        Assert.Equal(["a=1", "b=2", "sum=3"], Names(function.Scopes[0]));
+        Assert.Equal(["a=1", "add=func add(a, b)", "b=2", "sum=3", "total=100"], Names(function.Scopes[1]));
+        Assert.Equal(["add=func add(a, b)", "total=100"], Names(function.Scopes[2]));
+
+        // the outermost frame is the globals, so it only has its own locals
+        FishboneDebugScope script = Assert.Single(pause.Frames[1].Scopes);
+        Assert.Equal("Locals", script.Name);
+        Assert.Equal(6, pause.Frames[1].Line);
+
+        await client.ContinueAsync(timeout.Token);
+        FishboneDebugServerResult result = await server.Completion.WaitAsync(timeout.Token);
+        Assert.Equal(0, result.ExitCode);
+    }
+
+    private static IEnumerable<string> Names(FishboneDebugScope scope) =>
+        scope.Variables.Select(variable => $"{variable.Name}={variable.Value}").Order(StringComparer.Ordinal);
+
+    private static async Task<T> NextAsync<T>(ChannelReader<FishboneDebugEvent> events, CancellationToken cancellationToken)
+        where T : FishboneDebugEvent
+    {
+        while (true)
+            if (await events.ReadAsync(cancellationToken) is T match)
+                return match;
+    }
+
+    private static readonly string HostPath = new FishboneDapHostLocator(AppContext.BaseDirectory).Locate().FileName;
+
+    private static HashSet<int> HostProcessIds() =>
+        Process.GetProcessesByName(Path.GetFileNameWithoutExtension(HostPath)).Select(process => process.Id).ToHashSet();
+
+    // a launched session keeps its host process private. the new process running this
+    // test's own copy of fishbone-dap is the one it started
+    private static Process LaunchedHost(HashSet<int> existing)
+    {
+        Process host = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(HostPath)).Single(process =>
+            !existing.Contains(process.Id) &&
+            string.Equals(process.MainModule?.FileName, HostPath, StringComparison.OrdinalIgnoreCase));
+        // opening the handle now keeps the exit code readable after the process ends
+        _ = host.Handle;
+        return host;
     }
 }
