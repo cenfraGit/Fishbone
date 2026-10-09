@@ -60,6 +60,24 @@ public class WatchExpressionTests
         Assert.False(environment.IsDefined("n"));
     }
 
+    // like count_obj, which only takes HALCON objects
+    public sealed class Region;
+    public sealed class Picture;
+    private delegate void CountRegionsDelegate(Region regions, out int count);
+
+    [Fact]
+    public void Evaluate_AValueOfTheWrongType_SaysWhatItTakes()
+    {
+        var config = new FishboneConfiguration()
+            .AddBuiltIn("count_regions", new CountRegionsDelegate((Region regions, out int count) => count = 1))
+            .AddValue("photo", new Picture());
+        var environment = FishboneProgram.Run("", config);
+
+        var error = Assert.Throws<FishboneRuntimeException>(() => FishboneExpression.Evaluate("count_regions(photo, out n)", environment, config));
+
+        Assert.Equal("'count_regions' argument 1 ('regions') takes 'Region', not 'Picture'.", error.Message);
+    }
+
     [Fact]
     public void WatchCompletions_OfferTheNamesInScopeAtTheLine()
     {

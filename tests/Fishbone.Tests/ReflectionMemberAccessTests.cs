@@ -71,7 +71,7 @@ sample.Increment(ref value);
         AssertError("let value = null; let name = value.Name;", "Cannot access member 'Name' on null.");
         AssertError("let value = sample.Resize(1);", "No argument supplied for parameter 'height', which has no default value.");
         AssertError("let value = sample.Name();", "Object of type 'String' is not callable.");
-        AssertError("""let value = sample.Resize("wide", "high");""", "Argument 1 of type 'String' is not compatible with parameter 'width' of type 'Int32'.");
+        AssertError("""let value = sample.Resize("wide", "high");""", "'Resize' argument 1 ('width') takes 'Int32', not 'String'.");
         // out parameter called without the 'out' keyword
         AssertError("""let number = 0; let ok = sample.TryGetNumber("answer", number);""", "Parameter 'value' is an out parameter; pass the argument with 'out'.");
         // 'out' given, but the target is not a plain variable
