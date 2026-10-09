@@ -201,6 +201,7 @@ public sealed class FishboneDebugServerSession : IAsyncDisposable
         SupportTerminateDebuggee = true,
         SupportsExceptionInfoRequest = true,
         SupportsLoadedSourcesRequest = true,
+        SupportsCompletionsRequest = true,
         ExceptionBreakpointFilters = new Container<ExceptionBreakpointsFilter>(new ExceptionBreakpointsFilter
         {
             Filter = "all",

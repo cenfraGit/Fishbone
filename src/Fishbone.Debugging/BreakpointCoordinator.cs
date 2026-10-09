@@ -353,7 +353,10 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
             .Select(frame => new DebugCallFrameSnapshot(
                 frame.Name,
                 frame.Location ?? location,
-                frame.Locals()))
+                frame.Locals())
+            {
+                Environment = frame.Current ?? frame.Environment
+            })
             .ToImmutableArray();
 
         return new DebugPauseSnapshot(

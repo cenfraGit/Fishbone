@@ -15,7 +15,7 @@ public sealed class FishboneDebugAdapterSession :
     IContinueHandler, INextHandler, IStepInHandler, IStepOutHandler, IPauseHandler,
     IThreadsHandler, IStackTraceHandler, IScopesHandler, IVariablesHandler,
     ISetExceptionBreakpointsHandler, IExceptionInfoHandler, IDisconnectHandler, ITerminateHandler,
-    ILoadedSourcesHandler, ISourceHandler,
+    ILoadedSourcesHandler, ISourceHandler, IEvaluateHandler, ICompletionsHandler,
     IDisposable
 {
     public const long ThreadId = 1;
@@ -29,6 +29,12 @@ public sealed class FishboneDebugAdapterSession :
     private readonly Func<CancellationToken, Task> _execute;
     private readonly CancellationTokenSource _executionCancellation = new();
     private readonly DebugSnapshotHandles _handles;
+    private readonly FishboneConfiguration? _configuration;
+    // made the first time a watch asks for completions
+    private FishboneAnalysis? _analysis;
+    // a watch runs on the paused script's values, so the script doesn't resume until it's done
+    private readonly object _evaluating = new();
+    private static readonly TimeSpan EvaluationTimeout = TimeSpan.FromSeconds(10);
     private readonly Channel<IRequest> _events = Channel.CreateUnbounded<IRequest>(new UnboundedChannelOptions { SingleReader = true });
     private readonly TaskCompletionSource<int> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private IDebugAdapterServer? _server;
@@ -58,6 +64,7 @@ public sealed class FishboneDebugAdapterSession :
     {
         _coordinator = coordinator;
         _handles = new DebugSnapshotHandles(configuration);
+        _configuration = configuration;
         _sourceIdentity = sourceIdentity;
         _sourceCode = sourceCode;
         _source = new Source
@@ -166,6 +173,107 @@ public sealed class FishboneDebugAdapterSession :
 
     public Task<FishboneImageResponse> Handle(FishboneImageArguments request, CancellationToken cancellationToken) =>
         Task.FromResult(FishboneImageResponse.From(_handles.GetImage(request.VariablesReference)));
+
+    // a watch. it's evaluated in the frame's scope, with the script's configuration, and comes
+    // back like a variable, so it can have children or be an image. a watch that fails answers
+    // with the reason, marked as a failed evaluation, since a failed request loses its message
+    public Task<EvaluateResponse> Handle(EvaluateArguments request, CancellationToken cancellationToken)
+    {
+        lock (_evaluating)
+        {
+            Variable variable;
+            try
+            {
+                variable = Evaluate(request.Expression, request.FrameId);
+            }
+            catch (Exception exception)
+            {
+                return Task.FromResult(new EvaluateResponse
+                {
+                    Result = exception switch
+                    {
+                        FishboneParseException { Errors.Count: > 0 } parse => $"column {parse.Errors[0].Column}: {parse.Errors[0].Message}",
+                        OperationCanceledException => $"it took longer than {EvaluationTimeout.TotalSeconds:F0} seconds",
+                        _ => exception.Message
+                    },
+                    PresentationHint = new VariablePresentationHint
+                    {
+                        Attributes = new Container<VariableAttributes>(new VariableAttributes(FailedEvaluation))
+                    }
+                });
+            }
+            return Task.FromResult(new EvaluateResponse
+            {
+                Result = variable.Value,
+                Type = variable.Type,
+                VariablesReference = variable.VariablesReference,
+                PresentationHint = variable.PresentationHint,
+                NamedVariables = variable.NamedVariables,
+                IndexedVariables = variable.IndexedVariables
+            });
+        }
+    }
+
+    /// <summary>Marks a watch's answer as the reason it failed.</summary>
+    public const string FailedEvaluation = "failedEvaluation";
+
+    private Variable Evaluate(string expression, long? frameId)
+    {
+        if (_coordinator.State != DebugSessionState.Paused)
+            throw new InvalidOperationException("Watches are evaluated while the script is paused.");
+        FishboneEnvironment environment = _handles.GetFrame(frameId).Environment
+            ?? throw new InvalidOperationException("The frame has no scope to evaluate in.");
+        using var timeout = new CancellationTokenSource(EvaluationTimeout);
+        object? value = FishboneExpression.Evaluate(expression, environment, _configuration, timeout.Token);
+        return _handles.AddValue(expression, value);
+    }
+
+    // completions for a watch being typed, with the names in scope at the frame's line. after a
+    // dot, the members of the value before it when its type isn't known from the script
+    public Task<CompletionsResponse> Handle(CompletionsArguments request, CancellationToken cancellationToken)
+    {
+        var none = Task.FromResult(new CompletionsResponse { Targets = new Container<CompletionItem>() });
+        // columns start at 1, like lines
+        int caret = Math.Clamp((int)request.Column - 1, 0, request.Text.Length);
+        FishboneCompletions? completions;
+        lock (_evaluating)
+        {
+            if (_coordinator.State != DebugSessionState.Paused || string.IsNullOrEmpty(_sourceCode))
+                return none;
+            try
+            {
+                DebugCallFrameSnapshot frame = _handles.GetFrame(request.FrameId);
+                _analysis ??= FishboneAnalysis.Analyze(_sourceCode, (_configuration ?? new FishboneConfiguration()).Describe());
+                completions = _analysis.WatchCompletionsAt(_sourceCode, frame.Location.Line, request.Text, caret,
+                    frame.Environment is { } environment ? expression => FishboneExpression.Evaluate(expression, environment, _configuration) : null);
+            }
+            catch (InvalidOperationException)
+            {
+                // the frame is gone, the script continued
+                return none;
+            }
+        }
+        if (completions is null)
+            return none;
+
+        var items = completions.Items.Select(item => new CompletionItem
+        {
+            Label = item.Text,
+            Type = item.Kind switch
+            {
+                FishboneSuggestionKind.Keyword => CompletionItemType.Keyword,
+                FishboneSuggestionKind.Function => CompletionItemType.Function,
+                FishboneSuggestionKind.Type => CompletionItemType.Class,
+                FishboneSuggestionKind.Method => CompletionItemType.Method,
+                FishboneSuggestionKind.Property => CompletionItemType.Property,
+                FishboneSuggestionKind.Field => CompletionItemType.Field,
+                _ => CompletionItemType.Variable
+            },
+            Start = completions.Start + 1,
+            Length = caret - completions.Start
+        });
+        return Task.FromResult(new CompletionsResponse { Targets = new Container<CompletionItem>(items) });
+    }
 
     public Task<ContinueResponse> Handle(ContinueArguments request, CancellationToken cancellationToken)
     {
@@ -355,7 +463,9 @@ public sealed class FishboneDebugAdapterSession :
         // the "continued" notification is emitted by OnResumed, which the coordinator raises
         // before it releases the interpreter, so it can never be overtaken by the next pause's
         // 'stopped' notification (the bug behind intermittent stepping hangs / dropped sessions).
-        action();
+        // a watch still running on the script's values finishes first
+        lock (_evaluating)
+            action();
     }
 
     private void OnResumed(object? sender, EventArgs e)

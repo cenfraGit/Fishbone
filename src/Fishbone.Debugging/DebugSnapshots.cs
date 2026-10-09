@@ -28,7 +28,14 @@ public sealed record DebugExceptionSnapshot(string Type, string Message);
 public sealed record DebugCallFrameSnapshot(
     string FunctionName,
     DebugSourceLocation Location,
-    ImmutableArray<DebugVariableSnapshot> Variables);
+    ImmutableArray<DebugVariableSnapshot> Variables)
+{
+    /// <summary>
+    /// The frame's live scope, where a watch is evaluated. Only safe to use while the script is
+    /// paused, since the script changes it once it runs.
+    /// </summary>
+    public FishboneEnvironment? Environment { get; init; }
+}
 
 public sealed record DebugPauseSnapshot(
     DebugSourceLocation Location,
