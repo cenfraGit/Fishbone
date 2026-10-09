@@ -85,6 +85,7 @@ public class SpineIdeAttachTests
         Assert.True(result.Environment!.IsDefined("blobs"));
     }
 
+    // the plugins installed on this machine, not the empty folder the other tests use. returns
     // what loaded and what failed, which the loader only writes to stderr
     private static string LoadInstalledPlugins(FishboneConfiguration config)
     {
@@ -93,8 +94,8 @@ public class SpineIdeAttachTests
         Console.SetError(errors);
         try
         {
-            var loaded = FishbonePluginLoader.LoadPlugins(FishbonePluginLoader.DefaultPluginsDirectory, config);
-            return $"from {FishbonePluginLoader.DefaultPluginsDirectory}, loaded: [{string.Join(", ", loaded)}], errors: [{errors.ToString().Trim()}]";
+            var loaded = FishbonePluginLoader.LoadPlugins(IsolatedPlugins.MachineDirectory, config);
+            return $"from {IsolatedPlugins.MachineDirectory}, loaded: [{string.Join(", ", loaded)}], errors: [{errors.ToString().Trim()}]";
         }
         finally
         {
@@ -115,12 +116,27 @@ public class SpineIdeAttachTests
             OpenIde = true,
             AttachTimeout = TimeSpan.FromSeconds(30),
             SourceName = name,
-            IdeLauncher = endpoint => SpineIdeLauncher.Launch(endpoint, ide),
+            IdeLauncher = endpoint => LaunchWithInstalledPlugins(() => SpineIdeLauncher.Launch(endpoint, ide)),
         });
 
         Assert.True(result.DebuggerAttached, "SpineIDE didn't attach within 30 seconds");
         Assert.Null(result.Error);
         return result;
+    }
+
+    // the SpineIDE it starts gets the installed plugins too, for its completion lists
+    private static Process? LaunchWithInstalledPlugins(Func<Process?> launch)
+    {
+        string? isolated = Environment.GetEnvironmentVariable(FishbonePluginLoader.PluginsDirectoryVariable);
+        Environment.SetEnvironmentVariable(FishbonePluginLoader.PluginsDirectoryVariable, IsolatedPlugins.MachineDirectory);
+        try
+        {
+            return launch();
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(FishbonePluginLoader.PluginsDirectoryVariable, isolated);
+        }
     }
 
     // SPINEIDE_PATH when it's set, otherwise the IDE built next to this test, in the same configuration
