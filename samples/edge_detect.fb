@@ -6,7 +6,7 @@
 println("OpenCV edge detection\n");
 
 // read the source image as grayscale (cv_im_read returns a Mat directly)
-let image = cv_im_read("input.png", "Grayscale");
+let image = cv_im_read("input.png", ImreadModes.Grayscale);
 println("loaded " + image.Width + "x" + image.Height);
 
 // OpenCV writes into a destination Mat you allocate, so create one and read it back afterwards.
