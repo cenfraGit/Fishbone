@@ -457,8 +457,8 @@ public sealed class FishboneDebugAdapterSession :
                 DebugPauseReason.Step => StoppedEventReason.Step,
                 DebugPauseReason.ManualPause => StoppedEventReason.Pause,
                 DebugPauseReason.Exception => StoppedEventReason.Exception,
-                // final end-of-program pause: a custom reason the client/UI recognizes (see
-                // FishbonePauseSnapshot.ProgramExitReason) so it finishes without an interactive stop
+                // the pause after stepping off the last statement, or any end with pauseAtEnd: a custom
+                // reason the client recognizes (see FishbonePauseSnapshot.ProgramExitReason)
                 DebugPauseReason.Completed => new StoppedEventReason("program-exit"),
                 _ => StoppedEventReason.Pause
             },

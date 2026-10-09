@@ -9,8 +9,8 @@ public interface IFishboneDebugClientSession : IAsyncDisposable
 
     /// <summary>
     /// Whether the script pauses once more after its last statement, so the final values can be
-    /// looked at until the session continues. Set it before connecting. A launched host does by
-    /// default, and an attached one doesn't, since its host waits on the script.
+    /// looked at until the session continues. Set it before connecting. Off by default: a continue
+    /// that reaches the end ends the session, and only stepping off the last statement stops there.
     /// </summary>
     bool PauseAtEnd { get; set; }
     Task<FishboneDebugSource> ConnectAsync(bool stopOnEntry = false, CancellationToken cancellationToken = default);

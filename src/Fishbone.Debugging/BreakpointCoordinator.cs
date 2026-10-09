@@ -66,7 +66,7 @@ public sealed class BreakpointCoordinator : IFishboneDebugger, IDisposable
 
     /// <summary>
     /// When true, the script pauses once more after its last statement, so a client can show the
-    /// final values even when it wasn't stepping. A client that launched its own host asks for this.
+    /// final values even when it wasn't stepping. Stepping off the last statement always stops there.
     /// </summary>
     public bool PauseAtEnd { get; set; }
 
