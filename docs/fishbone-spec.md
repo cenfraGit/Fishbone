@@ -39,13 +39,11 @@ It is not a standalone CLR language either. It does not compile to MSIL and it d
 
 ## Syntax stability
 
-From 1.0 on, scripts you write keep working:
+Fishbone is still in alpha and far from 1.0, but the syntax already follows these rules, so scripts you write keep working:
 
 - Syntax is only **added**. Existing syntax is never removed.
 - Existing syntax doesn't change meaning.
 - New syntax never makes a valid script fail to parse or behave differently.
-
-Before 1.0, syntax can still change.
 
 ---
 
