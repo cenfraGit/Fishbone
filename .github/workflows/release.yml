@@ -11,6 +11,8 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write
+      # trusted publishing: nuget.org trusts this workflow and hands out a key for one hour
+      id-token: write
 
     steps:
       - name: Checkout
@@ -46,9 +48,15 @@ jobs:
 
       # SpineIDE has its own version. when it didn't change, nuget.org already has it and
       # --skip-duplicate leaves it alone
+      - name: Log in to nuget.org
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
       - name: Push to nuget.org
         shell: bash
-        run: dotnet nuget push "artifacts/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+        run: dotnet nuget push "artifacts/*.nupkg" --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
 
       - name: GitHub release
         shell: bash
