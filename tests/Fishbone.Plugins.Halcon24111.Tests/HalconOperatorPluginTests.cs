@@ -48,6 +48,49 @@ public class HalconOperatorPluginTests
         Assert.Equal(1.5, env.GetValue("half"));
     }
 
+    // handles collected with tuple_concat used to come back as strings once there were two of
+    // them, so the operator they were passed to next rejected them
+    [HalconFact]
+    public void Handles_SurviveARoundTripThroughScriptValues()
+    {
+        var config = new FishboneConfiguration().AddPlugin(new HalconOperatorPlugin());
+
+        foreach (int count in new[] { 1, 2, 3 })
+        {
+            var env = FishboneProgram.Run($$"""
+                tuple_gen_const(0, 0, out dicts);
+                for (i in 0, {{count}}) {
+                    create_dict(out d);
+                    set_dict_tuple(d, "k", i);
+                    tuple_concat(dicts, d, out dicts);
+                }
+                let total = 0;
+                for (i in 0, {{count}}) {
+                    tuple_select(dicts, i, out one);
+                    get_dict_tuple(one, "k", out k);
+                    total += k;
+                }
+                """, config);
+
+            Assert.Equal(count * (count - 1) / 2, Convert.ToInt32(env.GetValue("total")));
+        }
+
+        // several handles are a list, and each item is a handle an operator accepts
+        var looped = FishboneProgram.Run("""
+            create_dict(out a);
+            create_dict(out b);
+            set_dict_tuple(a, "k", 1);
+            set_dict_tuple(b, "k", 2);
+            tuple_concat(a, b, out dicts);
+            let total = 0;
+            foreach (one in dicts) {
+                get_dict_tuple(one, "k", out k);
+                total += k;
+            }
+            """, config);
+        Assert.Equal(3, Convert.ToInt32(looped.GetValue("total")));
+    }
+
     // the pattern the plugin's README shows: one result is a plain value, so a loop goes by the
     // count and picks each one with tuple_select, which works for none, one or several
     [HalconFact]

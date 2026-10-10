@@ -53,7 +53,9 @@ internal static class HalconConverters
                 HTupleType.INTEGER or HTupleType.LONG => element.L,
                 HTupleType.DOUBLE => element.D,
                 HTupleType.STRING => element.S,
-                _ => element
+                // a handle stays a tuple of its own. the element would only point back into this
+                // tuple, and going back into halcon it became a string
+                _ => htuple.TupleSelect(i)
             });
         }
         return list;
