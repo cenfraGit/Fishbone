@@ -74,3 +74,7 @@ Equality now compares every .NET number type by value, so a `float` or `decimal`
 - Watches with completion and parameter tips.
 - An image preview with zoom, pan and full screen. Checked variables stack over it: one image with regions and contours on top. Images inside lists, dictionaries and image arrays can be checked too.
 - Completion, parameter tips and diagnostics in the editor.
+
+### Fixed
+
+- HALCON handles, like dictionaries, survive a script. Two or more handles collected with `tuple_concat` came back as strings, so the next operator given them failed with "wrong type of control parameter". Each handle in such a list is now a one-element `HTuple`.
