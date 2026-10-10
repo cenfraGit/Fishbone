@@ -21,8 +21,8 @@ A control output is a HALCON tuple, and it comes back as an ordinary script valu
 | Elements | Script value |
 |---|---|
 | none | `null` |
-| one | the value itself: a `long`, a `double` or a `string` |
-| two or more | a list of them |
+| one | the value itself: a `long`, a `double` or a `string`. A handle, like a dictionary, stays an `HTuple` |
+| two or more | a list of them, with each handle a one-element `HTuple` |
 
 So the same line gives a different kind of value depending on the image. With one region, `area_center(regions, out areas, out rows, out cols)` makes `areas` a number, and `foreach (a in areas)` fails, since a number isn't something to loop over. With none, `areas` is `null`.
 
