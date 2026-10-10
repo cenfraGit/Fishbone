@@ -35,6 +35,13 @@ public sealed class HalconProcedurePluginTests : IDisposable
 {
     private readonly string _root = Directory.CreateTempSubdirectory("fishbone-hdvp-").FullName;
 
+    // HALCON keeps loaded procedures by name for the whole process, and the tests reuse names
+    public HalconProcedurePluginTests()
+    {
+        if (new HalconFactAttribute().Skip is null)
+            HalconProcedurePlugin.Reload();
+    }
+
     public void Dispose() => Directory.Delete(_root, recursive: true);
 
     [HalconFact]
@@ -46,20 +53,23 @@ public sealed class HalconProcedurePluginTests : IDisposable
         Assert.Equal("42", Run(folder, "let y = 0; add_one(41, out y);", "y"));
     }
 
+    // registering again is cheap because it reuses what HALCON loaded, so it doesn't see edits
     [HalconFact]
-    public void ReplacedFile_IsReadFreshByANewConfiguration()
+    public void ReplacedFile_IsKeptUntilReload()
     {
         string folder = Folder("a");
         Procedure(folder, "foo", [], ["Result"], "<l>Result := 1</l>");
         Assert.Equal("1", Run(folder, "let r = 0; foo(out r);", "r"));
 
         Procedure(folder, "foo", [], ["Result"], "<l>Result := 2</l>");
+        Assert.Equal("1", Run(folder, "let r = 0; foo(out r);", "r"));
 
+        HalconProcedurePlugin.Reload(folder);
         Assert.Equal("2", Run(folder, "let r = 0; foo(out r);", "r"));
     }
 
     [HalconFact]
-    public void ReplacedHelper_IsReadFreshToo()
+    public void ReplacedHelper_IsReadFreshAfterReload()
     {
         string folder = Folder("a");
         Procedure(folder, "helper", [], ["Result"], "<l>Result := 1</l>");
@@ -67,30 +77,53 @@ public sealed class HalconProcedurePluginTests : IDisposable
         Assert.Equal("11", Run(folder, "let r = 0; uses_helper(out r);", "r"));
 
         Procedure(folder, "helper", [], ["Result"], "<l>Result := 2</l>");
+        HalconProcedurePlugin.Reload(folder);
 
         Assert.Equal("12", Run(folder, "let r = 0; uses_helper(out r);", "r"));
     }
 
     [HalconFact]
-    public void AddedFile_IsFoundByANewConfiguration()
+    public void AddedFile_IsFoundAfterReload()
     {
         string folder = Folder("a");
         Procedure(folder, "foo", [], ["Result"], "<l>Result := 1</l>");
         Run(folder, "let r = 0; foo(out r);", "r");
 
         Procedure(folder, "bar", [], ["Result"], "<l>Result := 3</l>");
+        HalconProcedurePlugin.Reload(folder);
 
         Assert.Equal("3", Run(folder, "let r = 0; bar(out r);", "r"));
     }
 
     [HalconFact]
-    public void TwoFolders_EachConfigurationCallsItsOwn()
+    public void RegisteringAgain_IsFasterThanTheFirstTime()
+    {
+        string folder = Folder("a");
+        for (int i = 0; i < 10; i++)
+            Procedure(folder, $"proc_{i}", ["X"], ["Y"], "<l>Y := X + 1</l>");
+
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        new FishboneConfiguration().AddPlugin(new HalconProcedurePlugin(folder));
+        TimeSpan first = clock.Elapsed;
+        clock.Restart();
+        for (int i = 0; i < 5; i++)
+            new FishboneConfiguration().AddPlugin(new HalconProcedurePlugin(folder));
+        TimeSpan again = clock.Elapsed / 5;
+
+        // the first loads every procedure, the others reuse them
+        Assert.True(again < first, $"first {first.TotalMilliseconds} ms, again {again.TotalMilliseconds} ms");
+    }
+
+    [HalconFact]
+    public void TwoFolders_EachConfigurationCallsItsOwn_WithAReloadBetween()
     {
         string a = Folder("a"), b = Folder("b");
         Procedure(a, "foo", [], ["Result"], "<l>Result := 1</l>");
         Procedure(b, "foo", [], ["Result"], "<l>Result := 9</l>");
 
         var first = new FishboneConfiguration().AddPlugin(new HalconProcedurePlugin(a));
+        // HALCON knows foo by name, so the other folder's foo needs a reload first
+        HalconProcedurePlugin.Reload(b);
         var second = new FishboneConfiguration().AddPlugin(new HalconProcedurePlugin(b));
 
         // the first configuration still calls its own copy after the second one was built
@@ -112,7 +145,8 @@ public sealed class HalconProcedurePluginTests : IDisposable
         Assert.Contains("broken.hdvp", error.Message);
     }
 
-    [HalconFact]
+    // checked before HALCON is used, so it runs without it
+    [Fact]
     public void NameClash_ThrowsBeforeRegisteringAnything()
     {
         string folder = Folder("a");
@@ -120,10 +154,37 @@ public sealed class HalconProcedurePluginTests : IDisposable
         Procedure(folder, "other", [], ["Result"], "<l>Result := 2</l>");
         var config = new FishboneConfiguration().AddBuiltIn("println", (Action<object?>)(_ => { }));
 
-        var error = Assert.ThrowsAny<Exception>(() => config.AddPlugin(new HalconProcedurePlugin(folder)));
+        var error = Assert.Throws<FishboneConfigurationException>(() => config.AddPlugin(new HalconProcedurePlugin(folder)));
 
         Assert.Contains("println", error.Message);
+        Assert.Equal(["println"], error.Names);
         Assert.False(config.BuiltIns.ContainsKey("other"));
+    }
+
+    // checked before HALCON is used, so it runs without it
+    [Fact]
+    public void ProcedureNamedLikeAMathBuiltIn_Throws()
+    {
+        string folder = Folder("a");
+        Procedure(folder, "round", [], ["Result"], "<l>Result := 1</l>");
+        var config = new FishboneConfiguration().AddPlugin(new Fishbone.Plugins.Math.MathPlugin());
+
+        var error = Assert.Throws<FishboneConfigurationException>(() => config.AddPlugin(new HalconProcedurePlugin(folder)));
+
+        Assert.Contains("round", error.Message);
+        Assert.Equal(["round"], error.Names);
+    }
+
+    // checked before HALCON is used, so it runs without it
+    [Fact]
+    public void MissingFolder_Throws()
+    {
+        string missing = Path.Combine(_root, "missing");
+
+        var error = Assert.Throws<FishboneConfigurationException>(() => new FishboneConfiguration().AddPlugin(new HalconProcedurePlugin(missing)));
+
+        Assert.Contains(missing, error.Message);
+        Assert.Empty(error.Names);
     }
 
     [HalconFact]
@@ -165,16 +226,18 @@ public sealed class HalconProcedurePluginTests : IDisposable
         Assert.Equal("101", FishboneProgram.Run("let r = 0; caller(out r);", config).GetValue("r").ToString());
     }
 
-    [HalconFact]
+    // checked before HALCON is used, so it runs without it
+    [Fact]
     public void SameNameInTwoFolders_Throws()
     {
         string a = Folder("a"), b = Folder("b");
         Procedure(a, "foo", [], ["Result"], "<l>Result := 1</l>");
         Procedure(b, "foo", [], ["Result"], "<l>Result := 2</l>");
 
-        var error = Assert.ThrowsAny<Exception>(() => new FishboneConfiguration().AddPlugin(new HalconProcedurePlugin(a, b)));
+        var error = Assert.Throws<FishboneConfigurationException>(() => new FishboneConfiguration().AddPlugin(new HalconProcedurePlugin(a, b)));
 
         Assert.Contains("foo", error.Message);
+        Assert.Equal(["foo"], error.Names);
     }
 
     private string Folder(string name) => Directory.CreateDirectory(Path.Combine(_root, name)).FullName;
