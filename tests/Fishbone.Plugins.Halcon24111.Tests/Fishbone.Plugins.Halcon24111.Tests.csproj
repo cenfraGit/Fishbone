@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -20,6 +20,7 @@
     <ProjectReference Include="..\..\src\Fishbone.Debugging\Fishbone.Debugging.csproj" />
     <ProjectReference Include="..\..\src\Fishbone.Interpreter\Fishbone.Interpreter.csproj" />
     <ProjectReference Include="..\..\plugins\Fishbone.Plugins.Halcon24111\Fishbone.Plugins.Halcon24111.csproj" />
+    <ProjectReference Include="..\..\plugins\Fishbone.Plugins.Math\Fishbone.Plugins.Math.csproj" />
   </ItemGroup>
 
   <!-- the same threshold procedure saved plain and password-protected (password "miguel") in HDevelop -->

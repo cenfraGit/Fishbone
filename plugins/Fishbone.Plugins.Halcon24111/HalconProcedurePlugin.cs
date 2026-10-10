@@ -12,9 +12,12 @@ namespace Fishbone.Plugins.Halcon24111;
 /// hdevelop (same iconic/control input/output order), the only difference being 
 /// that output params in fishbone need the "out" keyword.
 ///
-/// Each registration reads the directories fresh, so a new configuration sees procedures that were
-/// added or changed since the last one. HALCON's procedure path is process-wide: registering sets
-/// it to these directories. Procedures loaded by earlier configurations keep working.
+/// Registering adds the directories to HALCON's procedure path, which is process-wide, and loads
+/// the procedures in them. A procedure HALCON already loaded is reused, so registering again is
+/// cheap, but it doesn't pick up files added or edited on disk since. When the files changed,
+/// call <see cref="Reload"/> and then build a new configuration. HALCON knows procedures by name
+/// across the whole process, so two folders with a procedure of the same name also need a
+/// <see cref="Reload"/> to switch between them.
 /// </summary>
 public sealed class HalconProcedurePlugin : IFishbonePlugin
 {
@@ -30,6 +33,23 @@ public sealed class HalconProcedurePlugin : IFishbonePlugin
     private static readonly object EngineLock = new();
 
     private HDevEngine? _engine;
+
+    /// <summary>
+    /// Makes HALCON pick up procedures that were added or edited on disk since they were loaded.
+    /// Sets the procedure path to exactly these directories, which finds new files, and unloads
+    /// every loaded procedure, so the next load reads the edited files. Call it when the files
+    /// changed, then build a new configuration. Configurations built before keep working.
+    /// </summary>
+    public static void Reload(params string[] proceduresDirectories)
+    {
+        lock (EngineLock)
+        {
+            // the path and the loaded procedures belong to the process, not to an engine
+            var engine = new HDevEngine();
+            engine.SetProcedurePath(string.Join(Path.PathSeparator, proceduresDirectories.Where(directory => !string.IsNullOrWhiteSpace(directory))));
+            engine.UnloadAllProcedures();
+        }
+    }
 
     /// <summary>
     /// Used by plugin loader (which cannot pass args).
@@ -59,7 +79,7 @@ public sealed class HalconProcedurePlugin : IFishbonePlugin
 
         foreach (var directory in _proceduresDirectories)
             if (!Directory.Exists(directory))
-                throw new Exception($"Procedures directory '{directory}' does not exist; no procedures registered.");
+                throw new FishboneConfigurationException($"Procedures directory '{directory}' does not exist; no procedures registered.");
 
         var procedures = _proceduresDirectories
             .SelectMany(directory => Directory.EnumerateFiles(directory, "*.hdvp"))
@@ -68,7 +88,7 @@ public sealed class HalconProcedurePlugin : IFishbonePlugin
             .ToList();
 
         // a clash is a setup mistake, so it fails before anything is registered. renaming the
-        // procedure and building a new configuration picks up the change. the same name in two
+        // procedure, calling Reload and building a new configuration picks up the change. the same name in two
         // directories clashes too, since halcon would just take the first one on the path
         var clashes = procedures
             .GroupBy(procedure => procedure.Name)
@@ -76,16 +96,17 @@ public sealed class HalconProcedurePlugin : IFishbonePlugin
             .Select(group => group.Key)
             .ToList();
         if (clashes.Count > 0)
-            throw new Exception($"Procedures in '{string.Join("', '", _proceduresDirectories)}' have names that are already taken: {string.Join(", ", clashes)}. Rename them.");
+            throw new FishboneConfigurationException(
+                $"Procedures in '{string.Join("', '", _proceduresDirectories)}' have names that are already taken: {string.Join(", ", clashes)}. Rename them.",
+                clashes);
 
         lock (EngineLock)
         {
             _engine ??= new HDevEngine();
-            // setting the path rescans the folders. everything is unloaded before anything loads,
-            // so a procedure doesn't pick up a stale copy of a helper it calls
-            _engine.SetProcedurePath(string.Join(Path.PathSeparator, _proceduresDirectories));
-            foreach (var procedure in procedures)
-                _engine.UnloadProcedure(procedure.Name);
+            // adding a directory that's already on the path does nothing, and a procedure that's
+            // loaded stays as it is. Reload is what reads changed files
+            foreach (var directory in _proceduresDirectories)
+                _engine.AddProcedurePath(directory);
 
             foreach (var (name, path) in procedures)
             {
