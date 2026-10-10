@@ -3,6 +3,8 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
+    <!-- one build for every runtime: .NET 8 when it is there, otherwise the newest installed -->
+    <RollForward>Major</RollForward>
     <AssemblyName>spineide</AssemblyName>
     <RootNamespace>SpineIDE.Win32</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
