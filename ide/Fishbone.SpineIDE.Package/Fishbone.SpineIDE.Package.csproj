@@ -25,7 +25,7 @@
          together: the debug adapter and the plugins use the engine's internals, and their
          dependency on Fishbone is only a minimum, so mixing versions could fail at load time -->
     <SpineIdeVersionPrefix>0.1.0</SpineIdeVersionPrefix>
-    <SpineIdeVersionSuffix>alpha.1</SpineIdeVersionSuffix>
+    <SpineIdeVersionSuffix>alpha.2</SpineIdeVersionSuffix>
     <Version Condition="'$(SpineIdeVersionSuffix)' != ''">$(SpineIdeVersionPrefix)-$(SpineIdeVersionSuffix)</Version>
     <Version Condition="'$(SpineIdeVersionSuffix)' == ''">$(SpineIdeVersionPrefix)</Version>
 

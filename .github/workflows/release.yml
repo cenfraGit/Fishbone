@@ -1,0 +1,60 @@
+name: Release
+
+# push a tag like v0.1.0-alpha.2 to publish every package to nuget.org
+on:
+  push:
+    tags: [ 'v*' ]
+
+jobs:
+  publish:
+    # windows, since check.sh only packs SpineIDE there
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      # the version lives in Directory.Build.props, the tag only has to agree with it
+      - name: Check the tag matches the version
+        shell: bash
+        run: |
+          version="$(dotnet msbuild src/Fishbone/Fishbone.csproj -getProperty:Version)"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "tag $GITHUB_REF_NAME doesn't match Directory.Build.props ($version)" >&2
+            exit 1
+          fi
+
+      - name: Test
+        run: dotnet test Fishbone.slnx --configuration Release --verbosity minimal --blame-hang-timeout 2m
+
+      # packs everything into artifacts/ and uses it from a fresh host. a plugin that ships
+      # its own copy of an engine dll is only a warning in pack.sh, here it stops the release
+      - name: Pack and check
+        shell: bash
+        run: |
+          bash tests/packaging/check.sh | tee pack.log
+          if grep -q "WARNING" pack.log; then exit 1; fi
+
+      # SpineIDE has its own version. when it didn't change, nuget.org already has it and
+      # --skip-duplicate leaves it alone
+      - name: Push to nuget.org
+        shell: bash
+        run: dotnet nuget push "artifacts/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pre=""
+          case "$GITHUB_REF_NAME" in *-*) pre="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" artifacts/*.nupkg --title "$GITHUB_REF_NAME" --notes "See [CHANGELOG.md](https://github.com/cenfraGit/Fishbone/blob/main/CHANGELOG.md)." $pre
