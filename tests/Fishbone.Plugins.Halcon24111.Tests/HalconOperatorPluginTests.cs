@@ -47,4 +47,41 @@ public class HalconOperatorPluginTests
         Assert.Null(env.GetValue("empty"));
         Assert.Equal(1.5, env.GetValue("half"));
     }
+
+    // the pattern the plugin's README shows: one result is a plain value, so a loop goes by the
+    // count and picks each one with tuple_select, which works for none, one or several
+    [HalconFact]
+    public void OneResultIsAValue_SoALoopGoesByTheCount()
+    {
+        HOperatorSet.GenCircle(out HObject one, 20, 20, 5);
+        HOperatorSet.AreaCenter(one, out HTuple circleArea, out _, out _);
+        var config = new FishboneConfiguration().AddPlugin(new HalconOperatorPlugin());
+
+        foreach (int circles in new[] { 0, 1, 3 })
+        {
+            var env = FishboneProgram.Run($$"""
+                gen_empty_obj(out regions);
+                for (i in 0, {{circles}}) {
+                    gen_circle(out circle, 20 + i * 30, 20, 5);
+                    concat_obj(regions, circle, out regions);
+                }
+                area_center(regions, out areas, out rows, out cols);
+                count_obj(regions, out n);
+                let total = 0;
+                for (i in 0, n) {
+                    tuple_select(areas, i, out area);
+                    total += area;
+                }
+                """, config);
+
+            object? areas = env.GetValue("areas");
+            switch (circles)
+            {
+                case 0: Assert.Null(areas); break;
+                case 1: Assert.IsType<long>(areas); break;
+                default: Assert.Equal(circles, Assert.IsType<List<object>>(areas).Count); break;
+            }
+            Assert.Equal(circles * circleArea.L, Convert.ToInt64(env.GetValue("total")));
+        }
+    }
 }

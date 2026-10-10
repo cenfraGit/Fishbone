@@ -33,7 +33,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <!-- its own readme, with what's particular to HALCON, like how tuples come back -->
+    <None Include="README.md" Pack="true" PackagePath="\" />
     <None Include="..\..\misc\fb_icon.png" Pack="true" PackagePath="\" />
   </ItemGroup>
 
