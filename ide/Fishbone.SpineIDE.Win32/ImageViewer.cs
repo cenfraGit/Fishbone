@@ -178,7 +178,10 @@ internal static partial class Program
     {
         int version = ++_previewVersion;
         _previewImages.Clear();
-        List<VariableNode> nodes = _previewNames.Select(find).OfType<VariableNode>().ToList();
+        var nodes = new List<VariableNode>();
+        foreach (string name in _previewNames.ToList())
+            if ((find(name) ?? await FindByPath(name)) is { } node)
+                nodes.Add(node);
         var images = new Dictionary<string, FishboneDebugImage>();
         foreach (VariableNode node in nodes)
         {
@@ -201,6 +204,36 @@ internal static partial class Program
                     _previewImages[name] = image;
             UpdatePreview();
         });
+    }
+
+    // a checked image inside a list, a dictionary or an image that holds several, like
+    // images["left"], worked out again from its path. null when it's gone
+    private static async Task<VariableNode?> FindByPath(string path)
+    {
+        if (!path.Contains('['))
+            return null;
+        try
+        {
+            if (_pausedSession is { State: FishboneDebugSessionState.Paused } session)
+            {
+                FishboneDebugVariable variable = await session.EvaluateAsync(path);
+                return variable.ImageHandle is null ? null : new VariableNode { Name = path, IsImage = true, Debug = variable };
+            }
+            if (_finalEnvironment is { } environment && _finalConfiguration is { } configuration)
+            {
+                object? value = await Task.Run(() =>
+                {
+                    using var timeout = new CancellationTokenSource(WatchTimeout);
+                    return FishboneExpression.Evaluate(path, environment, configuration, timeout.Token);
+                });
+                return configuration.CanVisualize(value) ? new VariableNode { Name = path, IsImage = true, Value = value } : null;
+            }
+        }
+        catch
+        {
+            // gone, or not a path that can be worked out
+        }
+        return null;
     }
 
     // the checked ones in the order they were checked, with the image moved under the shapes.

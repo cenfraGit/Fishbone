@@ -3,6 +3,7 @@ using Fishbone.DebugClient;
 using Fishbone.Debugging;
 using System.Collections;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 
 namespace SpineIDE.Win32;
 
@@ -19,7 +20,7 @@ internal static partial class Program
 
     // what a tree item stands for. a pause hands out debug variables, whose children come from the
     // debug host. a finished run hands out the real values, whose children are read directly. a
-    // watch is named after its expression
+    // watch is named after its expression, and a child by its path, like images["left"]
     private sealed class VariableNode
     {
         public required string Name { get; init; }
@@ -28,6 +29,9 @@ internal static partial class Program
         public FishboneDebugVariable? Debug { get; init; }
         public object? Value { get; init; }
         public bool Loaded { get; set; }
+        // a final value's images, when it holds several. read the first time they're asked for
+        public IReadOnlyList<(string Name, object? Value)>? Images { get; set; }
+        public bool ImagesRead { get; set; }
     }
 
     private static readonly Dictionary<IntPtr, VariableNode> _nodes = [];
@@ -46,9 +50,23 @@ internal static partial class Program
     // bumped whenever the tree is refilled, so children that finish loading late are dropped
     private static int _treeVersion;
 
+    // the images that final values were split into, made here, so they go with the tree
+    private static readonly List<IDisposable> _madeImages = [];
+
     private static void ClearVariables()
     {
         SendMessageW(_variables, TVM_DELETEITEM, 0, TVI_ROOT);
+        foreach (IDisposable image in _madeImages)
+        {
+            try
+            {
+                image.Dispose();
+            }
+            catch
+            {
+            }
+        }
+        _madeImages.Clear();
         _nodes.Clear();
         _checkItems.Clear();
         _checkNodes.Clear();
@@ -108,22 +126,50 @@ internal static partial class Program
             : WatchToFollow(name)));
     }
 
-    // checkable: one of the script's own variables, which the preview finds by name. the ones
-    // inside lists and objects have no checkbox
-    private static void InsertDebugVariable(IntPtr parent, FishboneDebugVariable variable, bool checkable = false)
+    // checkable: an image the preview can show, found by its name, or by its path for one inside a
+    // list, a dictionary or an image that holds several. the item shows only the last part
+    private static void InsertDebugVariable(IntPtr parent, FishboneDebugVariable variable, bool checkable = false, string? path = null)
     {
         bool isImage = variable.ImageHandle is not null;
         InsertVariableItem(parent, ItemText(variable.Name, variable.Value, variable.Type, isImage),
-            hasChildren: variable.ChildrenHandle is not null, new VariableNode { Name = variable.Name, IsImage = isImage, Debug = variable }, checkable);
+            hasChildren: variable.ChildrenHandle is not null, new VariableNode { Name = path ?? variable.Name, IsImage = isImage, Debug = variable }, checkable);
     }
 
-    private static void InsertLocalValue(IntPtr parent, string name, object? value, bool checkable = false)
+    private static void InsertLocalValue(IntPtr parent, string name, object? value, bool checkable = false, string? path = null)
     {
         bool isImage = _finalConfiguration?.CanVisualize(value) == true;
+        var node = new VariableNode { Name = path ?? name, IsImage = isImage, Value = value };
         InsertVariableItem(parent, ItemText(name, DebugValueFormatter.FormatValue(value), DebugValueFormatter.FormatType(value), isImage),
-            hasChildren: value is IDictionary or (IEnumerable and not string),
-            new VariableNode { Name = name, IsImage = isImage, Value = value }, checkable);
+            hasChildren: value is IDictionary or (IEnumerable and not string) || LocalImages(node) is not null, node, checkable);
     }
+
+    // the images a final value holds, when it holds several, from the run's visualizers
+    private static IReadOnlyList<(string Name, object? Value)>? LocalImages(VariableNode node)
+    {
+        if (node.ImagesRead || !node.IsImage || node.Debug is not null)
+            return node.Images;
+        node.ImagesRead = true;
+        try
+        {
+            if (_finalConfiguration?.ImageChildren(node.Value) is { } images)
+            {
+                _madeImages.AddRange(images.Select(image => image.Value).OfType<IDisposable>());
+                node.Images = images.Count > 0 ? images : null;
+            }
+        }
+        catch
+        {
+            // a visualizer that fails just leaves it one image
+        }
+        return node.Images;
+    }
+
+    // where a child is found again, like images["left"] or stack[2]. a watch that isn't a plain
+    // path goes in parentheses
+    private static string ChildPath(string parent, string child) => (PlainPath().IsMatch(parent) ? parent : $"({parent})") + child;
+
+    [GeneratedRegex(@"^[A-Za-z_]\w*(\.[A-Za-z_]\w*|\[(""([^""\\]|\\.)*""|-?\d+)\])*$")]
+    private static partial Regex PlainPath();
 
     // an image the preview can show gets a checkbox, checked when the preview has it
     private static void InsertVariableItem(IntPtr parent, string text, bool hasChildren, VariableNode node, bool checkable)
@@ -260,19 +306,28 @@ internal static partial class Program
         node.Loaded = true;
         IntPtr item = notification.itemNew.hItem;
         if (node.Debug?.ChildrenHandle is { } handle && _pausedSession is { } session)
-            LoadDebugChildren(item, session, handle);
+            LoadDebugChildren(item, session, handle, node.Name);
+        else if (LocalImages(node) is { } images)
+            foreach (var (name, value) in images)
+                InsertLocalValue(item, name, value, checkable: true, ChildPath(node.Name, name));
         else if (node.Value is IDictionary dictionary)
             foreach (DictionaryEntry entry in dictionary)
-                InsertLocalValue(item, $"[{DebugValueFormatter.FormatDictionaryKey(entry.Key)}]", entry.Value);
+            {
+                string name = $"[{DebugValueFormatter.FormatDictionaryKey(entry.Key)}]";
+                InsertLocalValue(item, name, entry.Value, checkable: true, ChildPath(node.Name, name));
+            }
         else if (node.Value is IEnumerable values)
         {
             int index = 0;
             foreach (object? value in values)
-                InsertLocalValue(item, $"[{index++}]", value);
+            {
+                string name = $"[{index++}]";
+                InsertLocalValue(item, name, value, checkable: true, ChildPath(node.Name, name));
+            }
         }
     }
 
-    private static async void LoadDebugChildren(IntPtr item, IFishboneDebugClientSession session, FishboneVariableHandle handle)
+    private static async void LoadDebugChildren(IntPtr item, IFishboneDebugClientSession session, FishboneVariableHandle handle, string parent)
     {
         int version = _treeVersion;
         try
@@ -283,7 +338,7 @@ internal static partial class Program
                 if (version != _treeVersion)
                     return;
                 foreach (FishboneDebugVariable child in children)
-                    InsertDebugVariable(item, child);
+                    InsertDebugVariable(item, child, checkable: true, ChildPath(parent, child.Name));
                 SendMessageW(_variables, TVM_EXPAND, (nint)TVE_EXPAND, item);
             });
         }

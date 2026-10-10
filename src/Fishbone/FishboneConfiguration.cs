@@ -61,14 +61,28 @@ public class FishboneConfiguration
     /// images. <paramref name="toImage"/> runs in the host while the script is paused, and returns
     /// null when there's nothing to show. <paramref name="canShow"/> is a cheap check for whether a
     /// value is an image at all; without it, every <typeparamref name="T"/> counts as one.
+    /// <paramref name="children"/> splits a value that holds several images into one named value
+    /// per image, which the debugger shows under it. It returns null when the value is a single
+    /// image. The debugger disposes the children it got once the pause ends.
     /// </summary>
-    public FishboneConfiguration AddVisualizer<T>(Func<T, FishboneImage?> toImage, Func<T, bool>? canShow = null)
+    public FishboneConfiguration AddVisualizer<T>(Func<T, FishboneImage?> toImage, Func<T, bool>? canShow = null,
+        Func<T, IReadOnlyList<(string Name, object? Value)>?>? children = null)
     {
         Visualizers[typeof(T)] = new FishboneVisualizer(
             value => toImage((T)value),
-            canShow is null ? null : value => canShow((T)value));
+            canShow is null ? null : value => canShow((T)value))
+        {
+            Children = children is null ? null : value => children((T)value)
+        };
         return this;
     }
+
+    /// <summary>
+    /// The images an image value holds, one named value each, or null when it's a single image.
+    /// They're new values, so the caller disposes the ones that are <see cref="IDisposable"/>.
+    /// </summary>
+    public IReadOnlyList<(string Name, object? Value)>? ImageChildren(object? value) =>
+        CanVisualize(value) && FindVisualizer(value!)!.Children is { } children ? children(value!) : null;
 
     /// <summary>Whether the debugger can show this value as an image.</summary>
     public bool CanVisualize(object? value) =>

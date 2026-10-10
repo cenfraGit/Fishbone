@@ -163,9 +163,86 @@ public class DebugSnapshotHandlesTests
         Assert.Contains("no pixels", exception.Message);
     }
 
+    // a stack holds several frames, and each frame is an image of its own
+    private static FishboneConfiguration StackConfig() => new FishboneConfiguration()
+        .AddVisualizer<Frame>(frame => new FishboneImage(1, 1, 1, [frame.Level]))
+        .AddVisualizer<Stack>(stack => new FishboneImage(1, 1, 1, [stack.Levels[0]]),
+            children: stack => stack.Levels.Length < 2 ? null : stack.Levels.Select((level, index) => ($"[{index + 1}]", (object?)new Frame(level))).ToArray());
+
+    [Fact]
+    public void ImageHoldingSeveral_HasOneImageChildPerImage()
+    {
+        var (handles, variable) = ShowVariable(StackConfig(), new Stack([10, 20, 30]));
+
+        Assert.Equal(DebugSnapshotHandles.ImageKind, variable.PresentationHint?.Kind);
+        Assert.Equal(3, variable.IndexedVariables);
+        // the same reference gives the first image, and the children
+        Assert.Equal([10], handles.GetImage(variable.VariablesReference).Pixels);
+        var children = handles.GetVariables(variable.VariablesReference);
+        Assert.Equal(["[1]", "[2]", "[3]"], children.Select(child => child.Name));
+        Assert.All(children, child => Assert.Equal(DebugSnapshotHandles.ImageKind, child.PresentationHint?.Kind));
+        Assert.Equal([20], handles.GetImage(children[1].VariablesReference).Pixels);
+    }
+
+    [Fact]
+    public void ImageHoldingOne_HasNoChildren()
+    {
+        var (handles, variable) = ShowVariable(StackConfig(), new Stack([10]));
+
+        Assert.Null(variable.IndexedVariables);
+        Assert.Empty(handles.GetVariables(variable.VariablesReference));
+    }
+
+    [Fact]
+    public void ImageChildren_AreDisposedWhenThePauseEnds()
+    {
+        var (handles, variable) = ShowVariable(StackConfig(), new Stack([10, 20]));
+        var frames = Frame.Made.TakeLast(2).ToArray();
+        // asked once, however often the children are listed
+        handles.GetVariables(variable.VariablesReference);
+        handles.GetVariables(variable.VariablesReference);
+        Assert.All(frames, frame => Assert.False(frame.Disposed));
+
+        handles.Clear();
+
+        Assert.All(frames, frame => Assert.True(frame.Disposed));
+    }
+
+    [Fact]
+    public void ImageChildrenThatFail_LeaveASingleImage()
+    {
+        var config = new FishboneConfiguration().AddVisualizer<Picture>(picture => new FishboneImage(1, 1, 1, [picture.Level]),
+            children: _ => throw new InvalidOperationException("no frames"));
+        var (handles, variable) = ShowVariable(config, new Picture(7));
+
+        Assert.Null(variable.IndexedVariables);
+        Assert.Equal([7], handles.GetImage(variable.VariablesReference).Pixels);
+    }
+
     private sealed class Picture(byte level)
     {
         public byte Level { get; } = level;
+    }
+
+    private sealed class Stack(byte[] levels)
+    {
+        public byte[] Levels { get; } = levels;
+    }
+
+    private sealed class Frame : IDisposable
+    {
+        public static readonly List<Frame> Made = [];
+
+        public Frame(byte level)
+        {
+            Level = level;
+            lock (Made)
+                Made.Add(this);
+        }
+
+        public byte Level { get; }
+        public bool Disposed { get; private set; }
+        public void Dispose() => Disposed = true;
     }
 
     private static DebugPauseSnapshot Snapshot(DebugVariableSnapshot variable) => new(

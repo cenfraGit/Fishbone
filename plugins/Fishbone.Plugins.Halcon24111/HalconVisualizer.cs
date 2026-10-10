@@ -11,7 +11,7 @@ namespace Fishbone.Plugins.Halcon24111;
 public static class HalconVisualizer
 {
     public static void Register(FishboneConfiguration config) =>
-        config.AddVisualizer<HObject>(ToImage, CanShow);
+        config.AddVisualizer<HObject>(ToImage, CanShow, Images);
 
     // xld_poly is what gen_polygons_xld makes. the other xld kinds, like parallels, are left out
     private static readonly string[] Classes = ["image", "region", "xld_cont", "xld_poly"];
@@ -36,6 +36,27 @@ public static class HalconVisualizer
         HOperatorSet.GetObjClass(value, out HTuple objectClass);
         string[] classes = objectClass.SArr;
         return classes[0] == "image" ? FirstImage(value) : Shapes(value, classes);
+    }
+
+    /// <summary>
+    /// One child per image when the object holds several, named [1] to [n] like select_obj counts.
+    /// Regions and contours already show all together, so they have none.
+    /// </summary>
+    public static IReadOnlyList<(string Name, object? Value)>? Images(HObject value)
+    {
+        HOperatorSet.CountObj(value, out HTuple count);
+        if (count.I < 2)
+            return null;
+        HOperatorSet.GetObjClass(value, out HTuple objectClass);
+        if (!objectClass.SArr.All(name => name == "image"))
+            return null;
+        var images = new List<(string, object?)>(count.I);
+        for (int i = 1; i <= count.I; i++)
+        {
+            HOperatorSet.SelectObj(value, out HObject single, i);
+            images.Add(($"[{i}]", single));
+        }
+        return images;
     }
 
     private static FishboneImage? FirstImage(HObject value)

@@ -86,6 +86,26 @@ public class VisualizerConfigurationTests
         Assert.True(config.Clone().CanVisualize(new Picture(1)));
     }
 
+    [Fact]
+    public void ImageChildren_ComeFromTheVisualizer()
+    {
+        var config = new FishboneConfiguration()
+            .AddVisualizer<Picture>(picture => Gray(picture.Level), children: picture => [("[1]", new Picture(1)), ("[2]", new Picture(2))]);
+
+        var children = config.Clone().ImageChildren(new Picture(9))!;
+
+        Assert.Equal(["[1]", "[2]"], children.Select(child => child.Name));
+    }
+
+    [Fact]
+    public void ImageChildren_AreNullWithoutAWayToSplit()
+    {
+        var config = new FishboneConfiguration().AddVisualizer<Picture>(picture => Gray(picture.Level));
+
+        Assert.Null(config.ImageChildren(new Picture(9)));
+        Assert.Null(config.ImageChildren("not an image"));
+    }
+
     public class Picture(byte level)
     {
         public byte Level { get; } = level;
