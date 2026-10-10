@@ -45,11 +45,13 @@ Fishbone is **not** trying to be Python or Lua for .NET, and it is not an indepe
 
 ## Syntax stability
 
-Fishbone is still in alpha and far from 1.0, but the syntax already follows these rules, so scripts you write keep working:
+Fishbone is still in alpha and far from 1.0, but from 0.1.0-alpha.2 on the syntax follows these rules, so scripts you write keep working:
 
 - Syntax is only **added**. Existing syntax is never removed.
 - Existing syntax doesn't change meaning.
 - New syntax never makes a valid script fail to parse or behave differently.
+
+alpha.2 itself changed some things scripts relied on in alpha.1. [CHANGELOG.md](https://github.com/cenfraGit/Fishbone/blob/main/CHANGELOG.md) lists them.
 
 ## How to use?
 
