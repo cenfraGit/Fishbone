@@ -118,7 +118,7 @@ for package in "$OUTPUT"/*.nupkg; do
     # would take the whole script down under pipefail
     if [ -d "$extracted/lib" ]; then
         find "$extracted/lib" -name "*.dll" | sort | while read -r dll; do
-            echo "    lib  $(basename "$dll")"
+            echo "    lib  ${dll#"$extracted/lib/"}"
         done
     fi
 
