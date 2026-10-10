@@ -13,6 +13,9 @@
 # only in your shell history is one you cannot reproduce. to release a new version,
 # edit the file and run this again.
 #
+# publishing is done by .github/workflows/release.yml: after the version bump is on main,
+# push a matching tag (git tag v0.1.0-alpha.2 && git push origin v0.1.0-alpha.2).
+#
 set -euo pipefail
 
 # resolve to the script's own directory, so it works from anywhere
