@@ -21,8 +21,9 @@
 
     <!-- versioned independently of the engine. this package declares no dependencies,
          so nothing pins it to a Fishbone version and it can move on its own cadence.
-         the other packages cannot: Fishbone.DebugAdapter pins Fishbone by exact version,
-         so those five have to be published together -->
+         the other five share one version from Directory.Build.props and are published
+         together: the debug adapter and the plugins use the engine's internals, and their
+         dependency on Fishbone is only a minimum, so mixing versions could fail at load time -->
     <SpineIdeVersionPrefix>0.1.0</SpineIdeVersionPrefix>
     <SpineIdeVersionSuffix>alpha.1</SpineIdeVersionSuffix>
     <Version Condition="'$(SpineIdeVersionSuffix)' != ''">$(SpineIdeVersionPrefix)-$(SpineIdeVersionSuffix)</Version>
