@@ -455,9 +455,11 @@ public sealed class FishboneDebugClientSession : IFishboneDebugClientSession
     {
         var handle = variable.VariablesReference == 0 ? null : new FishboneVariableHandle(generation, variable.VariablesReference);
         bool isImage = handle is not null && variable.PresentationHint?.Kind?.ToString() == ImageKind;
+        // an image that holds several has children too, under the same reference
+        bool hasChildren = !isImage || variable.IndexedVariables > 0 || variable.NamedVariables > 0;
         return new FishboneDebugVariable(
             variable.Name, variable.Value, variable.Type,
-            isImage ? null : handle,
+            hasChildren ? handle : null,
             variable.NamedVariables, variable.IndexedVariables,
             isImage ? handle : null);
     }

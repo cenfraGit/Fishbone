@@ -22,6 +22,58 @@ public class HalconVisualizerTests
     }
 
     [HalconFact]
+    public void SeveralImages_AreOneChildEach()
+    {
+        HOperatorSet.GenImageConst(out HObject first, "byte", 4, 3);
+        HOperatorSet.GenImageConst(out HObject second, "byte", 5, 3);
+        HOperatorSet.GenImageConst(out HObject third, "byte", 6, 3);
+        HOperatorSet.ConcatObj(first, second, out HObject two);
+        HOperatorSet.ConcatObj(two, third, out HObject three);
+
+        var children = HalconVisualizer.Images(three)!;
+
+        Assert.Equal(["[1]", "[2]", "[3]"], children.Select(child => child.Name));
+        Assert.All(children, child => Assert.True(HalconVisualizer.CanShow((HObject)child.Value!)));
+        Assert.Equal(5, HalconVisualizer.ToImage((HObject)children[1].Value!)!.Width);
+        Assert.Equal(6, HalconVisualizer.ToImage((HObject)children[2].Value!)!.Width);
+    }
+
+    [HalconFact]
+    public void OneImage_HasNoChildren()
+    {
+        HOperatorSet.GenImageConst(out HObject image, "byte", 4, 3);
+
+        Assert.Null(HalconVisualizer.Images(image));
+    }
+
+    [HalconFact]
+    public void SeveralRegions_HaveNoChildren()
+    {
+        HOperatorSet.GenCircle(out HObject first, 10, 10, 3);
+        HOperatorSet.GenCircle(out HObject second, 30, 40, 5);
+        HOperatorSet.ConcatObj(first, second, out HObject both);
+
+        Assert.Null(HalconVisualizer.Images(both));
+    }
+
+    // a checked image in an array is found again after a step through its path, like images[2]
+    [HalconFact]
+    public void ImageInAnArray_IsReachedByIndexFromOne()
+    {
+        HOperatorSet.GenImageConst(out HObject first, "byte", 4, 3);
+        HOperatorSet.GenImageConst(out HObject second, "byte", 5, 3);
+        HOperatorSet.ConcatObj(first, second, out HObject both);
+        var config = new FishboneConfiguration();
+        new HalconOperatorPlugin().Register(config);
+        var environment = new FishboneEnvironment();
+        environment.Declare("images", both);
+
+        var picked = FishboneExpression.Evaluate("images[2]", environment, config);
+
+        Assert.Equal(5, HalconVisualizer.ToImage((HObject)picked!)!.Width);
+    }
+
+    [HalconFact]
     public void Rectangle_IsOneRunPerRow()
     {
         // rows 2 to 4, columns 5 to 7, both ends included

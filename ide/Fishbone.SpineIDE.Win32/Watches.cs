@@ -169,7 +169,7 @@ internal static partial class Program
                     hasChildren: variable.ChildrenHandle is not null, node, checkable: true);
             else
                 InsertVariableItem(_watchRoot, ItemText(watch, DebugValueFormatter.FormatValue(node.Value), DebugValueFormatter.FormatType(node.Value), node.IsImage),
-                    hasChildren: node.Value is IDictionary or (IEnumerable and not string), node, checkable: true);
+                    hasChildren: node.Value is IDictionary or (IEnumerable and not string) || LocalImages(node) is not null, node, checkable: true);
         }
         SendMessageW(_variables, TVM_EXPAND, (nint)TVE_EXPAND, _watchRoot);
     }

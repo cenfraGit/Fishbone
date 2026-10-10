@@ -49,6 +49,10 @@ public sealed class DebugSnapshotHandles
     private readonly Dictionary<long, DebugCallFrameSnapshot> _frames = [];
     private readonly Dictionary<long, object> _variables = [];
     private readonly Dictionary<object, long> _objectHandles = new(ReferenceEqualityComparer.Instance);
+    // the images an image value holds, by its handle, null when it's a single one. made for this
+    // pause, so they're disposed when it ends
+    private readonly Dictionary<long, IReadOnlyList<DebugVariableSnapshot>?> _imageChildren = [];
+    private readonly List<IDisposable> _owned = [];
     private DebugPauseSnapshot? _snapshot;
     private long _nextHandle = 1;
     private long _nextFrame = 1000;
@@ -108,6 +112,7 @@ public sealed class DebugSnapshotHandles
             IEnumerable<DebugVariableSnapshot> children = target switch
             {
                 IReadOnlyList<DebugVariableSnapshot> values => values,
+                _ when _imageChildren.GetValueOrDefault(reference) is { } images => images,
                 IList list => list.Cast<object?>().Select((value, index) => new DebugVariableSnapshot($"[{index}]", value)),
                 IDictionary dictionary => EnumerateDictionary(dictionary),
                 _ => []
@@ -181,6 +186,7 @@ public sealed class DebugSnapshotHandles
     {
         bool isImage = IsImage(variable.Value);
         long reference = variable.Value is IList or IDictionary || isImage ? AddHandle(variable.Value!) : 0;
+        IReadOnlyList<DebugVariableSnapshot>? images = isImage ? ImageChildren(reference, variable.Value!) : null;
         return new Variable
         {
             Name = variable.Name,
@@ -188,7 +194,7 @@ public sealed class DebugSnapshotHandles
             Type = DebugValueFormatter.FormatType(variable.Value),
             VariablesReference = reference,
             PresentationHint = isImage ? new VariablePresentationHint { Kind = ImageKind } : null,
-            IndexedVariables = variable.Value is IList list ? list.Count : null,
+            IndexedVariables = variable.Value is IList list ? list.Count : images?.Count,
             NamedVariables = variable.Value is IDictionary dictionary ? dictionary.Count : null
         };
     }
@@ -204,6 +210,28 @@ public sealed class DebugSnapshotHandles
         {
             return false;
         }
+    }
+
+    // asked once per value and pause. a visualizer that fails just shows the value as one image
+    private IReadOnlyList<DebugVariableSnapshot>? ImageChildren(long reference, object value)
+    {
+        if (_imageChildren.TryGetValue(reference, out var known))
+            return known;
+        IReadOnlyList<DebugVariableSnapshot>? images = null;
+        try
+        {
+            if (_configuration!.ImageChildren(value) is { } children)
+            {
+                _owned.AddRange(children.Select(child => child.Value).OfType<IDisposable>());
+                if (children.Count > 0)
+                    images = children.Select(child => new DebugVariableSnapshot(child.Name, child.Value)).ToArray();
+            }
+        }
+        catch
+        {
+        }
+        _imageChildren[reference] = images;
+        return images;
     }
 
     private long AddHandle(object value)
@@ -228,6 +256,19 @@ public sealed class DebugSnapshotHandles
         _frames.Clear();
         _variables.Clear();
         _objectHandles.Clear();
+        _imageChildren.Clear();
+        foreach (IDisposable owned in _owned)
+        {
+            try
+            {
+                owned.Dispose();
+            }
+            catch
+            {
+                // plugin code. one that fails to let go doesn't stop the others
+            }
+        }
+        _owned.Clear();
         _nextHandle = 1;
         _nextFrame = 1000;
     }

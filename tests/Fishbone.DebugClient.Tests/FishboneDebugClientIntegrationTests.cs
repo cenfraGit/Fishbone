@@ -251,6 +251,47 @@ x = 2;
         Assert.Equal(0, result.ExitCode);
     }
 
+    [Fact]
+    public async Task ImageHoldingSeveral_IsAnImageWithImageChildren()
+    {
+        var configuration = new FishboneConfiguration()
+            .AddValue("stack", new Picture[] { new(10), new(20) })
+            .AddVisualizer<Picture>(picture => new FishboneImage(1, 1, 1, [picture.Level]))
+            .AddVisualizer<Picture[]>(pictures => new FishboneImage(1, 1, 1, [pictures[0].Level]),
+                children: pictures => pictures.Select((picture, index) => ($"[{index + 1}]", (object?)picture)).ToArray());
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await using FishboneDebugServerSession server = await FishboneDebugServer.StartAsync(new FishboneDebugServerOptions
+        {
+            SourceCode = "let x = 1;\nx = 2;",
+            SourceName = "stack.fb",
+            SourceIdentity = "fishbone://tests/stack.fb",
+            ListenEndpoint = new IPEndPoint(IPAddress.Loopback, 0),
+            Configuration = configuration
+        }, timeout.Token);
+        await using FishboneDebugClientSession client = FishboneDebugClientSession.Attach("127.0.0.1", server.Endpoint.Port);
+        var pauses = Channel.CreateUnbounded<FishbonePauseSnapshot>();
+        client.EventReceived += (_, debugEvent) =>
+        {
+            if (debugEvent is FishboneDebugPaused paused)
+                pauses.Writer.TryWrite(paused.Snapshot);
+        };
+        await client.ConnectAsync(stopOnEntry: false, timeout.Token);
+        await client.ConfigureAsync([2], timeout.Token);
+        FishbonePauseSnapshot pause = await pauses.Reader.ReadAsync(timeout.Token);
+        FishboneDebugVariable stack = pause.Frames[0].Scopes.Single(scope => scope.Name == "Locals").Variables.Single(variable => variable.Name == "stack");
+
+        Assert.NotNull(stack.ImageHandle);
+        Assert.NotNull(stack.ChildrenHandle);
+        IReadOnlyList<FishboneDebugVariable> children = await client.GetVariablesAsync(stack.ChildrenHandle, timeout.Token);
+        Assert.Equal(["[1]", "[2]"], children.Select(child => child.Name));
+        Assert.All(children, child => Assert.Null(child.ChildrenHandle));
+        FishboneDebugImage second = await client.GetImageAsync(children[1].ImageHandle!, timeout.Token);
+        Assert.Equal((1, 1), (second.Width, second.Height));
+
+        await client.ContinueAsync(timeout.Token);
+        await server.Completion.WaitAsync(timeout.Token);
+    }
+
     private sealed class Picture(byte level)
     {
         public byte Level { get; } = level;
